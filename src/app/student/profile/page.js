@@ -12,7 +12,6 @@ import {
   LoaderCircle,
   CheckCircle,
   AlertCircle,
-  Camera,
 } from "lucide-react";
 
 export default function StudentProfilePage() {
@@ -37,13 +36,13 @@ export default function StudentProfilePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  // =====================================================
+  // LOAD PROFILE
+  // =====================================================
+
   useEffect(() => {
     loadProfile();
   }, []);
-
-  // =====================================================
-  // LOAD STUDENT PROFILE
-  // =====================================================
 
   async function loadProfile() {
     try {
@@ -86,6 +85,7 @@ export default function StudentProfilePage() {
       });
     } catch (err) {
       console.error("PROFILE LOAD ERROR:", err);
+
       setError(
         err.message || "Unable to load profile."
       );
@@ -134,18 +134,21 @@ export default function StudentProfilePage() {
       setError(
         "Only JPG, PNG, and WebP images are allowed."
       );
+
       event.target.value = "";
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       setError("Image must be smaller than 5MB.");
+
       event.target.value = "";
       return;
     }
 
     if (file.size === 0) {
       setError("The selected image is empty.");
+
       event.target.value = "";
       return;
     }
@@ -192,6 +195,7 @@ export default function StudentProfilePage() {
         );
       }
 
+      // Immediately display uploaded image
       setForm((previous) => ({
         ...previous,
         profileImage: data.imageUrl,
@@ -217,7 +221,7 @@ export default function StudentProfilePage() {
   }
 
   // =====================================================
-  // SAVE STUDENT PROFILE
+  // SAVE PROFILE
   // =====================================================
 
   async function handleSubmit(event) {
@@ -255,10 +259,14 @@ export default function StudentProfilePage() {
 
       await loadProfile();
     } catch (err) {
-      console.error("PROFILE SAVE ERROR:", err);
+      console.error(
+        "PROFILE SAVE ERROR:",
+        err
+      );
 
       setError(
-        err.message || "Unable to save profile."
+        err.message ||
+          "Unable to save profile."
       );
     } finally {
       setSaving(false);
@@ -285,17 +293,22 @@ export default function StudentProfilePage() {
   // =====================================================
 
   return (
-    <div className="p-6 md:p-8">
+    <div className="min-h-screen bg-slate-50 p-6 md:p-8">
       <div className="mx-auto max-w-5xl">
 
-        {/* HEADER */}
+        {/* =================================================
+            PAGE HEADER
+        ================================================= */}
+
         <div className="mb-8">
           <div className="flex items-center gap-3">
+
             <div className="rounded-xl bg-blue-100 p-3 text-blue-600">
               <UserRound className="h-6 w-6" />
             </div>
 
             <div>
+
               <h1 className="text-2xl font-bold text-slate-900">
                 My Student Profile
               </h1>
@@ -303,23 +316,37 @@ export default function StudentProfilePage() {
               <p className="mt-1 text-sm text-slate-500">
                 Manage your personal and education information.
               </p>
+
             </div>
+
           </div>
         </div>
 
-        {/* SUCCESS MESSAGE */}
+        {/* =================================================
+            SUCCESS MESSAGE
+        ================================================= */}
+
         {message && (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-            <CheckCircle className="h-5 w-5" />
+
+            <CheckCircle className="h-5 w-5 shrink-0" />
+
             {message}
+
           </div>
         )}
 
-        {/* ERROR MESSAGE */}
+        {/* =================================================
+            ERROR MESSAGE
+        ================================================= */}
+
         {error && (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            <AlertCircle className="h-5 w-5" />
+
+            <AlertCircle className="h-5 w-5 shrink-0" />
+
             {error}
+
           </div>
         )}
 
@@ -329,39 +356,51 @@ export default function StudentProfilePage() {
         >
 
           {/* =================================================
-              PROFILE PICTURE
+              PROFILE PICTURE UPLOAD
           ================================================= */}
 
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+
             <div className="mb-6">
+
               <h2 className="text-lg font-semibold text-slate-900">
-                Profile Picture
+                Update Profile Picture
               </h2>
 
               <p className="mt-1 text-sm text-slate-500">
                 Upload a JPG, PNG, or WebP image. Maximum 5MB.
               </p>
+
             </div>
 
             <div className="flex flex-col items-center gap-6 sm:flex-row">
 
-              {/* PROFILE IMAGE */}
-              <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-slate-100 bg-slate-100">
+              {/* CURRENT IMAGE PREVIEW */}
+
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-slate-100 bg-slate-100 shadow-sm">
 
                 {form.profileImage ? (
                   <img
                     src={form.profileImage}
-                    alt="Student profile"
+                    alt="Current student profile"
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <UserRound className="h-16 w-16 text-slate-400" />
+                  <UserRound className="h-14 w-14 text-slate-400" />
                 )}
 
               </div>
 
               {/* UPLOAD CONTROL */}
-              <div className="w-full sm:w-auto">
+
+              <div className="w-full">
+
+                <label
+                  htmlFor="profile-picture"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Choose a new profile picture
+                </label>
 
                 <input
                   id="profile-picture"
@@ -375,15 +414,21 @@ export default function StudentProfilePage() {
 
                 {uploading && (
                   <div className="mt-3 flex items-center gap-2 text-sm text-blue-600">
+
                     <LoaderCircle className="h-4 w-4 animate-spin" />
+
                     Uploading picture...
+
                   </div>
                 )}
 
                 {!uploading && form.profileImage && (
                   <p className="mt-3 flex items-center gap-2 text-sm text-green-600">
+
                     <CheckCircle className="h-4 w-4" />
-                    Profile picture ready to save.
+
+                    Profile picture ready.
+
                   </p>
                 )}
 
@@ -394,7 +439,9 @@ export default function StudentProfilePage() {
                 )}
 
               </div>
+
             </div>
+
           </section>
 
           {/* =================================================
@@ -404,6 +451,7 @@ export default function StudentProfilePage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="mb-6">
+
               <h2 className="text-lg font-semibold text-slate-900">
                 Personal Information
               </h2>
@@ -411,17 +459,21 @@ export default function StudentProfilePage() {
               <p className="mt-1 text-sm text-slate-500">
                 Enter your basic personal information.
               </p>
+
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
 
               {/* FIRST NAME */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   First Name
                 </label>
 
                 <div className="relative">
+
                   <UserRound className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
 
                   <input
@@ -433,11 +485,15 @@ export default function StudentProfilePage() {
                     className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     placeholder="First name"
                   />
+
                 </div>
+
               </div>
 
               {/* LAST NAME */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Last Name
                 </label>
@@ -451,15 +507,19 @@ export default function StudentProfilePage() {
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="Last name"
                 />
+
               </div>
 
               {/* PHONE */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Phone Number
                 </label>
 
                 <div className="relative">
+
                   <Phone className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
 
                   <input
@@ -470,16 +530,21 @@ export default function StudentProfilePage() {
                     className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     placeholder="024 000 0000"
                   />
+
                 </div>
+
               </div>
 
               {/* DATE OF BIRTH */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Date of Birth
                 </label>
 
                 <div className="relative">
+
                   <CalendarDays className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
 
                   <input
@@ -489,11 +554,15 @@ export default function StudentProfilePage() {
                     onChange={handleChange}
                     className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
+
                 </div>
+
               </div>
 
               {/* GENDER */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Gender
                 </label>
@@ -504,6 +573,7 @@ export default function StudentProfilePage() {
                   onChange={handleChange}
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
+
                   <option value="">
                     Select gender
                   </option>
@@ -519,10 +589,13 @@ export default function StudentProfilePage() {
                   <option value="Prefer not to say">
                     Prefer not to say
                   </option>
+
                 </select>
+
               </div>
 
             </div>
+
           </section>
 
           {/* =================================================
@@ -532,6 +605,7 @@ export default function StudentProfilePage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="mb-6">
+
               <h2 className="text-lg font-semibold text-slate-900">
                 Education Information
               </h2>
@@ -539,17 +613,21 @@ export default function StudentProfilePage() {
               <p className="mt-1 text-sm text-slate-500">
                 Tell us about your current education.
               </p>
+
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
 
               {/* PROGRAM */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Program
                 </label>
 
                 <div className="relative">
+
                   <GraduationCap className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
 
                   <input
@@ -560,11 +638,15 @@ export default function StudentProfilePage() {
                     className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     placeholder="e.g. Software Development"
                   />
+
                 </div>
+
               </div>
 
               {/* EDUCATION LEVEL */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Education Level
                 </label>
@@ -575,6 +657,7 @@ export default function StudentProfilePage() {
                   onChange={handleChange}
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 >
+
                   <option value="">
                     Select level
                   </option>
@@ -598,16 +681,21 @@ export default function StudentProfilePage() {
                   <option value="Other">
                     Other
                   </option>
+
                 </select>
+
               </div>
 
               {/* SCHOOL */}
+
               <div className="md:col-span-2">
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   School / Institution
                 </label>
 
                 <div className="relative">
+
                   <School className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
 
                   <input
@@ -618,10 +706,13 @@ export default function StudentProfilePage() {
                     className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     placeholder="School or institution"
                   />
+
                 </div>
+
               </div>
 
             </div>
+
           </section>
 
           {/* =================================================
@@ -631,6 +722,7 @@ export default function StudentProfilePage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="mb-6">
+
               <h2 className="text-lg font-semibold text-slate-900">
                 Contact Information
               </h2>
@@ -638,14 +730,17 @@ export default function StudentProfilePage() {
               <p className="mt-1 text-sm text-slate-500">
                 Provide your contact and location details.
               </p>
+
             </div>
 
             <div>
+
               <label className="mb-2 block text-sm font-medium text-slate-700">
                 Address
               </label>
 
               <div className="relative">
+
                 <MapPin className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
 
                 <textarea
@@ -656,8 +751,11 @@ export default function StudentProfilePage() {
                   className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="Your residential address"
                 />
+
               </div>
+
             </div>
+
           </section>
 
           {/* =================================================
@@ -667,6 +765,7 @@ export default function StudentProfilePage() {
           <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
 
             <div className="mb-6">
+
               <h2 className="text-lg font-semibold text-slate-900">
                 Emergency Contact
               </h2>
@@ -674,12 +773,15 @@ export default function StudentProfilePage() {
               <p className="mt-1 text-sm text-slate-500">
                 Provide someone we can contact when necessary.
               </p>
+
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
 
               {/* CONTACT NAME */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Contact Name
                 </label>
@@ -692,10 +794,13 @@ export default function StudentProfilePage() {
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="Full name"
                 />
+
               </div>
 
               {/* CONTACT PHONE */}
+
               <div>
+
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   Contact Phone
                 </label>
@@ -708,22 +813,25 @@ export default function StudentProfilePage() {
                   className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   placeholder="024 000 0000"
                 />
+
               </div>
 
             </div>
+
           </section>
 
           {/* =================================================
               SAVE BUTTON
           ================================================= */}
 
-          <div className="flex justify-end">
+          <div className="flex justify-end pb-8">
 
             <button
               type="submit"
               disabled={saving || uploading}
               className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
+
               {saving ? (
                 <>
                   <LoaderCircle className="h-5 w-5 animate-spin" />
@@ -735,11 +843,13 @@ export default function StudentProfilePage() {
                   Save Profile
                 </>
               )}
+
             </button>
 
           </div>
 
         </form>
+
       </div>
     </div>
   );

@@ -126,7 +126,8 @@ export async function PUT(request) {
     const body = await request.json();
 
     // =================================================
-    // ONLY THESE PROFILE FIELDS CAN BE EDITED
+    // ONLY THE LOGGED-IN STUDENT'S PROFILE FIELDS
+    // CAN BE EDITED
     // =================================================
 
     const updates = {
@@ -153,6 +154,12 @@ export async function PUT(request) {
       gender:
         typeof body.gender === "string"
           ? body.gender.trim()
+          : "",
+
+      // STUDENT CAN NOW SAVE THEIR PREFERRED PROGRAM
+      program:
+        typeof body.program === "string"
+          ? body.program.trim()
           : "",
 
       educationLevel:

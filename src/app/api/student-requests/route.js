@@ -1,6 +1,7 @@
+import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
@@ -22,7 +23,7 @@ async function requireFacilitator() {
     return {
       error: NextResponse.json(
         {
-          error: "Authentication required.",
+          error: "You must be logged in.",
         },
         { status: 401 }
       ),
@@ -33,8 +34,7 @@ async function requireFacilitator() {
     return {
       error: NextResponse.json(
         {
-          error:
-            "Only facilitators can manage student requests.",
+          error: "Only facilitators can perform this action.",
         },
         { status: 403 }
       ),
@@ -43,11 +43,6 @@ async function requireFacilitator() {
 
   return { session };
 }
-
-// =====================================================
-// GET
-// Get all pending student registrations
-// =====================================================
 
 export async function GET() {
   try {
@@ -58,54 +53,43 @@ export async function GET() {
     }
 
     const client = await clientPromise;
-
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
+    const dbName = process.env.DB_NAME || "DCCPlatform";
+    const db = client.db(dbName);
 
     const requests = await db
       .collection("users")
       .find({
         role: "student",
         status: "pending",
+        emailVerified: true,
       })
       .sort({ createdAt: -1 })
       .toArray();
 
-    const formattedRequests = requests.map(
-      (request) => ({
-        _id: request._id.toString(),
-        name: request.name,
-        email: request.email,
-        program: request.program || "",
-        status: request.status,
-        createdAt: request.createdAt,
-      })
-    );
+    const formattedRequests = requests.map((user) => ({
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      program: user.program || "",
+      status: user.status,
+      emailVerified: user.emailVerified === true,
+      createdAt: user.createdAt || null,
+    }));
 
     return NextResponse.json({
       requests: formattedRequests,
     });
   } catch (error) {
-    console.error(
-      "Student Requests GET Error:",
-      error
-    );
+    console.error("STUDENT REQUESTS GET ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Unable to load student requests.",
+        error: "Failed to load student requests.",
       },
       { status: 500 }
     );
   }
 }
-
-// =====================================================
-// POST
-// Accept or reject a student registration
-// =====================================================
 
 export async function POST(request) {
   try {
@@ -123,8 +107,7 @@ export async function POST(request) {
     if (!userId || !action) {
       return NextResponse.json(
         {
-          error:
-            "User ID and action are required.",
+          error: "User ID and action are required.",
         },
         { status: 400 }
       );
@@ -133,8 +116,7 @@ export async function POST(request) {
     if (!["accept", "reject"].includes(action)) {
       return NextResponse.json(
         {
-          error:
-            "Action must be accept or reject.",
+          error: "Invalid action.",
         },
         { status: 400 }
       );
@@ -150,38 +132,29 @@ export async function POST(request) {
     }
 
     const client = await clientPromise;
+    const dbName = process.env.DB_NAME || "DCCPlatform";
+    const db = client.db(dbName);
 
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
-
-    const user = await db
-      .collection("users")
-      .findOne({
-        _id: new ObjectId(userId),
-        role: "student",
-        status: "pending",
-      });
+    const user = await db.collection("users").findOne({
+      _id: new ObjectId(userId),
+      role: "student",
+      status: "pending",
+      emailVerified: true,
+    });
 
     if (!user) {
       return NextResponse.json(
         {
           error:
-            "Pending student registration not found.",
+            "Student request was not found, is already processed, or the email has not been verified.",
         },
         { status: 404 }
       );
     }
 
-    // =================================================
-    // REJECT
-    // =================================================
-
     if (action === "reject") {
       await db.collection("users").updateOne(
-        {
-          _id: user._id,
-        },
+        { _id: user._id },
         {
           $set: {
             status: "rejected",
@@ -191,81 +164,76 @@ export async function POST(request) {
       );
 
       return NextResponse.json({
-        message:
-          "Student registration rejected.",
+        message: "Student request rejected.",
       });
     }
 
-    // =================================================
-    // ACCEPT
-    // =================================================
-
-    const existingStudent = await db
-      .collection("students")
-      .findOne({
-        email: user.email,
-      });
+    const existingStudent = await db.collection("students").findOne({
+      email: user.email,
+    });
 
     let studentId;
 
     if (existingStudent) {
       studentId = existingStudent._id;
+
+      await db.collection("students").updateOne(
+        { _id: existingStudent._id },
+        {
+          $set: {
+            status: "Active",
+            updatedAt: new Date(),
+          },
+        }
+      );
     } else {
-      const now = new Date();
+      const nameParts = (user.name || "").trim().split(/\s+/);
 
-      const enrollmentDate = now;
+      const firstName = nameParts.shift() || "";
+      const lastName = nameParts.join(" ") || "";
 
-      const expectedCompletionDate =
-        new Date(now);
+      const enrollmentDate = new Date();
 
+      const expectedCompletionDate = new Date(enrollmentDate);
       expectedCompletionDate.setMonth(
         expectedCompletionDate.getMonth() + 24
       );
 
       const student = {
-        firstName:
-          user.name?.split(" ")[0] || "",
-        lastName:
-          user.name
-            ?.split(" ")
-            .slice(1)
-            .join(" ") || "",
-
+        firstName,
+        lastName,
         email: user.email,
-
-        program: user.program || "",
-
-        status: "Active",
+        phone: "",
+        dateOfBirth: "",
+        gender: "",
+        program: user.program || "Software Development",
+        educationLevel: "",
+        school: "",
+        address: "",
+        emergencyContactName: "",
+        emergencyContactPhone: "",
 
         enrollmentDate,
-
         expectedCompletionDate,
-
         programDurationMonths: 24,
 
+        status: "Active",
         progress: 0,
-
         profileImage: "",
 
-        createdAt: now,
-        updatedAt: now,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      const studentResult = await db
+      const result = await db
         .collection("students")
         .insertOne(student);
 
-      studentId = studentResult.insertedId;
+      studentId = result.insertedId;
     }
 
-    // =================================================
-    // ACTIVATE USER ACCOUNT
-    // =================================================
-
     await db.collection("users").updateOne(
-      {
-        _id: user._id,
-      },
+      { _id: user._id },
       {
         $set: {
           status: "active",
@@ -276,20 +244,15 @@ export async function POST(request) {
     );
 
     return NextResponse.json({
-      message:
-        "Student registration accepted successfully.",
+      message: "Student accepted successfully.",
       studentId: studentId.toString(),
     });
   } catch (error) {
-    console.error(
-      "Student Request Action Error:",
-      error
-    );
+    console.error("STUDENT REQUEST POST ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Unable to process student registration.",
+        error: "Failed to process student request.",
       },
       { status: 500 }
     );
