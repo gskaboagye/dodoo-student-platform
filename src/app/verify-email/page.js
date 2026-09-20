@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Mail,
   ShieldCheck,
@@ -10,23 +10,14 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-function VerifyEmailForm() {
+export default function VerifyEmailPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const emailFromUrl = searchParams.get("email");
-
-    if (emailFromUrl) {
-      setEmail(emailFromUrl);
-    }
-  }, [searchParams]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -67,7 +58,8 @@ function VerifyEmailForm() {
       }, 1800);
     } catch (err) {
       setError(
-        err.message || "Something went wrong while verifying your email."
+        err.message ||
+          "Something went wrong while verifying your email."
       );
     } finally {
       setLoading(false);
@@ -78,6 +70,7 @@ function VerifyEmailForm() {
     <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
+
           <div className="flex justify-center mb-6">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
               <ShieldCheck className="h-8 w-8 text-blue-600" />
@@ -90,8 +83,8 @@ function VerifyEmailForm() {
             </h1>
 
             <p className="mt-2 text-sm text-slate-600">
-              Enter the six-digit verification code sent to your email
-              address.
+              Enter the email address you registered with and the
+              six-digit verification code sent to your email.
             </p>
           </div>
 
@@ -110,6 +103,7 @@ function VerifyEmailForm() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+
             <div>
               <label
                 htmlFor="email"
@@ -125,9 +119,12 @@ function VerifyEmailForm() {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  onChange={(event) =>
+                    setEmail(event.target.value)
+                  }
                   placeholder="you@example.com"
                   required
+                  autoComplete="email"
                   className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </div>
@@ -149,7 +146,9 @@ function VerifyEmailForm() {
                 value={code}
                 onChange={(event) =>
                   setCode(
-                    event.target.value.replace(/\D/g, "").slice(0, 6)
+                    event.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, 6)
                   )
                 }
                 placeholder="123456"
@@ -175,27 +174,25 @@ function VerifyEmailForm() {
                 </>
               )}
             </button>
+
           </form>
 
-          <p className="mt-6 text-center text-xs text-slate-500">
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => router.push("/login")}
+              className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              Back to Login
+            </button>
+          </div>
+
+          <p className="mt-4 text-center text-xs text-slate-500">
             The verification code expires after 10 minutes.
           </p>
+
         </div>
       </div>
     </main>
-  );
-}
-
-export default function VerifyEmailPage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen bg-slate-50 flex items-center justify-center">
-          <LoaderCircle className="h-8 w-8 animate-spin text-blue-600" />
-        </main>
-      }
-    >
-      <VerifyEmailForm />
-    </Suspense>
   );
 }
