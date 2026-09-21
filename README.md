@@ -1132,9 +1132,11 @@ Dodoo Coding Club
 
 Pokuase Community Library, Ghana
 
-## Website
+## Websites
 
 [https://dodoocodingclub.com/](https://dodoocodingclub.com/)
+
+https://www.dccstudentplatform.com/progress
 
 ---
 
