@@ -3,6 +3,7 @@ export default function Footer() {
     <footer className="bg-gray-200">
       <div className="grid gap-10 px-8 py-12 md:grid-cols-3">
         
+        {/* DODOO CODING CLUB */}
         <div>
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-blue-700 text-xl font-bold text-blue-700">
@@ -25,6 +26,7 @@ export default function Footer() {
           </p>
         </div>
 
+        {/* LOCATION */}
         <div>
           <h3 className="text-lg font-bold text-gray-900">
             GHANA
@@ -41,6 +43,7 @@ export default function Footer() {
           </p>
         </div>
 
+        {/* CONTACT */}
         <div>
           <h3 className="text-lg font-bold text-gray-900">
             CONTACT
@@ -58,7 +61,8 @@ export default function Footer() {
             <a
               href="https://dodoocodingclub.com/"
               target="_blank"
-              className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-700 hover:text-white"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm transition hover:bg-blue-700 hover:text-white"
             >
               Visit DCC
             </a>
@@ -66,17 +70,28 @@ export default function Footer() {
             <a
               href="https://dodoocodingclub.com/"
               target="_blank"
-              className="rounded-lg bg-yellow-400 px-4 py-2 text-sm font-bold text-gray-900 shadow-sm hover:bg-yellow-500"
+              rel="noopener noreferrer"
+              className="rounded-lg bg-yellow-400 px-4 py-2 text-sm font-bold text-gray-900 shadow-sm transition hover:bg-yellow-500"
             >
               Support DCC
             </a>
           </div>
         </div>
-
       </div>
 
-      <div className="border-t border-gray-300 px-8 py-5 text-center text-sm text-gray-500">
-        © 2026 Dodoo Coding Club. Student Success & Impact Platform.
+      {/* COPYRIGHT & DEVELOPER CREDIT */}
+      <div className="border-t border-gray-300 px-8 py-5 text-center">
+        <p className="text-sm text-gray-500">
+          © 2026 Dodoo Coding Club. Student Success & Impact Platform.
+        </p>
+
+        <p className="mt-1 text-xs text-gray-400">
+          Developed by{" "}
+          <span className="font-semibold text-gray-600">
+            Godfred Sefa Aboagye
+          </span>{" "}
+          — Software Developer
+        </p>
       </div>
     </footer>
   );
