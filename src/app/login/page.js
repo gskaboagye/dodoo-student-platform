@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { GraduationCap, UserRound } from "lucide-react";
+import { GraduationCap, UserRound, KeyRound } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +12,7 @@ export default function LoginPage() {
     email: "",
     password: "",
     role: "",
+    facilitatorCode: "",
   });
 
   const [message, setMessage] = useState("");
@@ -24,13 +25,37 @@ export default function LoginPage() {
     });
   }
 
+  function selectRole(role) {
+    setForm({
+      ...form,
+      role,
+      facilitatorCode: role === "facilitator"
+        ? form.facilitatorCode
+        : "",
+    });
+
+    setMessage("");
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
 
     setMessage("");
 
     if (!form.role) {
-      setMessage("Please select whether you are logging in as a student or facilitator.");
+      setMessage(
+        "Please select whether you are logging in as a Student or Facilitator."
+      );
+      return;
+    }
+
+    if (
+      form.role === "facilitator" &&
+      !form.facilitatorCode.trim()
+    ) {
+      setMessage(
+        "The facilitator invitation code is required."
+      );
       return;
     }
 
@@ -42,13 +67,25 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          role: form.role,
+          facilitatorCode:
+            form.role === "facilitator"
+              ? form.facilitatorCode
+              : undefined,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(data.error || data.message || "Login failed.");
+        setMessage(
+          data.error ||
+            data.message ||
+            "Login failed."
+        );
         setLoading(false);
         return;
       }
@@ -57,14 +94,19 @@ export default function LoginPage() {
       router.refresh();
     } catch (error) {
       console.error("Login error:", error);
-      setMessage("Unable to connect to the server.");
+
+      setMessage(
+        "Unable to connect to the server."
+      );
+
       setLoading(false);
     }
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-md">
+
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
 
           {/* Header */}
@@ -89,9 +131,12 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
 
-            {/* Login As */}
+            {/* Login Type */}
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
                 Login As
@@ -102,13 +147,9 @@ export default function LoginPage() {
                 {/* Student */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setForm({
-                      ...form,
-                      role: "student",
-                    });
-                    setMessage("");
-                  }}
+                  onClick={() =>
+                    selectRole("student")
+                  }
                   className={`flex flex-col items-center justify-center rounded-xl border-2 px-4 py-4 transition ${
                     form.role === "student"
                       ? "border-blue-600 bg-blue-50 text-blue-700"
@@ -129,13 +170,9 @@ export default function LoginPage() {
                 {/* Facilitator */}
                 <button
                   type="button"
-                  onClick={() => {
-                    setForm({
-                      ...form,
-                      role: "facilitator",
-                    });
-                    setMessage("");
-                  }}
+                  onClick={() =>
+                    selectRole("facilitator")
+                  }
                   className={`flex flex-col items-center justify-center rounded-xl border-2 px-4 py-4 transition ${
                     form.role === "facilitator"
                       ? "border-blue-600 bg-blue-50 text-blue-700"
@@ -200,6 +237,39 @@ export default function LoginPage() {
               />
             </div>
 
+            {/* Facilitator Invitation Code */}
+            {form.role === "facilitator" && (
+              <div>
+                <label
+                  htmlFor="facilitatorCode"
+                  className="mb-2 block text-sm font-medium text-slate-700"
+                >
+                  Facilitator Invitation Code
+                </label>
+
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+
+                  <input
+                    id="facilitatorCode"
+                    type="password"
+                    name="facilitatorCode"
+                    value={form.facilitatorCode}
+                    onChange={handleChange}
+                    placeholder="Enter facilitator invitation code"
+                    required
+                    autoComplete="off"
+                    className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  This is the same invitation code used when
+                  registering your facilitator account.
+                </p>
+              </div>
+            )}
+
             {/* Selected Role */}
             {form.role && (
               <div className="rounded-lg bg-blue-50 px-4 py-3 text-center text-sm text-blue-700">
@@ -218,7 +288,9 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Signing in..." : "Sign In"}
+              {loading
+                ? "Signing in..."
+                : "Sign In"}
             </button>
           </form>
 
@@ -234,6 +306,7 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {/* Footer */}
         <p className="mt-6 text-center text-xs text-slate-400">
           Dodoo Coding Club · Student Success & Impact Platform
         </p>
