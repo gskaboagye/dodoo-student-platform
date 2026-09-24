@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -20,14 +20,15 @@ import {
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Load the currently authenticated user
+  // ==========================================
+  // LOAD CURRENT USER
+  // ==========================================
   useEffect(() => {
     let cancelled = false;
 
@@ -45,6 +46,7 @@ export default function Sidebar() {
           if (!cancelled) {
             setUser(null);
           }
+
           return;
         }
 
@@ -73,12 +75,16 @@ export default function Sidebar() {
     };
   }, [pathname]);
 
-  // Close mobile menu whenever the route changes
+  // ==========================================
+  // CLOSE MOBILE MENU WHEN ROUTE CHANGES
+  // ==========================================
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Prevent background scrolling when mobile menu is open
+  // ==========================================
+  // PREVENT BACKGROUND SCROLL
+  // ==========================================
   useEffect(() => {
     if (mobileMenuOpen) {
       document.body.style.overflow = "hidden";
@@ -91,40 +97,39 @@ export default function Sidebar() {
     };
   }, [mobileMenuOpen]);
 
-  // Logout
-  async function handleLogout() {
-    if (loggingOut) return;
-
-    try {
-      setLoggingOut(true);
-
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-      });
-
-      if (!response.ok) {
-        throw new Error("Logout request failed");
-      }
-
-      // Immediately clear local authentication state
-      setUser(null);
-
-      // Close mobile navigation
-      setMobileMenuOpen(false);
-
-      // Navigate to login
-      router.replace("/login");
-
-      // Refresh server/client authentication state
-      router.refresh();
-    } catch (error) {
-      console.error("Logout failed:", error);
-      setLoggingOut(false);
+  // ==========================================
+  // LOGOUT
+  // ==========================================
+  function handleLogout() {
+    if (loggingOut) {
+      return;
     }
+
+    setLoggingOut(true);
+
+    // Immediately clear the local user state.
+    setUser(null);
+
+    // Close the mobile menu.
+    setMobileMenuOpen(false);
+
+    // Clear the server session in the background.
+    fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+      cache: "no-store",
+      keepalive: true,
+    }).catch((error) => {
+      console.error("Logout request failed:", error);
+    });
+
+    // Immediately leave the protected page.
+    window.location.replace("/login");
   }
 
+  // ==========================================
+  // FACILITATOR LINKS
+  // ==========================================
   const facilitatorLinks = [
     {
       name: "Dashboard",
@@ -163,6 +168,9 @@ export default function Sidebar() {
     },
   ];
 
+  // ==========================================
+  // STUDENT LINKS
+  // ==========================================
   const studentLinks = [
     {
       name: "Dashboard",
@@ -196,6 +204,9 @@ export default function Sidebar() {
     },
   ];
 
+  // ==========================================
+  // SELECT LINKS BASED ON ROLE
+  // ==========================================
   const links =
     user?.role === "facilitator"
       ? facilitatorLinks
@@ -203,6 +214,9 @@ export default function Sidebar() {
         ? studentLinks
         : [];
 
+  // ==========================================
+  // ACTIVE LINK
+  // ==========================================
   function isActiveLink(href) {
     if (href === "/") {
       return pathname === "/";
@@ -214,10 +228,16 @@ export default function Sidebar() {
     );
   }
 
+  // ==========================================
+  // CLOSE MOBILE MENU
+  // ==========================================
   function closeMobileMenu() {
     setMobileMenuOpen(false);
   }
 
+  // ==========================================
+  // NAVIGATION
+  // ==========================================
   function renderNavigation() {
     return (
       <nav className="px-3 py-5">
@@ -236,7 +256,11 @@ export default function Sidebar() {
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-              <Icon size={19} className="shrink-0" />
+              <Icon
+                size={19}
+                className="shrink-0"
+              />
+
               <span>{link.name}</span>
             </Link>
           );
@@ -245,6 +269,9 @@ export default function Sidebar() {
     );
   }
 
+  // ==========================================
+  // USER INFORMATION
+  // ==========================================
   function renderUserInformation() {
     if (loading || !user) {
       return null;
@@ -271,6 +298,9 @@ export default function Sidebar() {
     );
   }
 
+  // ==========================================
+  // LOGIN / LOGOUT BUTTON
+  // ==========================================
   function renderAuthButton() {
     if (loading) {
       return null;
@@ -284,10 +314,15 @@ export default function Sidebar() {
           disabled={loggingOut}
           className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <LogOut size={19} className="shrink-0" />
+          <LogOut
+            size={19}
+            className="shrink-0"
+          />
 
           <span>
-            {loggingOut ? "Logging out..." : "Logout"}
+            {loggingOut
+              ? "Logging out..."
+              : "Logout"}
           </span>
         </button>
       );
@@ -303,16 +338,24 @@ export default function Sidebar() {
             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
         }`}
       >
-        <LogIn size={19} className="shrink-0" />
+        <LogIn
+          size={19}
+          className="shrink-0"
+        />
 
         <span>Login</span>
       </Link>
     );
   }
 
+  // ==========================================
+  // RENDER
+  // ==========================================
   return (
     <>
-      {/* Mobile Menu Button */}
+      {/* =====================================
+          MOBILE MENU BUTTON
+      ====================================== */}
       <button
         type="button"
         aria-label="Open navigation menu"
@@ -323,7 +366,9 @@ export default function Sidebar() {
         <Menu size={22} />
       </button>
 
-      {/* Mobile Overlay */}
+      {/* =====================================
+          MOBILE OVERLAY
+      ====================================== */}
       {mobileMenuOpen && (
         <button
           type="button"
@@ -333,11 +378,16 @@ export default function Sidebar() {
         />
       )}
 
-      {/* Desktop Sidebar */}
+      {/* =====================================
+          DESKTOP SIDEBAR
+      ====================================== */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
         {/* Logo */}
         <div className="border-b border-slate-200 px-6 py-6">
-          <Link href="/" className="block">
+          <Link
+            href="/"
+            className="block"
+          >
             <h1 className="text-lg font-bold text-slate-900">
               Dodoo Coding Club
             </h1>
@@ -362,7 +412,9 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* Mobile Sidebar */}
+      {/* =====================================
+          MOBILE SIDEBAR
+      ====================================== */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,320px)] flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
           mobileMenuOpen
