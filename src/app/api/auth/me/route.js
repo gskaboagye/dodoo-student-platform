@@ -1,11 +1,12 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 import { verifySession } from "@/lib/auth";
 import clientPromise from "@/lib/mongodb";
 
 export async function GET() {
   try {
-    // Get session cookie
+    // Get the session cookie
     const cookieStore = await cookies();
     const token = cookieStore.get("dcc_session")?.value;
 
@@ -16,7 +17,7 @@ export async function GET() {
       );
     }
 
-    // Verify session
+    // Verify the session
     const session = await verifySession(token);
 
     if (!session) {
@@ -33,23 +34,31 @@ export async function GET() {
       ? client.db(process.env.MONGODB_DB)
       : client.db();
 
-    // Find the logged-in user
-    const user = await db.collection("users").findOne(
-      {
-        _id: new (await import("mongodb")).ObjectId(session.userId),
-      },
-      {
-        projection: {
-          password: 0,
-          verificationCode: 0,
-          verificationCodeExpires: 0,
-        },
+    // Find the user safely
+    let user = null;
+
+    if (session.userId) {
+      // If the session contains a valid MongoDB ObjectId
+      if (ObjectId.isValid(session.userId)) {
+        user = await db.collection("users").findOne({
+          _id: new ObjectId(session.userId),
+        });
       }
-    );
+
+      // If the ID is stored as a string instead
+      if (!user) {
+        user = await db.collection("users").findOne({
+          _id: session.userId,
+        });
+      }
+    }
 
     if (!user) {
       return NextResponse.json(
-        { authenticated: false },
+        {
+          authenticated: false,
+          message: "User account not found.",
+        },
         { status: 401 }
       );
     }
@@ -68,7 +77,7 @@ export async function GET() {
       authenticated: true,
 
       user: {
-        id: user._id.toString(),
+        id: user._id?.toString() || session.userId,
 
         firstName: user.firstName || "",
 
@@ -78,9 +87,12 @@ export async function GET() {
 
         email: user.email || "",
 
-        role: user.role,
+        role: user.role || session.role,
 
-        studentId: user.studentId || session.studentId || null,
+        studentId:
+          user.studentId ||
+          session.studentId ||
+          null,
       },
     });
   } catch (error) {
