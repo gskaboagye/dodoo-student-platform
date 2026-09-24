@@ -85,6 +85,7 @@ export default function StudentsPage() {
           : data.students || []
       );
     } catch (err) {
+      console.error("Load students error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
@@ -96,46 +97,6 @@ export default function StudentsPage() {
       loadStudents();
     }
   }, [checkingAccess, user]);
-
-  // =====================================================
-  // DELETE STUDENT
-  // =====================================================
-
-  async function handleDelete(id) {
-    setMessage("");
-    setError("");
-
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this student? This will also remove the student's login account."
-    );
-
-    if (!confirmed) return;
-
-    try {
-      const response = await fetch(
-        `/api/students?id=${id}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Failed to delete student."
-        );
-      }
-
-      setMessage(
-        "Student and associated login account deleted successfully."
-      );
-
-      await loadStudents();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
 
   // =====================================================
   // SEARCH
@@ -176,26 +137,6 @@ export default function StudentsPage() {
   }, [students, search]);
 
   // =====================================================
-  // DATE FORMATTER
-  // =====================================================
-
-  function formatDate(date) {
-    if (!date) return "Not available";
-
-    const parsedDate = new Date(date);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-      return "Not available";
-    }
-
-    return parsedDate.toLocaleDateString("en-GH", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  }
-
-  // =====================================================
   // ACCESS CHECK SCREEN
   // =====================================================
 
@@ -232,7 +173,7 @@ export default function StudentsPage() {
           </h1>
 
           <p className="mt-2 text-lg text-slate-600">
-            View complete student profiles and learning progress.
+            View and manage student profiles.
           </p>
         </div>
 
@@ -274,7 +215,7 @@ export default function StudentsPage() {
               onChange={(event) =>
                 setSearch(event.target.value)
               }
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-80"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-80"
             />
           </div>
 
@@ -288,271 +229,165 @@ export default function StudentsPage() {
               No students found.
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
               {filteredStudents.map((student) => {
+                const fullName =
+                  `${student.firstName || ""} ${
+                    student.lastName || ""
+                  }`.trim() || "Unnamed Student";
+
+                const initials =
+                  `${student.firstName?.[0] || ""}${
+                    student.lastName?.[0] || ""
+                  }`.toUpperCase() || "S";
+
                 const progress =
                   Number(student.progress) || 0;
 
                 return (
-                  <article
+                  <button
                     key={student._id}
-                    className="overflow-hidden rounded-2xl border border-slate-200"
+                    type="button"
+                    onClick={() =>
+                      router.push(
+                        `/students/${student._id}`
+                      )
+                    }
+                    className="group text-left"
                   >
+                    <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md">
 
-                    {/* STUDENT HEADER */}
-                    <div className="bg-slate-50 p-6">
+                      {/* STUDENT HEADER */}
+                      <div className="flex items-start gap-4">
 
-                      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-
-                        <div className="flex items-center gap-5">
-
-                          {student.profileImage ? (
-                            <img
-                              src={student.profileImage}
-                              alt={`${student.firstName} ${student.lastName}`}
-                              className="h-24 w-24 shrink-0 rounded-full object-cover ring-4 ring-white shadow-sm"
-                            />
-                          ) : (
-                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-blue-100 text-2xl font-bold text-blue-700 ring-4 ring-white">
-                              {student.firstName?.[0]}
-                              {student.lastName?.[0]}
-                            </div>
-                          )}
-
-                          <div>
-                            <h3 className="text-2xl font-bold text-slate-900">
-                              {student.firstName}{" "}
-                              {student.lastName}
-                            </h3>
-
-                            <p className="mt-1 text-slate-600">
-                              {student.email}
-                            </p>
-
-                            <p className="mt-1 text-sm text-slate-500">
-                              Student Profile
-                            </p>
+                        {student.profileImage ? (
+                          <img
+                            src={student.profileImage}
+                            alt={fullName}
+                            className="h-16 w-16 shrink-0 rounded-full object-cover ring-2 ring-slate-100"
+                          />
+                        ) : (
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
+                            {initials}
                           </div>
+                        )}
 
-                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-lg font-bold text-slate-900 group-hover:text-blue-600">
+                            {fullName}
+                          </h3>
 
-                        <div className="flex items-center gap-3">
-
-                          <span
-                            className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                              student.status === "Active"
-                                ? "bg-green-100 text-green-700"
-                                : student.status === "Completed"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-slate-200 text-slate-700"
-                            }`}
-                          >
-                            {student.status || "Active"}
-                          </span>
-
+                          <p className="mt-1 truncate text-sm text-slate-500">
+                            {student.email || "No email provided"}
+                          </p>
                         </div>
 
                       </div>
-                    </div>
 
-                    {/* COMPLETE PROFILE */}
-                    <div className="p-6">
+                      {/* BASIC INFORMATION */}
+                      <div className="mt-5 space-y-3">
 
-                      <div className="mb-6">
-                        <h4 className="text-lg font-bold text-slate-900">
-                          Personal Information
-                        </h4>
+                        {student.studentId && (
+                          <div className="flex justify-between gap-4 text-sm">
+                            <span className="text-slate-500">
+                              Student ID
+                            </span>
 
-                        <p className="mt-1 text-sm text-slate-500">
-                          Read-only student information.
-                        </p>
-                      </div>
+                            <span className="font-medium text-slate-900">
+                              {student.studentId}
+                            </span>
+                          </div>
+                        )}
 
-                      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                        {student.program && (
+                          <div className="flex justify-between gap-4 text-sm">
+                            <span className="text-slate-500">
+                              Program
+                            </span>
 
-                        {/* FIRST NAME */}
-                        <InfoItem
-                          label="First Name"
-                          value={student.firstName}
-                        />
+                            <span className="truncate font-medium text-slate-900">
+                              {student.program}
+                            </span>
+                          </div>
+                        )}
 
-                        {/* LAST NAME */}
-                        <InfoItem
-                          label="Last Name"
-                          value={student.lastName}
-                        />
+                        {student.educationLevel && (
+                          <div className="flex justify-between gap-4 text-sm">
+                            <span className="text-slate-500">
+                              Education
+                            </span>
 
-                        {/* EMAIL */}
-                        <InfoItem
-                          label="Email"
-                          value={student.email}
-                        />
+                            <span className="font-medium text-slate-900">
+                              {student.educationLevel}
+                            </span>
+                          </div>
+                        )}
 
-                        {/* PHONE */}
-                        <InfoItem
-                          label="Phone"
-                          value={student.phone}
-                        />
+                        {student.school && (
+                          <div className="flex justify-between gap-4 text-sm">
+                            <span className="text-slate-500">
+                              School
+                            </span>
 
-                        {/* DATE OF BIRTH */}
-                        <InfoItem
-                          label="Date of Birth"
-                          value={formatDate(
-                            student.dateOfBirth
-                          )}
-                        />
+                            <span className="truncate font-medium text-slate-900">
+                              {student.school}
+                            </span>
+                          </div>
+                        )}
 
-                        {/* GENDER */}
-                        <InfoItem
-                          label="Gender"
-                          value={student.gender}
-                        />
-
-                        {/* PROGRAM */}
-                        <InfoItem
-                          label="Program"
-                          value={student.program}
-                        />
-
-                        {/* EDUCATION */}
-                        <InfoItem
-                          label="Education Level"
-                          value={student.educationLevel}
-                        />
-
-                        {/* SCHOOL */}
-                        <InfoItem
-                          label="School"
-                          value={student.school}
-                        />
-
-                        {/* ADDRESS */}
-                        <InfoItem
-                          label="Address"
-                          value={student.address}
-                          wide
-                        />
-
-                      </div>
-
-                      {/* EMERGENCY CONTACT */}
-                      <div className="mt-8">
-
-                        <h4 className="mb-4 text-lg font-bold text-slate-900">
-                          Emergency Contact
-                        </h4>
-
-                        <div className="grid gap-5 sm:grid-cols-2">
-
-                          <InfoItem
-                            label="Contact Name"
-                            value={
-                              student.emergencyContactName
-                            }
-                          />
-
-                          <InfoItem
-                            label="Contact Phone"
-                            value={
-                              student.emergencyContactPhone
-                            }
-                          />
-
-                        </div>
-                      </div>
-
-                      {/* PROGRAM INFORMATION */}
-                      <div className="mt-8">
-
-                        <h4 className="mb-4 text-lg font-bold text-slate-900">
-                          Program Information
-                        </h4>
-
-                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
-                          <InfoItem
-                            label="Enrollment Date"
-                            value={formatDate(
-                              student.enrollmentDate
-                            )}
-                          />
-
-                          <InfoItem
-                            label="Expected Completion"
-                            value={formatDate(
-                              student.expectedCompletionDate
-                            )}
-                          />
-
-                          <InfoItem
-                            label="Program Duration"
-                            value={
-                              student.programDurationMonths
-                                ? `${student.programDurationMonths} months`
-                                : "24 months"
-                            }
-                          />
-
-                          <InfoItem
-                            label="Status"
-                            value={
-                              student.status || "Active"
-                            }
-                          />
-
-                        </div>
                       </div>
 
                       {/* PROGRESS */}
-                      <div className="mt-8">
+                      <div className="mt-5 border-t border-slate-100 pt-5">
 
-                        <div className="mb-3 flex items-center justify-between">
-
-                          <div>
-                            <h4 className="text-lg font-bold text-slate-900">
-                              Overall Progress
-                            </h4>
-
-                            <p className="text-sm text-slate-500">
-                              Progress is calculated automatically.
-                            </p>
-                          </div>
-
-                          <span className="text-xl font-bold text-blue-600">
-                            {progress}%
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-sm text-slate-500">
+                            Progress
                           </span>
 
+                          <span className="text-sm font-semibold text-blue-600">
+                            {progress}%
+                          </span>
                         </div>
 
-                        <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-200">
                           <div
                             className="h-full rounded-full bg-blue-600 transition-all"
                             style={{
-                              width: `${progress}%`,
+                              width: `${Math.min(
+                                Math.max(progress, 0),
+                                100
+                              )}%`,
                             }}
                           />
                         </div>
 
                       </div>
 
-                      {/* DELETE */}
-                      <div className="mt-8 flex justify-end border-t border-slate-200 pt-6">
+                      {/* STATUS + VIEW PROFILE */}
+                      <div className="mt-5 flex items-center justify-between">
 
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDelete(student._id)
-                          }
-                          className="rounded-xl border border-red-200 px-5 py-3 font-semibold text-red-600 hover:bg-red-50"
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            student.status === "Active"
+                              ? "bg-green-100 text-green-700"
+                              : student.status === "Completed"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
                         >
-                          Delete Student
-                        </button>
+                          {student.status || "Active"}
+                        </span>
+
+                        <span className="text-sm font-semibold text-blue-600 group-hover:underline">
+                          View Profile →
+                        </span>
 
                       </div>
 
-                    </div>
-                  </article>
+                    </article>
+                  </button>
                 );
               })}
 
@@ -562,27 +397,5 @@ export default function StudentsPage() {
         </section>
       </div>
     </main>
-  );
-}
-
-// =====================================================
-// READ-ONLY INFORMATION ITEM
-// =====================================================
-
-function InfoItem({ label, value, wide = false }) {
-  return (
-    <div
-      className={`rounded-xl bg-slate-50 p-4 ${
-        wide ? "sm:col-span-2 lg:col-span-3" : ""
-      }`}
-    >
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-
-      <p className="mt-1 break-words font-medium text-slate-900">
-        {value || "Not provided"}
-      </p>
-    </div>
   );
 }
