@@ -81,36 +81,75 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
+        cache: "no-store",
         body: JSON.stringify({
-          email: form.email,
+          email: form.email.trim().toLowerCase(),
           password: form.password,
           role: form.role,
-          facilitatorCode:
-            form.role === "facilitator"
-              ? form.facilitatorCode
-              : undefined,
+          ...(form.role === "facilitator"
+            ? {
+                facilitatorCode:
+                  form.facilitatorCode.trim(),
+              }
+            : {}),
         }),
       });
 
-      const data = await response.json();
+      // Read the response as text first.
+      // This prevents response.json() from crashing
+      // when the server returns an empty response.
+      const responseText = await response.text();
 
+      let data = {};
+
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error(
+            "Invalid JSON response from login API:",
+            responseText
+          );
+
+          setMessage(
+            `The server returned an invalid response (HTTP ${response.status}).`
+          );
+
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Handle unsuccessful login
       if (!response.ok) {
         setMessage(
           data.error ||
             data.message ||
-            "Login failed."
+            `Login failed. Server returned status ${response.status}.`
         );
+
         setLoading(false);
         return;
       }
 
+      // Make sure the server actually returned success
+      if (!data.success && !data.message && !data.user) {
+        setMessage(
+          "Login response was incomplete. Please try again."
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      // Successful login
       router.replace("/");
-      router.refresh();
     } catch (error) {
       console.error("Login error:", error);
 
       setMessage(
-        "Unable to connect to the server."
+        "Unable to connect to the server. Please check your internet connection and try again."
       );
 
       setLoading(false);
@@ -120,9 +159,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-md">
-
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
-
           {/* Header */}
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-bold text-white">
@@ -149,7 +186,6 @@ export default function LoginPage() {
             onSubmit={handleSubmit}
             className="space-y-5"
           >
-
             {/* Login Type */}
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -157,13 +193,10 @@ export default function LoginPage() {
               </label>
 
               <div className="grid grid-cols-2 gap-3">
-
                 {/* Student */}
                 <button
                   type="button"
-                  onClick={() =>
-                    selectRole("student")
-                  }
+                  onClick={() => selectRole("student")}
                   className={`flex flex-col items-center justify-center rounded-xl border-2 px-4 py-4 transition ${
                     form.role === "student"
                       ? "border-blue-600 bg-blue-50 text-blue-700"
@@ -203,14 +236,12 @@ export default function LoginPage() {
                     Facilitator account
                   </span>
                 </button>
-
               </div>
             </div>
 
-            {/* Show login fields only after role selection */}
+            {/* Login Fields */}
             {form.role && (
               <div className="space-y-5">
-
                 {/* Email */}
                 <div>
                   <label
@@ -298,7 +329,7 @@ export default function LoginPage() {
 
                 {/* Selected Role */}
                 <div className="rounded-lg bg-blue-50 px-4 py-3 text-center text-sm text-blue-700">
-                  You are signing in as a{" "}
+                  You are signing in as{" "}
                   <span className="font-bold">
                     {form.role === "student"
                       ? "Student"
@@ -316,10 +347,8 @@ export default function LoginPage() {
                     ? "Signing in..."
                     : "Sign In"}
                 </button>
-
               </div>
             )}
-
           </form>
 
           {/* Register */}
@@ -338,7 +367,6 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-xs text-slate-400">
           Dodoo Coding Club · Student Success & Impact Platform
         </p>
-
       </div>
     </main>
   );
