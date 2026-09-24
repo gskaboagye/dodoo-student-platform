@@ -27,14 +27,58 @@ export default function Sidebar() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Load the currently authenticated user
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadUser() {
+      try {
+        setLoading(true);
+
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          if (!cancelled) {
+            setUser(null);
+          }
+          return;
+        }
+
+        const data = await response.json();
+
+        if (!cancelled) {
+          setUser(data.user || null);
+        }
+      } catch (error) {
+        console.error("Failed to load user:", error);
+
+        if (!cancelled) {
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
     loadUser();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pathname]);
 
+  // Close mobile menu whenever the route changes
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
+  // Prevent background scrolling when mobile menu is open
   useEffect(() => {
     if (mobileMenuOpen) {
       document.body.style.overflow = "hidden";
@@ -47,39 +91,33 @@ export default function Sidebar() {
     };
   }, [mobileMenuOpen]);
 
-  async function loadUser() {
+  // Logout
+  async function handleLogout() {
+    if (loggingOut) return;
+
     try {
-      const response = await fetch("/api/auth/me", {
+      setLoggingOut(true);
+
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
         cache: "no-store",
       });
 
       if (!response.ok) {
-        setUser(null);
-        return;
+        throw new Error("Logout request failed");
       }
 
-      const data = await response.json();
-      setUser(data.user || null);
-    } catch (error) {
-      console.error("Failed to load user:", error);
+      // Immediately clear local authentication state
       setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  async function handleLogout() {
-    try {
-      setLoggingOut(true);
-
-      await fetch("/api/auth/logout", {
-        method: "POST",
-      });
-
-      setUser(null);
+      // Close mobile navigation
       setMobileMenuOpen(false);
 
+      // Navigate to login
       router.replace("/login");
+
+      // Refresh server/client authentication state
       router.refresh();
     } catch (error) {
       console.error("Logout failed:", error);
@@ -166,9 +204,14 @@ export default function Sidebar() {
         : [];
 
   function isActiveLink(href) {
-    return href === "/"
-      ? pathname === "/"
-      : pathname === href || pathname.startsWith(`${href}/`);
+    if (href === "/") {
+      return pathname === "/";
+    }
+
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`)
+    );
   }
 
   function closeMobileMenu() {
@@ -261,6 +304,7 @@ export default function Sidebar() {
         }`}
       >
         <LogIn size={19} className="shrink-0" />
+
         <span>Login</span>
       </Link>
     );
@@ -268,9 +312,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* ================================
-          MOBILE MENU BUTTON
-      ================================= */}
+      {/* Mobile Menu Button */}
       <button
         type="button"
         aria-label="Open navigation menu"
@@ -281,9 +323,7 @@ export default function Sidebar() {
         <Menu size={22} />
       </button>
 
-      {/* ================================
-          MOBILE OVERLAY
-      ================================= */}
+      {/* Mobile Overlay */}
       {mobileMenuOpen && (
         <button
           type="button"
@@ -293,9 +333,7 @@ export default function Sidebar() {
         />
       )}
 
-      {/* ================================
-          DESKTOP SIDEBAR
-      ================================= */}
+      {/* Desktop Sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
         {/* Logo */}
         <div className="border-b border-slate-200 px-6 py-6">
@@ -310,7 +348,7 @@ export default function Sidebar() {
           </Link>
         </div>
 
-        {/* User information */}
+        {/* User Information */}
         {renderUserInformation()}
 
         {/* Navigation */}
@@ -324,9 +362,7 @@ export default function Sidebar() {
         </div>
       </aside>
 
-      {/* ================================
-          MOBILE SIDEBAR
-      ================================= */}
+      {/* Mobile Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,320px)] flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
           mobileMenuOpen
