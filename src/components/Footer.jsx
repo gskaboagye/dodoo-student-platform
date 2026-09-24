@@ -50,9 +50,9 @@ export default function Footer() {
           </h3>
 
           <p className="mt-4 text-sm leading-7 text-gray-600">
-            +233 54 338 7880
+            +233 55 844 6017
             <br />
-            +233 24 060 5684
+            
             <br />
             info@dodoocodingclub.com
           </p>
