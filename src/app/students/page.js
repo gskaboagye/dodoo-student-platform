@@ -12,6 +12,8 @@ export default function StudentsPage() {
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
 
+  const [selectedStudent, setSelectedStudent] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -79,11 +81,24 @@ export default function StudentsPage() {
         );
       }
 
-      setStudents(
-        Array.isArray(data)
-          ? data
-          : data.students || []
-      );
+      const studentList = Array.isArray(data)
+        ? data
+        : data.students || [];
+
+      setStudents(studentList);
+
+      // Keep selected student information updated
+      if (selectedStudent) {
+        const updatedStudent = studentList.find(
+          (student) => student._id === selectedStudent._id
+        );
+
+        if (updatedStudent) {
+          setSelectedStudent(updatedStudent);
+        } else {
+          setSelectedStudent(null);
+        }
+      }
     } catch (err) {
       console.error("Load students error:", err);
       setError(err.message);
@@ -137,6 +152,104 @@ export default function StudentsPage() {
   }, [students, search]);
 
   // =====================================================
+  // SELECT STUDENT
+  // =====================================================
+
+  function handleStudentClick(student) {
+    setMessage("");
+    setError("");
+    setSelectedStudent(student);
+
+    // Scroll to the top of the page
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  // =====================================================
+  // BACK TO STUDENT LIST
+  // =====================================================
+
+  function handleBackToStudents() {
+    setMessage("");
+    setError("");
+    setSelectedStudent(null);
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  }
+
+  // =====================================================
+  // DELETE STUDENT
+  // =====================================================
+
+  async function handleDelete(id) {
+    setMessage("");
+    setError("");
+
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this student? This will also remove the student's login account."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/api/students?id=${id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to delete student."
+        );
+      }
+
+      setMessage(
+        "Student and associated login account deleted successfully."
+      );
+
+      setSelectedStudent(null);
+
+      await loadStudents();
+    } catch (err) {
+      console.error("Delete student error:", err);
+      setError(err.message);
+    }
+  }
+
+  // =====================================================
+  // DATE FORMATTER
+  // =====================================================
+
+  function formatDate(date) {
+    if (!date) {
+      return "Not available";
+    }
+
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "Not available";
+    }
+
+    return parsedDate.toLocaleDateString("en-GH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
+
+  // =====================================================
   // ACCESS CHECK SCREEN
   // =====================================================
 
@@ -159,7 +272,316 @@ export default function StudentsPage() {
   }
 
   // =====================================================
-  // PAGE
+  // FULL STUDENT PROFILE
+  // =====================================================
+
+  if (selectedStudent) {
+    const fullName =
+      `${selectedStudent.firstName || ""} ${
+        selectedStudent.lastName || ""
+      }`.trim() || "Unnamed Student";
+
+    const initials =
+      `${selectedStudent.firstName?.[0] || ""}${
+        selectedStudent.lastName?.[0] || ""
+      }`.toUpperCase() || "S";
+
+    const progress =
+      Number(selectedStudent.progress) || 0;
+
+    return (
+      <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
+        <div className="mx-auto max-w-7xl">
+
+          {/* BACK BUTTON */}
+          <button
+            type="button"
+            onClick={handleBackToStudents}
+            className="mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+          >
+            ← Back to Students
+          </button>
+
+          {/* SUCCESS MESSAGE */}
+          {message && (
+            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-700">
+              {message}
+            </div>
+          )}
+
+          {/* ERROR MESSAGE */}
+          {error && (
+            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* PROFILE HEADER */}
+          <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+
+            <div className="bg-slate-900 px-6 py-8 md:px-8">
+              <div className="flex flex-col gap-6 md:flex-row md:items-center">
+
+                {/* PROFILE IMAGE */}
+                {selectedStudent.profileImage ? (
+                  <img
+                    src={selectedStudent.profileImage}
+                    alt={fullName}
+                    className="h-28 w-28 rounded-full object-cover ring-4 ring-white/20"
+                  />
+                ) : (
+                  <div className="flex h-28 w-28 items-center justify-center rounded-full bg-blue-100 text-3xl font-bold text-blue-700 ring-4 ring-white/20">
+                    {initials}
+                  </div>
+                )}
+
+                {/* NAME */}
+                <div className="flex-1">
+                  <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">
+                    Student Profile
+                  </p>
+
+                  <h1 className="mt-1 text-3xl font-bold text-white md:text-4xl">
+                    {fullName}
+                  </h1>
+
+                  <p className="mt-2 text-slate-300">
+                    {selectedStudent.email ||
+                      "No email provided"}
+                  </p>
+                </div>
+
+                {/* STATUS */}
+                <div>
+                  <span
+                    className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${
+                      selectedStudent.status === "Active"
+                        ? "bg-green-100 text-green-700"
+                        : selectedStudent.status ===
+                          "Completed"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-slate-200 text-slate-700"
+                    }`}
+                  >
+                    {selectedStudent.status || "Active"}
+                  </span>
+                </div>
+
+              </div>
+            </div>
+
+            <div className="p-6 md:p-8">
+
+              {/* PERSONAL INFORMATION */}
+              <section>
+                <h2 className="text-xl font-bold text-slate-900">
+                  Personal Information
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Student personal and contact information.
+                </p>
+
+                <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+
+                  <InfoItem
+                    label="First Name"
+                    value={selectedStudent.firstName}
+                  />
+
+                  <InfoItem
+                    label="Last Name"
+                    value={selectedStudent.lastName}
+                  />
+
+                  <InfoItem
+                    label="Email"
+                    value={selectedStudent.email}
+                  />
+
+                  <InfoItem
+                    label="Phone"
+                    value={selectedStudent.phone}
+                  />
+
+                  <InfoItem
+                    label="Date of Birth"
+                    value={formatDate(
+                      selectedStudent.dateOfBirth
+                    )}
+                  />
+
+                  <InfoItem
+                    label="Gender"
+                    value={selectedStudent.gender}
+                  />
+
+                  <InfoItem
+                    label="Program"
+                    value={selectedStudent.program}
+                  />
+
+                  <InfoItem
+                    label="Education Level"
+                    value={selectedStudent.educationLevel}
+                  />
+
+                  <InfoItem
+                    label="School"
+                    value={selectedStudent.school}
+                  />
+
+                  <InfoItem
+                    label="Address"
+                    value={selectedStudent.address}
+                    wide
+                  />
+
+                </div>
+              </section>
+
+              {/* EMERGENCY CONTACT */}
+              <section className="mt-10 border-t border-slate-200 pt-8">
+                <h2 className="text-xl font-bold text-slate-900">
+                  Emergency Contact
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Emergency contact information provided by
+                  the student.
+                </p>
+
+                <div className="mt-5 grid gap-5 sm:grid-cols-2">
+
+                  <InfoItem
+                    label="Contact Name"
+                    value={
+                      selectedStudent.emergencyContactName
+                    }
+                  />
+
+                  <InfoItem
+                    label="Contact Phone"
+                    value={
+                      selectedStudent.emergencyContactPhone
+                    }
+                  />
+
+                </div>
+              </section>
+
+              {/* PROGRAM INFORMATION */}
+              <section className="mt-10 border-t border-slate-200 pt-8">
+                <h2 className="text-xl font-bold text-slate-900">
+                  Program Information
+                </h2>
+
+                <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+
+                  <InfoItem
+                    label="Student ID"
+                    value={selectedStudent.studentId}
+                  />
+
+                  <InfoItem
+                    label="Enrollment Date"
+                    value={formatDate(
+                      selectedStudent.enrollmentDate
+                    )}
+                  />
+
+                  <InfoItem
+                    label="Expected Completion"
+                    value={formatDate(
+                      selectedStudent.expectedCompletionDate
+                    )}
+                  />
+
+                  <InfoItem
+                    label="Program Duration"
+                    value={
+                      selectedStudent.programDurationMonths
+                        ? `${selectedStudent.programDurationMonths} months`
+                        : "24 months"
+                    }
+                  />
+
+                  <InfoItem
+                    label="Status"
+                    value={
+                      selectedStudent.status || "Active"
+                    }
+                  />
+
+                </div>
+              </section>
+
+              {/* PROGRESS */}
+              <section className="mt-10 border-t border-slate-200 pt-8">
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">
+                      Overall Progress
+                    </h2>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                      Current student progress.
+                    </p>
+                  </div>
+
+                  <span className="text-2xl font-bold text-blue-600">
+                    {progress}%
+                  </span>
+                </div>
+
+                <div className="mt-5 h-4 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-blue-600 transition-all"
+                    style={{
+                      width: `${Math.min(
+                        Math.max(progress, 0),
+                        100
+                      )}%`,
+                    }}
+                  />
+                </div>
+
+              </section>
+
+              {/* ACTIONS */}
+              <section className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row sm:justify-between">
+
+                <button
+                  type="button"
+                  onClick={handleBackToStudents}
+                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  ← Back to Students
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDelete(selectedStudent._id)
+                  }
+                  className="rounded-xl border border-red-200 px-5 py-3 font-semibold text-red-600 transition hover:bg-red-50"
+                >
+                  Delete Student
+                </button>
+
+              </section>
+
+            </div>
+          </section>
+
+        </div>
+      </main>
+    );
+  }
+
+  // =====================================================
+  // STUDENT LIST PAGE
   // =====================================================
 
   return (
@@ -204,7 +626,9 @@ export default function StudentsPage() {
 
               <p className="mt-1 text-slate-500">
                 {filteredStudents.length} registered student
-                {filteredStudents.length === 1 ? "" : "s"}
+                {filteredStudents.length === 1
+                  ? ""
+                  : "s"}
               </p>
             </div>
 
@@ -217,6 +641,7 @@ export default function StudentsPage() {
               }
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-80"
             />
+
           </div>
 
           {/* LOADING */}
@@ -232,6 +657,7 @@ export default function StudentsPage() {
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
               {filteredStudents.map((student) => {
+
                 const fullName =
                   `${student.firstName || ""} ${
                     student.lastName || ""
@@ -250,9 +676,7 @@ export default function StudentsPage() {
                     key={student._id}
                     type="button"
                     onClick={() =>
-                      router.push(
-                        `/students/${student._id}`
-                      )
+                      handleStudentClick(student)
                     }
                     className="group text-left"
                   >
@@ -279,7 +703,8 @@ export default function StudentsPage() {
                           </h3>
 
                           <p className="mt-1 truncate text-sm text-slate-500">
-                            {student.email || "No email provided"}
+                            {student.email ||
+                              "No email provided"}
                           </p>
                         </div>
 
@@ -324,18 +749,6 @@ export default function StudentsPage() {
                           </div>
                         )}
 
-                        {student.school && (
-                          <div className="flex justify-between gap-4 text-sm">
-                            <span className="text-slate-500">
-                              School
-                            </span>
-
-                            <span className="truncate font-medium text-slate-900">
-                              {student.school}
-                            </span>
-                          </div>
-                        )}
-
                       </div>
 
                       {/* PROGRESS */}
@@ -372,7 +785,8 @@ export default function StudentsPage() {
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             student.status === "Active"
                               ? "bg-green-100 text-green-700"
-                              : student.status === "Completed"
+                              : student.status ===
+                                "Completed"
                               ? "bg-blue-100 text-blue-700"
                               : "bg-slate-100 text-slate-600"
                           }`}
@@ -395,7 +809,36 @@ export default function StudentsPage() {
           )}
 
         </section>
+
       </div>
     </main>
+  );
+}
+
+// =====================================================
+// READ-ONLY INFORMATION ITEM
+// =====================================================
+
+function InfoItem({
+  label,
+  value,
+  wide = false,
+}) {
+  return (
+    <div
+      className={`rounded-xl bg-slate-50 p-4 ${
+        wide
+          ? "sm:col-span-2 lg:col-span-3"
+          : ""
+      }`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+
+      <p className="mt-1 break-words font-medium text-slate-900">
+        {value || "Not provided"}
+      </p>
+    </div>
   );
 }
