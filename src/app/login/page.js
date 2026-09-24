@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { GraduationCap, UserRound, KeyRound } from "lucide-react";
+import {
+  GraduationCap,
+  UserRound,
+  KeyRound,
+  Mail,
+  LockKeyhole,
+} from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,9 +35,10 @@ export default function LoginPage() {
     setForm({
       ...form,
       role,
-      facilitatorCode: role === "facilitator"
-        ? form.facilitatorCode
-        : "",
+      facilitatorCode:
+        role === "facilitator"
+          ? form.facilitatorCode
+          : "",
     });
 
     setMessage("");
@@ -45,6 +52,13 @@ export default function LoginPage() {
     if (!form.role) {
       setMessage(
         "Please select whether you are logging in as a Student or Facilitator."
+      );
+      return;
+    }
+
+    if (!form.email || !form.password) {
+      setMessage(
+        "Please enter your email address and password."
       );
       return;
     }
@@ -139,7 +153,7 @@ export default function LoginPage() {
             {/* Login Type */}
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
-                Login As
+                How are you logging in?
               </label>
 
               <div className="grid grid-cols-2 gap-3">
@@ -193,105 +207,119 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label
-                htmlFor="email"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                Email Address
-              </label>
+            {/* Show login fields only after role selection */}
+            {form.role && (
+              <div className="space-y-5">
 
-              <input
-                id="email"
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
+                {/* Email */}
+                <div>
+                  <label
+                    htmlFor="email"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Email Address
+                  </label>
 
-            {/* Password */}
-            <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
-                Password
-              </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
 
-              <input
-                id="password"
-                type="password"
-                name="password"
-                value={form.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                required
-                autoComplete="current-password"
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-            </div>
-
-            {/* Facilitator Invitation Code */}
-            {form.role === "facilitator" && (
-              <div>
-                <label
-                  htmlFor="facilitatorCode"
-                  className="mb-2 block text-sm font-medium text-slate-700"
-                >
-                  Facilitator Invitation Code
-                </label>
-
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-
-                  <input
-                    id="facilitatorCode"
-                    type="password"
-                    name="facilitatorCode"
-                    value={form.facilitatorCode}
-                    onChange={handleChange}
-                    placeholder="Enter facilitator invitation code"
-                    required
-                    autoComplete="off"
-                    className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  />
+                    <input
+                      id="email"
+                      type="email"
+                      name="email"
+                      value={form.email}
+                      onChange={handleChange}
+                      placeholder="you@example.com"
+                      required
+                      autoComplete="email"
+                      className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
                 </div>
 
-                <p className="mt-2 text-xs text-slate-500">
-                  This is the same invitation code used when
-                  registering your facilitator account.
-                </p>
+                {/* Password */}
+                <div>
+                  <label
+                    htmlFor="password"
+                    className="mb-2 block text-sm font-medium text-slate-700"
+                  >
+                    Password
+                  </label>
+
+                  <div className="relative">
+                    <LockKeyhole className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+
+                    <input
+                      id="password"
+                      type="password"
+                      name="password"
+                      value={form.password}
+                      onChange={handleChange}
+                      placeholder="Enter your password"
+                      required
+                      autoComplete="current-password"
+                      className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                </div>
+
+                {/* Facilitator Invitation Code */}
+                {form.role === "facilitator" && (
+                  <div>
+                    <label
+                      htmlFor="facilitatorCode"
+                      className="mb-2 block text-sm font-medium text-slate-700"
+                    >
+                      Facilitator Invitation Code
+                    </label>
+
+                    <div className="relative">
+                      <KeyRound className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+
+                      <input
+                        id="facilitatorCode"
+                        type="password"
+                        name="facilitatorCode"
+                        value={form.facilitatorCode}
+                        onChange={handleChange}
+                        placeholder="Enter invitation code"
+                        required
+                        autoComplete="off"
+                        className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+
+                    <p className="mt-2 text-xs text-slate-500">
+                      Use the same invitation code provided
+                      during facilitator registration.
+                    </p>
+                  </div>
+                )}
+
+                {/* Selected Role */}
+                <div className="rounded-lg bg-blue-50 px-4 py-3 text-center text-sm text-blue-700">
+                  You are signing in as a{" "}
+                  <span className="font-bold">
+                    {form.role === "student"
+                      ? "Student"
+                      : "Facilitator"}
+                  </span>
+                </div>
+
+                {/* Sign In */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading
+                    ? "Signing in..."
+                    : "Sign In"}
+                </button>
+
               </div>
             )}
 
-            {/* Selected Role */}
-            {form.role && (
-              <div className="rounded-lg bg-blue-50 px-4 py-3 text-center text-sm text-blue-700">
-                You are signing in as a{" "}
-                <span className="font-bold">
-                  {form.role === "student"
-                    ? "Student"
-                    : "Facilitator"}
-                </span>
-              </div>
-            )}
-
-            {/* Sign In */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading
-                ? "Signing in..."
-                : "Sign In"}
-            </button>
           </form>
 
           {/* Register */}
@@ -310,6 +338,7 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-xs text-slate-400">
           Dodoo Coding Club · Student Success & Impact Platform
         </p>
+
       </div>
     </main>
   );
