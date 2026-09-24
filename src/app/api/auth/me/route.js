@@ -10,42 +10,54 @@ export async function GET() {
     const cookieStore = await cookies();
     const token = cookieStore.get("dcc_session")?.value;
 
+    // No session cookie
     if (!token) {
       return NextResponse.json(
-        { authenticated: false },
-        { status: 401 }
+        {
+          authenticated: false,
+          message: "No active session.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
     // Verify the session
     const session = await verifySession(token);
 
+    // Invalid or expired session
     if (!session) {
       return NextResponse.json(
-        { authenticated: false },
-        { status: 401 }
+        {
+          authenticated: false,
+          message: "Invalid or expired session.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
     // Connect to MongoDB
     const client = await clientPromise;
 
-    const db = process.env.MONGODB_DB
-      ? client.db(process.env.MONGODB_DB)
-      : client.db();
+    // Use the same database as the login route
+    const dbName = process.env.DB_NAME || "DCCPlatform";
+    const db = client.db(dbName);
 
-    // Find the user safely
+    // Find the user
     let user = null;
 
     if (session.userId) {
-      // If the session contains a valid MongoDB ObjectId
+      // MongoDB ObjectId
       if (ObjectId.isValid(session.userId)) {
         user = await db.collection("users").findOne({
           _id: new ObjectId(session.userId),
         });
       }
 
-      // If the ID is stored as a string instead
+      // Fallback if the ID is stored as a string
       if (!user) {
         user = await db.collection("users").findOne({
           _id: session.userId,
@@ -53,13 +65,16 @@ export async function GET() {
       }
     }
 
+    // User does not exist
     if (!user) {
       return NextResponse.json(
         {
           authenticated: false,
           message: "User account not found.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
@@ -73,28 +88,39 @@ export async function GET() {
       user.email ||
       "User";
 
-    return NextResponse.json({
-      authenticated: true,
+    // Return authenticated user
+    return NextResponse.json(
+      {
+        authenticated: true,
 
-      user: {
-        id: user._id?.toString() || session.userId,
+        user: {
+          id: user._id?.toString() || session.userId,
 
-        firstName: user.firstName || "",
+          firstName: user.firstName || "",
 
-        lastName: user.lastName || "",
+          lastName: user.lastName || "",
 
-        name: fullName,
+          name: fullName,
 
-        email: user.email || "",
+          email: user.email || "",
 
-        role: user.role || session.role,
+          role: user.role || session.role,
 
-        studentId:
-          user.studentId ||
-          session.studentId ||
-          null,
+          studentId:
+            user.studentId ||
+            session.studentId ||
+            null,
+
+          status:
+            user.status ||
+            session.status ||
+            "active",
+        },
       },
-    });
+      {
+        status: 200,
+      }
+    );
   } catch (error) {
     console.error("SESSION ERROR:", error);
 
@@ -103,7 +129,9 @@ export async function GET() {
         authenticated: false,
         message: "Unable to retrieve session.",
       },
-      { status: 401 }
+      {
+        status: 401,
+      }
     );
   }
 }
