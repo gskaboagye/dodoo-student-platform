@@ -18,9 +18,7 @@ export async function POST() {
         success: true,
         message: "Logged out successfully.",
       },
-      {
-        status: 200,
-      }
+      { status: 200 }
     );
   } catch (error) {
     console.error("Logout error:", error);
@@ -30,9 +28,7 @@ export async function POST() {
         success: false,
         message: "Failed to log out.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
