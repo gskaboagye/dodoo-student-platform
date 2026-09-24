@@ -10,21 +10,52 @@ export async function POST(request) {
 
     const email = body.email?.trim().toLowerCase();
     const password = body.password;
+    const role = body.role;
+    const facilitatorCode = body.facilitatorCode?.trim();
 
-    if (!email || !password) {
+    // Basic validation
+    if (!email || !password || !role) {
       return NextResponse.json(
         {
-          error: "Email and password are required.",
+          error:
+            "Email, password, and account type are required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Only these two roles are allowed
+    if (role !== "student" && role !== "facilitator") {
+      return NextResponse.json(
+        {
+          error: "Please select Student or Facilitator.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Facilitators must provide the invitation code
+    if (role === "facilitator" && !facilitatorCode) {
+      return NextResponse.json(
+        {
+          error:
+            "The facilitator invitation code is required.",
         },
         { status: 400 }
       );
     }
 
     const client = await clientPromise;
-    const dbName = process.env.DB_NAME || "DCCPlatform";
+
+    const dbName =
+      process.env.DB_NAME || "DCCPlatform";
+
     const db = client.db(dbName);
 
-    const user = await db.collection("users").findOne({ email });
+    // Find account
+    const user = await db.collection("users").findOne({
+      email,
+    });
 
     if (!user) {
       return NextResponse.json(
@@ -35,6 +66,7 @@ export async function POST(request) {
       );
     }
 
+    // Check password
     const passwordMatches = await bcrypt.compare(
       password,
       user.passwordHash
@@ -49,6 +81,50 @@ export async function POST(request) {
       );
     }
 
+    // Make sure selected role matches the actual account role
+    if (user.role !== role) {
+      return NextResponse.json(
+        {
+          error:
+            user.role === "student"
+              ? "This account is registered as a student. Please select Student to continue."
+              : "This account is registered as a facilitator. Please select Facilitator to continue.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Verify facilitator invitation code
+    if (role === "facilitator") {
+      const expectedFacilitatorCode =
+        process.env.FACILITATOR_CODE;
+
+      if (!expectedFacilitatorCode) {
+        console.error(
+          "FACILITATOR_CODE is not configured."
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Facilitator login is temporarily unavailable. Please contact the administrator.",
+          },
+          { status: 500 }
+        );
+      }
+
+      if (facilitatorCode !== expectedFacilitatorCode) {
+        return NextResponse.json(
+          {
+            error:
+              "Invalid facilitator invitation code.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Email verification
     if (user.emailVerified !== true) {
       return NextResponse.json(
         {
@@ -61,7 +137,11 @@ export async function POST(request) {
       );
     }
 
-    if (user.role === "student" && user.status === "pending") {
+    // Student approval checks
+    if (
+      user.role === "student" &&
+      user.status === "pending"
+    ) {
       return NextResponse.json(
         {
           error:
@@ -71,7 +151,10 @@ export async function POST(request) {
       );
     }
 
-    if (user.role === "student" && user.status === "rejected") {
+    if (
+      user.role === "student" &&
+      user.status === "rejected"
+    ) {
       return NextResponse.json(
         {
           error:
@@ -81,6 +164,7 @@ export async function POST(request) {
       );
     }
 
+    // Account must be active
     if (user.status !== "active") {
       return NextResponse.json(
         {
@@ -91,6 +175,7 @@ export async function POST(request) {
       );
     }
 
+    // Create session
     const sessionToken = await createSession({
       id: user._id.toString(),
       role: user.role,
@@ -102,15 +187,21 @@ export async function POST(request) {
       status: user.status,
     });
 
+    // Set secure session cookie
     const cookieStore = await cookies();
 
-    cookieStore.set("dcc_session", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7,
-      path: "/",
-    });
+    cookieStore.set(
+      "dcc_session",
+      sessionToken,
+      {
+        httpOnly: true,
+        secure:
+          process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 7,
+        path: "/",
+      }
+    );
 
     return NextResponse.json(
       {
@@ -133,7 +224,8 @@ export async function POST(request) {
 
     return NextResponse.json(
       {
-        error: "Something went wrong during login.",
+        error:
+          "Something went wrong during login.",
       },
       { status: 500 }
     );
