@@ -11,7 +11,6 @@ export default function StudentsPage() {
 
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
-
   const [selectedStudent, setSelectedStudent] = useState(null);
 
   const [loading, setLoading] = useState(true);
@@ -87,7 +86,7 @@ export default function StudentsPage() {
 
       setStudents(studentList);
 
-      // Keep selected student information updated
+      // Keep the selected profile updated
       if (selectedStudent) {
         const updatedStudent = studentList.find(
           (student) => student._id === selectedStudent._id
@@ -152,7 +151,7 @@ export default function StudentsPage() {
   }, [students, search]);
 
   // =====================================================
-  // SELECT STUDENT
+  // OPEN STUDENT PROFILE
   // =====================================================
 
   function handleStudentClick(student) {
@@ -160,7 +159,6 @@ export default function StudentsPage() {
     setError("");
     setSelectedStudent(student);
 
-    // Scroll to the top of the page
     window.scrollTo({
       top: 0,
       behavior: "smooth",
@@ -293,7 +291,7 @@ export default function StudentsPage() {
       <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
         <div className="mx-auto max-w-7xl">
 
-          {/* BACK BUTTON */}
+          {/* BACK TO STUDENTS */}
           <button
             type="button"
             onClick={handleBackToStudents}
@@ -316,9 +314,10 @@ export default function StudentsPage() {
             </div>
           )}
 
-          {/* PROFILE HEADER */}
+          {/* PROFILE */}
           <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
 
+            {/* PROFILE HEADER */}
             <div className="bg-slate-900 px-6 py-8 md:px-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center">
 
@@ -357,8 +356,7 @@ export default function StudentsPage() {
                     className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${
                       selectedStudent.status === "Active"
                         ? "bg-green-100 text-green-700"
-                        : selectedStudent.status ===
-                          "Completed"
+                        : selectedStudent.status === "Completed"
                         ? "bg-blue-100 text-blue-700"
                         : "bg-slate-200 text-slate-700"
                     }`}
@@ -574,14 +572,13 @@ export default function StudentsPage() {
 
             </div>
           </section>
-
         </div>
       </main>
     );
   }
 
   // =====================================================
-  // STUDENT LIST PAGE
+  // STUDENT LIST
   // =====================================================
 
   return (
@@ -626,9 +623,7 @@ export default function StudentsPage() {
 
               <p className="mt-1 text-slate-500">
                 {filteredStudents.length} registered student
-                {filteredStudents.length === 1
-                  ? ""
-                  : "s"}
+                {filteredStudents.length === 1 ? "" : "s"}
               </p>
             </div>
 
@@ -657,7 +652,6 @@ export default function StudentsPage() {
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
 
               {filteredStudents.map((student) => {
-
                 const fullName =
                   `${student.firstName || ""} ${
                     student.lastName || ""
@@ -678,7 +672,7 @@ export default function StudentsPage() {
                     onClick={() =>
                       handleStudentClick(student)
                     }
-                    className="group text-left"
+                    className="group w-full text-left"
                   >
                     <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md">
 
@@ -785,8 +779,7 @@ export default function StudentsPage() {
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             student.status === "Active"
                               ? "bg-green-100 text-green-700"
-                              : student.status ===
-                                "Completed"
+                              : student.status === "Completed"
                               ? "bg-blue-100 text-blue-700"
                               : "bg-slate-100 text-slate-600"
                           }`}
@@ -809,7 +802,6 @@ export default function StudentsPage() {
           )}
 
         </section>
-
       </div>
     </main>
   );
@@ -819,11 +811,7 @@ export default function StudentsPage() {
 // READ-ONLY INFORMATION ITEM
 // =====================================================
 
-function InfoItem({
-  label,
-  value,
-  wide = false,
-}) {
+function InfoItem({ label, value, wide = false }) {
   return (
     <div
       className={`rounded-xl bg-slate-50 p-4 ${
