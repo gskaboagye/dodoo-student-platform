@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { GraduationCap, UserRound } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [form, setForm] = useState({
     email: "",
     password: "",
+    role: "",
   });
 
   const [message, setMessage] = useState("");
@@ -26,6 +28,12 @@ export default function LoginPage() {
     e.preventDefault();
 
     setMessage("");
+
+    if (!form.role) {
+      setMessage("Please select whether you are logging in as a student or facilitator.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -40,12 +48,11 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(data.error || "Login failed.");
+        setMessage(data.error || data.message || "Login failed.");
         setLoading(false);
         return;
       }
 
-      // Both students and facilitators go to the official dashboard.
       router.replace("/");
       router.refresh();
     } catch (error) {
@@ -56,11 +63,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
-          <div className="text-center mb-8">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white text-2xl font-bold">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+
+          {/* Header */}
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-bold text-white">
               DCC
             </div>
 
@@ -73,45 +82,137 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {/* Error Message */}
           {message && (
-            <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {message}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* Login As */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Login As
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+
+                {/* Student */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm({
+                      ...form,
+                      role: "student",
+                    });
+                    setMessage("");
+                  }}
+                  className={`flex flex-col items-center justify-center rounded-xl border-2 px-4 py-4 transition ${
+                    form.role === "student"
+                      ? "border-blue-600 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <GraduationCap className="mb-2 h-7 w-7" />
+
+                  <span className="font-semibold">
+                    Student
+                  </span>
+
+                  <span className="mt-1 text-xs text-slate-500">
+                    Student account
+                  </span>
+                </button>
+
+                {/* Facilitator */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm({
+                      ...form,
+                      role: "facilitator",
+                    });
+                    setMessage("");
+                  }}
+                  className={`flex flex-col items-center justify-center rounded-xl border-2 px-4 py-4 transition ${
+                    form.role === "facilitator"
+                      ? "border-blue-600 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <UserRound className="mb-2 h-7 w-7" />
+
+                  <span className="font-semibold">
+                    Facilitator
+                  </span>
+
+                  <span className="mt-1 text-xs text-slate-500">
+                    Facilitator account
+                  </span>
+                </button>
+
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
                 Email Address
               </label>
 
               <input
+                id="email"
                 type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
                 placeholder="you@example.com"
                 required
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                autoComplete="email"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
+            {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label
+                htmlFor="password"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
                 Password
               </label>
 
               <input
+                id="password"
                 type="password"
                 name="password"
                 value={form.password}
                 onChange={handleChange}
                 placeholder="Enter your password"
                 required
-                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                autoComplete="current-password"
+                className="w-full rounded-lg border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
+            {/* Selected Role */}
+            {form.role && (
+              <div className="rounded-lg bg-blue-50 px-4 py-3 text-center text-sm text-blue-700">
+                You are signing in as a{" "}
+                <span className="font-bold">
+                  {form.role === "student"
+                    ? "Student"
+                    : "Facilitator"}
+                </span>
+              </div>
+            )}
+
+            {/* Sign In */}
             <button
               type="submit"
               disabled={loading}
@@ -121,6 +222,7 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Register */}
           <div className="mt-6 text-center text-sm text-slate-500">
             Don't have an account?{" "}
             <Link
