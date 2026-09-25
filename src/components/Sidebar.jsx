@@ -475,3 +475,4 @@ export default function Sidebar() {
     </>
   );
 }
+// Reports navigation enabled
