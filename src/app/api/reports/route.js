@@ -5,6 +5,46 @@ import { cookies } from "next/headers";
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
+// Get the database using the same database name everywhere.
+async function getDatabase() {
+  const client = await clientPromise;
+  const dbName = process.env.DB_NAME || "DCCPlatform";
+  return client.db(dbName);
+}
+
+// Build the actual user's full name from the users collection.
+function getFullName(user) {
+  if (!user) return "";
+
+  const firstName = user.firstName?.trim() || "";
+  const lastName = user.lastName?.trim() || "";
+
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  return fullName || user.name?.trim() || user.email?.trim() || "";
+}
+
+// Find the logged-in user.
+async function getCurrentUser(session, db) {
+  if (!session?.userId) return null;
+
+  let user = null;
+
+  if (ObjectId.isValid(session.userId)) {
+    user = await db.collection("users").findOne({
+      _id: new ObjectId(session.userId),
+    });
+  }
+
+  if (!user) {
+    user = await db.collection("users").findOne({
+      _id: session.userId,
+    });
+  }
+
+  return user;
+}
+
 // GET - Students see their own reports.
 // Facilitators see all reports.
 export async function GET() {
@@ -28,9 +68,7 @@ export async function GET() {
       );
     }
 
-    const client = await clientPromise;
-    const dbName = process.env.DB_NAME || "DCCPlatform";
-    const db = client.db(dbName);
+    const db = await getDatabase();
 
     const query =
       session.role === "facilitator"
@@ -108,14 +146,39 @@ export async function POST(request) {
       );
     }
 
-    const client = await clientPromise;
-    const dbName = process.env.DB_NAME || "DCCPlatform";
-    const db = client.db(dbName);
+    const db = await getDatabase();
+
+    // Get the actual student account from MongoDB.
+    const studentUser = await getCurrentUser(session, db);
+
+    if (!studentUser) {
+      return NextResponse.json(
+        { message: "Student account could not be found." },
+        { status: 404 }
+      );
+    }
+
+    const studentName = getFullName(studentUser);
+    const studentEmail =
+      studentUser.email?.trim() || session.email || "";
+
+    if (!studentName) {
+      return NextResponse.json(
+        {
+          message:
+            "Your account does not have a name configured. Please contact a facilitator.",
+        },
+        { status: 400 }
+      );
+    }
 
     const report = {
-      studentId: session.studentId,
-      studentName: session.name || "",
-      studentEmail: session.email || "",
+      studentId:
+        studentUser.studentId || session.studentId || "",
+
+      // Actual student information from MongoDB.
+      studentName,
+      studentEmail,
 
       title,
       category,
@@ -124,7 +187,7 @@ export async function POST(request) {
 
       status: "Open",
 
-      // Facilitator response information
+      // Facilitator response information.
       response: "",
       facilitatorId: "",
       facilitatorName: "",
@@ -190,9 +253,7 @@ export async function DELETE(request) {
       );
     }
 
-    const client = await clientPromise;
-    const dbName = process.env.DB_NAME || "DCCPlatform";
-    const db = client.db(dbName);
+    const db = await getDatabase();
 
     const result = await db.collection("reports").deleteOne({
       _id: new ObjectId(id),
@@ -268,11 +329,29 @@ export async function PATCH(request) {
       );
     }
 
-    const client = await clientPromise;
-    const dbName = process.env.DB_NAME || "DCCPlatform";
-    const db = client.db(dbName);
+    const db = await getDatabase();
 
-    // Save facilitator information only when a response is provided.
+    // Get the actual facilitator account from MongoDB.
+    const facilitatorUser = await getCurrentUser(
+      session,
+      db
+    );
+
+    if (!facilitatorUser) {
+      return NextResponse.json(
+        { message: "Facilitator account could not be found." },
+        { status: 404 }
+      );
+    }
+
+    const facilitatorName =
+      getFullName(facilitatorUser);
+
+    const facilitatorEmail =
+      facilitatorUser.email?.trim() ||
+      session.email ||
+      "";
+
     const updateData = {
       status,
       updatedAt: new Date(),
@@ -280,11 +359,19 @@ export async function PATCH(request) {
 
     if (response) {
       updateData.response = response;
-      updateData.facilitatorId = session.userId || "";
+
+      // Actual facilitator information from MongoDB.
+      updateData.facilitatorId =
+        facilitatorUser._id?.toString() ||
+        session.userId ||
+        "";
+
       updateData.facilitatorName =
-        session.name || "Facilitator";
+        facilitatorName || "Facilitator";
+
       updateData.facilitatorEmail =
-        session.email || "";
+        facilitatorEmail;
+
       updateData.respondedAt = new Date();
     } else {
       updateData.response = "";
