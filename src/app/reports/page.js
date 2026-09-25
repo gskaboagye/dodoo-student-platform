@@ -9,7 +9,6 @@ import {
   Trash2,
   MessageSquare,
   User,
-  UserCheck,
 } from "lucide-react";
 
 export default function ReportsPage() {
@@ -78,6 +77,8 @@ export default function ReportsPage() {
 
       setMessage("Report updated successfully.");
 
+      // Reload the reports after saving.
+      // This ensures the facilitator sees the latest saved data.
       await loadReports();
     } catch (error) {
       console.error("UPDATE REPORT ERROR:", error);
@@ -129,22 +130,16 @@ export default function ReportsPage() {
   function formatDate(date) {
     if (!date) return "Unknown date";
 
-    return new Date(date).toLocaleDateString("en-GH", {
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "Unknown date";
+    }
+
+    return parsedDate.toLocaleDateString("en-GH", {
       year: "numeric",
       month: "short",
       day: "numeric",
-    });
-  }
-
-  function formatDateTime(date) {
-    if (!date) return "";
-
-    return new Date(date).toLocaleString("en-GH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
     });
   }
 
@@ -191,7 +186,7 @@ export default function ReportsPage() {
           </p>
         </div>
 
-        {/* Success */}
+        {/* Success Message */}
         {message && (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
             <CheckCircle size={20} />
@@ -199,7 +194,7 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* Error */}
+        {/* Error Message */}
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
             {error}
@@ -234,8 +229,10 @@ export default function ReportsPage() {
               Loading student reports...
             </p>
           </div>
+
         ) : reports.length === 0 ? (
-          /* Empty */
+
+          /* Empty State */
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
             <MessageSquare
               size={38}
@@ -251,7 +248,9 @@ export default function ReportsPage() {
               submitted.
             </p>
           </div>
+
         ) : (
+
           /* Reports */
           <div className="space-y-6">
             {reports.map((report) => (
@@ -262,7 +261,6 @@ export default function ReportsPage() {
                 onUpdate={updateReport}
                 onDelete={deleteReport}
                 formatDate={formatDate}
-                formatDateTime={formatDateTime}
                 getStatusStyle={getStatusStyle}
                 getPriorityStyle={getPriorityStyle}
               />
@@ -280,7 +278,6 @@ function ReportCard({
   onUpdate,
   onDelete,
   formatDate,
-  formatDateTime,
   getStatusStyle,
   getPriorityStyle,
 }) {
@@ -361,42 +358,14 @@ function ReportCard({
         </p>
       </div>
 
-      {/* Existing Facilitator Response */}
-      {report.response && (
-        <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2 font-semibold text-blue-800">
-                <UserCheck size={18} />
-                Facilitator Response
-              </div>
-
-              <p className="mt-2 text-sm font-semibold text-blue-900">
-                Responded by:{" "}
-                {report.facilitatorName || "Facilitator"}
-              </p>
-
-              {report.facilitatorEmail && (
-                <p className="mt-1 text-xs text-blue-700">
-                  {report.facilitatorEmail}
-                </p>
-              )}
-
-              {report.respondedAt && (
-                <p className="mt-1 text-xs text-blue-600">
-                  {formatDateTime(report.respondedAt)}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-4 border-t border-blue-200 pt-4">
-            <p className="whitespace-pre-wrap text-sm leading-6 text-blue-900">
-              {report.response}
-            </p>
-          </div>
-        </div>
-      )}
+      {/* IMPORTANT:
+          There is intentionally NO
+          "Existing Facilitator Response" section here.
+          
+          The facilitator can write/update the response below,
+          but the actual response display belongs ONLY
+          on the student side.
+      */}
 
       {/* Facilitator Controls */}
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
@@ -431,9 +400,7 @@ function ReportCard({
             htmlFor={`response-${report._id}`}
             className="mb-2 block text-sm font-semibold text-slate-700"
           >
-            {report.response
-              ? "Update Response"
-              : "Response to Student"}
+            Response to Student
           </label>
 
           <textarea
@@ -442,16 +409,22 @@ function ReportCard({
             onChange={(event) =>
               setResponse(event.target.value)
             }
-            rows={4}
+            rows={5}
             placeholder="Write a response or guidance for the student..."
             className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
+
+          <p className="mt-2 text-xs text-slate-500">
+            This response will be visible to the student after
+            you save the changes.
+          </p>
         </div>
       </div>
 
       {/* Actions */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
 
+        {/* Delete */}
         <button
           type="button"
           onClick={() => onDelete(report._id)}
@@ -462,6 +435,7 @@ function ReportCard({
           Delete
         </button>
 
+        {/* Save */}
         <button
           type="button"
           onClick={() =>
