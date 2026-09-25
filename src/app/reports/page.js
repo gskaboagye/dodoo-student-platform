@@ -17,35 +17,42 @@ export default function ReportsPage() {
   const [updating, setUpdating] = useState(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [clearResponse, setClearResponse] =
+    useState({});
 
-  // Used to clear the response textbox after saving.
-  const [clearResponse, setClearResponse] = useState({});
-
-  // ---------------------------------------------------------
+  // =========================================================
   // LOAD REPORTS
-  // ---------------------------------------------------------
+  // =========================================================
 
   async function loadReports() {
     try {
       setLoading(true);
       setError("");
 
-      const response = await fetch("/api/reports", {
-        method: "GET",
-        cache: "no-store",
-      });
+      const response = await fetch(
+        "/api/reports",
+        {
+          method: "GET",
+          cache: "no-store",
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Unable to load reports."
+          data.message ||
+            "Unable to load reports."
         );
       }
 
       setReports(data.reports || []);
     } catch (error) {
-      console.error("LOAD REPORTS ERROR:", error);
+      console.error(
+        "LOAD REPORTS ERROR:",
+        error
+      );
+
       setError(error.message);
     } finally {
       setLoading(false);
@@ -56,37 +63,44 @@ export default function ReportsPage() {
     loadReports();
   }, []);
 
-  // ---------------------------------------------------------
+  // =========================================================
   // UPDATE REPORT
-  // ---------------------------------------------------------
+  // =========================================================
 
-  async function updateReport(id, status, responseText) {
+  async function updateReport(
+    id,
+    status,
+    responseText
+  ) {
     try {
       setUpdating(id);
       setError("");
       setMessage("");
 
-      const response = await fetch("/api/reports", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id,
-          status,
-          response: responseText,
-        }),
-      });
+      const response = await fetch(
+        "/api/reports",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id,
+            status,
+            response: responseText,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Unable to update report."
+          data.message ||
+            "Unable to update report."
         );
       }
 
-      // Keep the saved response and date in the report data.
       if (data.report) {
         setReports((currentReports) =>
           currentReports.map((report) =>
@@ -101,48 +115,58 @@ export default function ReportsPage() {
         );
       }
 
-      // Clear only the editable response textbox.
+      /*
+       * Clear the editable response textbox.
+       * The saved response remains in MongoDB.
+       */
       setClearResponse((previous) => ({
         ...previous,
         [id]: Date.now(),
       }));
 
-      setMessage("Report updated successfully.");
+      setMessage(
+        "Report updated successfully."
+      );
     } catch (error) {
-      console.error("UPDATE REPORT ERROR:", error);
+      console.error(
+        "UPDATE REPORT ERROR:",
+        error
+      );
+
       setError(error.message);
     } finally {
       setUpdating(null);
     }
   }
 
-  // ---------------------------------------------------------
-  // REMOVE REPORT FROM FACILITATOR DASHBOARD
-  // ---------------------------------------------------------
+  // =========================================================
+  // FACILITATOR REMOVE
+  // =========================================================
 
-  async function deleteReport(id) {
+  async function removeReport(id) {
     const confirmed = window.confirm(
-      "Are you sure you want to remove this report from your dashboard?"
+      "Are you sure you want to remove this report from the facilitator dashboard?"
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       setUpdating(id);
       setError("");
       setMessage("");
 
-      const response = await fetch("/api/reports", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id,
-        }),
-      });
+      const response = await fetch(
+        "/api/reports",
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -154,14 +178,14 @@ export default function ReportsPage() {
       }
 
       /*
-       * Remove the report from the facilitator's screen.
+       * Remove it from this facilitator page.
        *
-       * The API now uses a soft delete for facilitators,
-       * so the actual student report remains in MongoDB.
+       * The API does NOT delete the MongoDB document.
        */
       setReports((currentReports) =>
         currentReports.filter(
-          (report) => report._id !== id
+          (report) =>
+            report._id !== id
         )
       );
 
@@ -169,21 +193,23 @@ export default function ReportsPage() {
         "Report removed from the facilitator dashboard."
       );
     } catch (error) {
-      console.error("REMOVE REPORT ERROR:", error);
+      console.error(
+        "REMOVE REPORT ERROR:",
+        error
+      );
+
       setError(error.message);
     } finally {
       setUpdating(null);
     }
   }
 
-  // ---------------------------------------------------------
+  // =========================================================
   // DATE
-  // ---------------------------------------------------------
+  // =========================================================
 
   function formatDate(date) {
-    if (!date) {
-      return "Unknown date";
-    }
+    if (!date) return "Unknown date";
 
     const parsedDate = new Date(date);
 
@@ -191,16 +217,19 @@ export default function ReportsPage() {
       return "Unknown date";
     }
 
-    return parsedDate.toLocaleDateString("en-GH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return parsedDate.toLocaleDateString(
+      "en-GH",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }
+    );
   }
 
-  // ---------------------------------------------------------
-  // STATUS STYLE
-  // ---------------------------------------------------------
+  // =========================================================
+  // STATUS
+  // =========================================================
 
   function getStatusStyle(status) {
     switch (status) {
@@ -218,9 +247,9 @@ export default function ReportsPage() {
     }
   }
 
-  // ---------------------------------------------------------
-  // PRIORITY STYLE
-  // ---------------------------------------------------------
+  // =========================================================
+  // PRIORITY
+  // =========================================================
 
   function getPriorityStyle(priority) {
     if (priority === "Urgent") {
@@ -230,12 +259,13 @@ export default function ReportsPage() {
     return "bg-slate-100 text-slate-700";
   }
 
-  // ---------------------------------------------------------
+  // =========================================================
   // PAGE
-  // ---------------------------------------------------------
+  // =========================================================
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+
       <div className="mx-auto max-w-6xl">
 
         {/* Header */}
@@ -251,22 +281,25 @@ export default function ReportsPage() {
           </h1>
 
           <p className="mt-2 text-slate-600">
-            Review and respond to issues submitted by students.
+            Review and respond to issues submitted
+            by students.
           </p>
 
         </div>
 
-        {/* Success Message */}
+        {/* Success */}
 
         {message && (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
+
             <CheckCircle size={20} />
 
             <p>{message}</p>
+
           </div>
         )}
 
-        {/* Error Message */}
+        {/* Error */}
 
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
@@ -317,8 +350,6 @@ export default function ReportsPage() {
 
         ) : reports.length === 0 ? (
 
-          /* Empty State */
-
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
 
             <MessageSquare
@@ -331,15 +362,13 @@ export default function ReportsPage() {
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
-              Student issues will appear here when they are
-              submitted.
+              Student issues will appear here when
+              they are submitted.
             </p>
 
           </div>
 
         ) : (
-
-          /* Reports */
 
           <div className="space-y-6">
 
@@ -349,20 +378,24 @@ export default function ReportsPage() {
                 report={report}
                 updating={updating}
                 onUpdate={updateReport}
-                onDelete={deleteReport}
+                onRemove={removeReport}
                 formatDate={formatDate}
                 getStatusStyle={getStatusStyle}
                 getPriorityStyle={getPriorityStyle}
                 clearResponse={
-                  clearResponse[report._id]
+                  clearResponse[
+                    report._id
+                  ]
                 }
               />
             ))}
 
           </div>
+
         )}
 
       </div>
+
     </main>
   );
 }
@@ -375,32 +408,28 @@ function ReportCard({
   report,
   updating,
   onUpdate,
-  onDelete,
+  onRemove,
   formatDate,
   getStatusStyle,
   getPriorityStyle,
   clearResponse,
 }) {
-  const [status, setStatus] = useState(
-    report.status || "Open"
-  );
+  const [status, setStatus] =
+    useState(
+      report.status || "Open"
+    );
 
-  // Only stores what the facilitator is currently typing.
-  // The saved response is stored in report.response.
-  const [response, setResponse] = useState("");
+  const [response, setResponse] =
+    useState("");
 
-  // ---------------------------------------------------------
-  // KEEP STATUS SYNCHRONIZED
-  // ---------------------------------------------------------
-
+  // Keep status synchronized.
   useEffect(() => {
-    setStatus(report.status || "Open");
+    setStatus(
+      report.status || "Open"
+    );
   }, [report.status]);
 
-  // ---------------------------------------------------------
-  // CLEAR RESPONSE TEXTBOX AFTER SUCCESSFUL SAVE
-  // ---------------------------------------------------------
-
+  // Clear response textbox after save.
   useEffect(() => {
     if (clearResponse) {
       setResponse("");
@@ -411,7 +440,7 @@ function ReportCard({
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
       {/* =====================================================
-          REPORT HEADER
+          HEADER
       ===================================================== */}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -422,7 +451,7 @@ function ReportCard({
             {report.title}
           </h2>
 
-          {/* Student Information */}
+          {/* Student */}
 
           <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
 
@@ -432,7 +461,8 @@ function ReportCard({
             </div>
 
             <p className="mt-2 text-sm font-semibold text-slate-900">
-              {report.studentName || "Student"}
+              {report.studentName ||
+                "Student"}
             </p>
 
             {report.studentEmail && (
@@ -442,14 +472,17 @@ function ReportCard({
             )}
 
             <p className="mt-1 text-xs text-slate-500">
-              Submitted {formatDate(report.createdAt)}
+              Submitted{" "}
+              {formatDate(
+                report.createdAt
+              )}
             </p>
 
           </div>
 
         </div>
 
-        {/* Report Badges */}
+        {/* Badges */}
 
         <div className="flex flex-wrap gap-2">
 
@@ -458,7 +491,8 @@ function ReportCard({
               report.status
             )}`}
           >
-            {report.status || "Open"}
+            {report.status ||
+              "Open"}
           </span>
 
           <span
@@ -466,7 +500,9 @@ function ReportCard({
               report.priority
             )}`}
           >
-            {report.priority || "Normal"} Priority
+            {report.priority ||
+              "Normal"}{" "}
+            Priority
           </span>
 
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
@@ -478,7 +514,7 @@ function ReportCard({
       </div>
 
       {/* =====================================================
-          STUDENT DESCRIPTION
+          DESCRIPTION
       ===================================================== */}
 
       <div className="mt-5 rounded-xl bg-slate-50 p-5">
@@ -514,7 +550,9 @@ function ReportCard({
             id={`status-${report._id}`}
             value={status}
             onChange={(event) =>
-              setStatus(event.target.value)
+              setStatus(
+                event.target.value
+              )
             }
             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           >
@@ -552,7 +590,9 @@ function ReportCard({
             id={`response-${report._id}`}
             value={response}
             onChange={(event) =>
-              setResponse(event.target.value)
+              setResponse(
+                event.target.value
+              )
             }
             rows={5}
             placeholder="Write a response or guidance for the student..."
@@ -560,8 +600,8 @@ function ReportCard({
           />
 
           <p className="mt-2 text-xs text-slate-500">
-            This response will be visible to the student after
-            you save the changes.
+            This response will be visible to the
+            student after you save the changes.
           </p>
 
         </div>
@@ -584,7 +624,10 @@ function ReportCard({
           </p>
 
           <p className="mt-4 text-xs text-slate-500">
-            Date: {formatDate(report.respondedAt)}
+            Date:{" "}
+            {formatDate(
+              report.respondedAt
+            )}
           </p>
 
         </div>
@@ -596,12 +639,16 @@ function ReportCard({
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
 
-        {/* Remove from Facilitator Dashboard */}
+        {/* FACILITATOR REMOVE */}
 
         <button
           type="button"
-          onClick={() => onDelete(report._id)}
-          disabled={updating === report._id}
+          onClick={() =>
+            onRemove(report._id)
+          }
+          disabled={
+            updating === report._id
+          }
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
         >
           <Trash2 size={17} />
@@ -611,7 +658,7 @@ function ReportCard({
             : "Remove"}
         </button>
 
-        {/* Save Changes */}
+        {/* SAVE */}
 
         <button
           type="button"
@@ -622,7 +669,9 @@ function ReportCard({
               response
             )
           }
-          disabled={updating === report._id}
+          disabled={
+            updating === report._id
+          }
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <CheckCircle size={17} />

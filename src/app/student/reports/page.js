@@ -27,13 +27,15 @@ export default function ReportIssuePage() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingReports, setLoadingReports] = useState(true);
-  const [deletingReport, setDeletingReport] = useState(null);
+  const [deletingReport, setDeletingReport] =
+    useState(null);
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // ---------------------------------------------------------
-  // LOAD STUDENT REPORTS
-  // ---------------------------------------------------------
+  // =========================================================
+  // LOAD REPORTS
+  // =========================================================
 
   async function loadReports() {
     try {
@@ -49,13 +51,18 @@ export default function ReportIssuePage() {
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Unable to load your reports."
+          data.message ||
+            "Unable to load your reports."
         );
       }
 
       setReports(data.reports || []);
     } catch (error) {
-      console.error("LOAD REPORTS ERROR:", error);
+      console.error(
+        "LOAD REPORTS ERROR:",
+        error
+      );
+
       setError(error.message);
     } finally {
       setLoadingReports(false);
@@ -66,9 +73,9 @@ export default function ReportIssuePage() {
     loadReports();
   }, []);
 
-  // ---------------------------------------------------------
-  // FORM CHANGE
-  // ---------------------------------------------------------
+  // =========================================================
+  // FORM
+  // =========================================================
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -79,9 +86,9 @@ export default function ReportIssuePage() {
     }));
   }
 
-  // ---------------------------------------------------------
+  // =========================================================
   // SUBMIT REPORT
-  // ---------------------------------------------------------
+  // =========================================================
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -91,23 +98,29 @@ export default function ReportIssuePage() {
     setError("");
 
     try {
-      const response = await fetch("/api/reports", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(form),
-      });
+      const response = await fetch(
+        "/api/reports",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(form),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Unable to submit your report."
+          data.message ||
+            "Unable to submit your report."
         );
       }
 
-      setMessage("Your issue has been reported successfully.");
+      setMessage(
+        "Your issue has been reported successfully."
+      );
 
       setForm({
         title: "",
@@ -116,23 +129,26 @@ export default function ReportIssuePage() {
         priority: "Normal",
       });
 
-      // Refresh reports so the new report appears immediately.
       await loadReports();
     } catch (error) {
-      console.error("SUBMIT REPORT ERROR:", error);
+      console.error(
+        "SUBMIT REPORT ERROR:",
+        error
+      );
+
       setError(error.message);
     } finally {
       setLoading(false);
     }
   }
 
-  // ---------------------------------------------------------
-  // DELETE STUDENT REPORT
-  // ---------------------------------------------------------
+  // =========================================================
+  // STUDENT DELETE
+  // =========================================================
 
   async function handleDeleteReport(reportId) {
     const confirmed = window.confirm(
-      "Are you sure you want to delete this report? This action cannot be undone."
+      "Are you sure you want to permanently delete this report?"
     );
 
     if (!confirmed) {
@@ -144,43 +160,56 @@ export default function ReportIssuePage() {
       setMessage("");
       setError("");
 
-      const response = await fetch("/api/reports", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id: reportId,
-        }),
-      });
+      const response = await fetch(
+        "/api/reports",
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: reportId,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Unable to delete your report."
+          data.message ||
+            "Unable to delete your report."
         );
       }
 
-      // Remove the deleted report from the student's screen.
+      /*
+       * Remove it immediately from the student's screen.
+       */
       setReports((currentReports) =>
         currentReports.filter(
-          (report) => report._id !== reportId
+          (report) =>
+            report._id !== reportId
         )
       );
 
-      setMessage("Your report was deleted successfully.");
+      setMessage(
+        "Your report was deleted successfully."
+      );
     } catch (error) {
-      console.error("DELETE REPORT ERROR:", error);
+      console.error(
+        "DELETE REPORT ERROR:",
+        error
+      );
+
       setError(error.message);
     } finally {
       setDeletingReport(null);
     }
   }
 
-  // ---------------------------------------------------------
-  // STATUS STYLE
-  // ---------------------------------------------------------
+  // =========================================================
+  // HELPERS
+  // =========================================================
 
   function getStatusStyle(status) {
     switch (status) {
@@ -198,10 +227,6 @@ export default function ReportIssuePage() {
     }
   }
 
-  // ---------------------------------------------------------
-  // PRIORITY STYLE
-  // ---------------------------------------------------------
-
   function getPriorityStyle(priority) {
     if (priority === "Urgent") {
       return "bg-red-100 text-red-700";
@@ -210,14 +235,8 @@ export default function ReportIssuePage() {
     return "bg-slate-100 text-slate-700";
   }
 
-  // ---------------------------------------------------------
-  // FORMAT DATE
-  // ---------------------------------------------------------
-
   function formatDate(date) {
-    if (!date) {
-      return "Unknown date";
-    }
+    if (!date) return "Unknown date";
 
     const parsedDate = new Date(date);
 
@@ -225,21 +244,18 @@ export default function ReportIssuePage() {
       return "Unknown date";
     }
 
-    return parsedDate.toLocaleDateString("en-GH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return parsedDate.toLocaleDateString(
+      "en-GH",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }
+    );
   }
-
-  // ---------------------------------------------------------
-  // FORMAT DATE + TIME
-  // ---------------------------------------------------------
 
   function formatDateTime(date) {
-    if (!date) {
-      return "Unknown date";
-    }
+    if (!date) return "Unknown date";
 
     const parsedDate = new Date(date);
 
@@ -247,27 +263,27 @@ export default function ReportIssuePage() {
       return "Unknown date";
     }
 
-    return parsedDate.toLocaleString("en-GH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    return parsedDate.toLocaleString(
+      "en-GH",
+      {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }
+    );
   }
 
-  // ---------------------------------------------------------
+  // =========================================================
   // PAGE
-  // ---------------------------------------------------------
+  // =========================================================
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl">
 
-        {/* ================================================= */}
-        {/* BACK */}
-        {/* ================================================= */}
-
+        {/* Back */}
         <button
           type="button"
           onClick={() => router.back()}
@@ -277,10 +293,7 @@ export default function ReportIssuePage() {
           Back
         </button>
 
-        {/* ================================================= */}
-        {/* HEADER */}
-        {/* ================================================= */}
-
+        {/* Header */}
         <div className="mb-8">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
             <AlertCircle size={26} />
@@ -291,15 +304,13 @@ export default function ReportIssuePage() {
           </h1>
 
           <p className="mt-2 text-slate-600">
-            Let us know about any academic, technical,
-            personal, or other issue you are experiencing.
+            Let us know about any academic,
+            technical, personal, or other issue
+            you are experiencing.
           </p>
         </div>
 
-        {/* ================================================= */}
-        {/* SUCCESS MESSAGE */}
-        {/* ================================================= */}
-
+        {/* Success */}
         {message && (
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
             <CheckCircle
@@ -311,27 +322,22 @@ export default function ReportIssuePage() {
           </div>
         )}
 
-        {/* ================================================= */}
-        {/* ERROR MESSAGE */}
-        {/* ================================================= */}
-
+        {/* Error */}
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
             {error}
           </div>
         )}
 
-        {/* ================================================= */}
-        {/* REPORT FORM */}
-        {/* ================================================= */}
+        {/* ===================================================
+            REPORT FORM
+        =================================================== */}
 
         <form
           onSubmit={handleSubmit}
           className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
         >
-
           {/* Title */}
-
           <div className="mb-6">
             <label
               htmlFor="title"
@@ -348,12 +354,11 @@ export default function ReportIssuePage() {
               onChange={handleChange}
               placeholder="Example: I need help with my assignment"
               required
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
           {/* Category */}
-
           <div className="mb-6">
             <label
               htmlFor="category"
@@ -400,7 +405,6 @@ export default function ReportIssuePage() {
           </div>
 
           {/* Priority */}
-
           <div className="mb-6">
             <label
               htmlFor="priority"
@@ -427,7 +431,6 @@ export default function ReportIssuePage() {
           </div>
 
           {/* Description */}
-
           <div className="mb-6">
             <label
               htmlFor="description"
@@ -444,16 +447,15 @@ export default function ReportIssuePage() {
               placeholder="Please explain what happened and what kind of help you need..."
               rows={7}
               required
-              className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              className="w-full resize-y rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
           {/* Submit */}
-
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Send size={18} />
 
@@ -463,13 +465,11 @@ export default function ReportIssuePage() {
           </button>
         </form>
 
-        {/* ================================================= */}
-        {/* MY REPORTS */}
-        {/* ================================================= */}
+        {/* ===================================================
+            MY REPORTS
+        =================================================== */}
 
         <section className="mt-10">
-
-          {/* Section Header */}
 
           <div className="mb-5 flex items-center justify-between">
             <div>
@@ -501,10 +501,7 @@ export default function ReportIssuePage() {
             </button>
           </div>
 
-          {/* ================================================= */}
-          {/* LOADING */}
-          {/* ================================================= */}
-
+          {/* Loading */}
           {loadingReports ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
               <Clock
@@ -518,10 +515,6 @@ export default function ReportIssuePage() {
             </div>
 
           ) : reports.length === 0 ? (
-
-            /* ================================================= */
-            /* NO REPORTS */
-            /* ================================================= */
 
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
               <MessageSquare
@@ -540,10 +533,6 @@ export default function ReportIssuePage() {
 
           ) : (
 
-            /* ================================================= */
-            /* REPORTS */
-            /* ================================================= */
-
             <div className="space-y-4">
 
               {reports.map((report) => (
@@ -552,10 +541,7 @@ export default function ReportIssuePage() {
                   className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
                 >
 
-                  {/* ================================================= */}
-                  {/* REPORT HEADER */}
-                  {/* ================================================= */}
-
+                  {/* Report Header */}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 
                     <div>
@@ -565,7 +551,9 @@ export default function ReportIssuePage() {
 
                       <p className="mt-1 text-sm text-slate-500">
                         Submitted{" "}
-                        {formatDate(report.createdAt)}
+                        {formatDate(
+                          report.createdAt
+                        )}
                       </p>
                     </div>
 
@@ -576,12 +564,10 @@ export default function ReportIssuePage() {
                     >
                       {report.status || "Open"}
                     </span>
+
                   </div>
 
-                  {/* ================================================= */}
-                  {/* CATEGORY / PRIORITY */}
-                  {/* ================================================= */}
-
+                  {/* Category / Priority */}
                   <div className="mt-4 flex flex-wrap gap-2">
 
                     <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
@@ -595,32 +581,32 @@ export default function ReportIssuePage() {
                     >
                       {report.priority} Priority
                     </span>
+
                   </div>
 
-                  {/* ================================================= */}
-                  {/* DESCRIPTION */}
-                  {/* ================================================= */}
-
+                  {/* Description */}
                   <div className="mt-4 rounded-xl bg-slate-50 p-4">
+
                     <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
                       {report.description}
                     </p>
+
                   </div>
 
-                  {/* ================================================= */}
-                  {/* FACILITATOR RESPONSE */}
-                  {/* ================================================= */}
+                  {/* =================================================
+                      FACILITATOR RESPONSE
+                  ================================================= */}
 
                   {report.response &&
                     report.response.trim() && (
                       <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
 
-                        {/* Response Header */}
-
-                        <div className="mb-4 flex items-center gap-2">
+                        <div className="mb-3 flex items-center gap-2">
 
                           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
-                            <MessageSquare size={18} />
+                            <MessageSquare
+                              size={18}
+                            />
                           </div>
 
                           <div>
@@ -635,29 +621,10 @@ export default function ReportIssuePage() {
 
                         </div>
 
-                        {/* Response Date */}
-
-                        <div className="mb-4 rounded-xl border border-blue-100 bg-white p-3">
-
-                          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            <CalendarDays size={14} />
-                            Response Date
-                          </div>
-
-                          <p className="font-medium text-slate-800">
-                            {formatDateTime(
-                              report.respondedAt
-                            )}
-                          </p>
-
-                        </div>
-
-                        {/* Response Message */}
-
                         <div className="rounded-xl border border-blue-100 bg-white p-4">
 
                           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Message
+                            Response
                           </p>
 
                           <p className="whitespace-pre-wrap text-sm leading-7 text-slate-700">
@@ -665,12 +632,23 @@ export default function ReportIssuePage() {
                           </p>
 
                         </div>
+
+                        <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                          <CalendarDays
+                            size={14}
+                          />
+
+                          {formatDateTime(
+                            report.respondedAt
+                          )}
+                        </div>
+
                       </div>
                     )}
 
-                  {/* ================================================= */}
-                  {/* DELETE REPORT */}
-                  {/* ================================================= */}
+                  {/* =================================================
+                      STUDENT DELETE BUTTON
+                  ================================================= */}
 
                   <div className="mt-5 flex justify-end border-t border-slate-100 pt-5">
 
@@ -685,7 +663,7 @@ export default function ReportIssuePage() {
                         deletingReport ===
                         report._id
                       }
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Trash2 size={17} />
 
@@ -705,13 +683,9 @@ export default function ReportIssuePage() {
 
         </section>
 
-        {/* ================================================= */}
-        {/* PRIVACY NOTE */}
-        {/* ================================================= */}
-
         <p className="mt-6 text-center text-sm text-slate-500">
-          Your reports are private and can only be viewed
-          by you and authorized facilitators.
+          Your reports are private and can only be
+          viewed by you and authorized facilitators.
         </p>
 
       </div>

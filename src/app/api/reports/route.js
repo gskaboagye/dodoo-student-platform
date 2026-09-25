@@ -5,34 +5,28 @@ import { cookies } from "next/headers";
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
-// ---------------------------------------------------------
+// =========================================================
 // DATABASE
-// ---------------------------------------------------------
+// =========================================================
 
 async function getDatabase() {
   const client = await clientPromise;
-  const dbName = process.env.DB_NAME || "DCCPlatform";
-
-  return client.db(dbName);
+  return client.db(process.env.DB_NAME || "DCCPlatform");
 }
 
-// ---------------------------------------------------------
+// =========================================================
 // USER NAME
-// ---------------------------------------------------------
+// =========================================================
 
 function getFullName(user) {
-  if (!user) {
-    return "";
-  }
+  if (!user) return "";
 
   const firstName = user.firstName?.trim() || "";
   const lastName = user.lastName?.trim() || "";
 
   const fullName = `${firstName} ${lastName}`.trim();
 
-  if (fullName) {
-    return fullName;
-  }
+  if (fullName) return fullName;
 
   if (user.name?.trim()) {
     return user.name.trim();
@@ -41,25 +35,21 @@ function getFullName(user) {
   return user.email?.trim() || "";
 }
 
-// ---------------------------------------------------------
+// =========================================================
 // CURRENT USER
-// ---------------------------------------------------------
+// =========================================================
 
 async function getCurrentUser(session, db) {
-  if (!session?.userId) {
-    return null;
-  }
+  if (!session?.userId) return null;
 
   let user = null;
 
-  // Try ObjectId first.
   if (ObjectId.isValid(session.userId)) {
     user = await db.collection("users").findOne({
       _id: new ObjectId(session.userId),
     });
   }
 
-  // Some older records may use a string ID.
   if (!user) {
     user = await db.collection("users").findOne({
       _id: session.userId,
@@ -69,15 +59,9 @@ async function getCurrentUser(session, db) {
   return user;
 }
 
-// ---------------------------------------------------------
+// =========================================================
 // GET REPORTS
-// ---------------------------------------------------------
-// Student:
-//   - sees only their own reports
-//
-// Facilitator:
-//   - sees reports that have not been hidden by facilitator
-// ---------------------------------------------------------
+// =========================================================
 
 export async function GET() {
   try {
@@ -86,12 +70,8 @@ export async function GET() {
 
     if (!token) {
       return NextResponse.json(
-        {
-          message: "Unauthorized.",
-        },
-        {
-          status: 401,
-        }
+        { message: "Unauthorized." },
+        { status: 401 }
       );
     }
 
@@ -99,12 +79,8 @@ export async function GET() {
 
     if (!session) {
       return NextResponse.json(
-        {
-          message: "Invalid or expired session.",
-        },
-        {
-          status: 401,
-        }
+        { message: "Invalid or expired session." },
+        { status: 401 }
       );
     }
 
@@ -121,12 +97,8 @@ export async function GET() {
 
       if (!studentUser) {
         return NextResponse.json(
-          {
-            message: "Student account could not be found.",
-          },
-          {
-            status: 404,
-          }
+          { message: "Student account could not be found." },
+          { status: 404 }
         );
       }
 
@@ -141,22 +113,19 @@ export async function GET() {
             message:
               "Your account is not linked to a student record.",
           },
-          {
-            status: 400,
-          }
+          { status: 400 }
         );
       }
 
       /*
-       * IMPORTANT:
+       * Students ALWAYS see their own reports.
        *
-       * Students see their own reports regardless of whether
-       * a facilitator has hidden the report from the
-       * facilitator dashboard.
+       * Notice that we do NOT check deletedByFacilitator here.
+       * This is important because a facilitator's Remove action
+       * must NOT hide the report from the student.
        */
-
       query = {
-        studentId: studentId,
+        studentId,
       };
     }
 
@@ -166,16 +135,12 @@ export async function GET() {
 
     else if (session.role === "facilitator") {
       /*
-       * IMPORTANT:
+       * Facilitators see reports that have NOT been removed
+       * from their dashboard.
        *
-       * Facilitator deletion is a SOFT DELETE.
-       *
-       * The report remains in MongoDB so the student can
-       * continue seeing it.
-       *
-       * It is simply hidden from the facilitator dashboard.
+       * Old reports that do not have deletedByFacilitator are
+       * also visible.
        */
-
       query = {
         $or: [
           {
@@ -190,80 +155,55 @@ export async function GET() {
       };
     }
 
-    // -------------------------------------------------------
-    // UNKNOWN ROLE
-    // -------------------------------------------------------
-
     else {
       return NextResponse.json(
-        {
-          message: "Unauthorized role.",
-        },
-        {
-          status: 403,
-        }
+        { message: "Unauthorized role." },
+        { status: 403 }
       );
     }
-
-    // -------------------------------------------------------
-    // FIND REPORTS
-    // -------------------------------------------------------
 
     const reports = await db
       .collection("reports")
       .find(query)
-      .sort({
-        createdAt: -1,
-      })
+      .sort({ createdAt: -1 })
       .toArray();
-
-    // -------------------------------------------------------
-    // FORMAT REPORTS
-    // -------------------------------------------------------
 
     const formattedReports = reports.map((report) => ({
       ...report,
 
       _id: report._id.toString(),
 
-      // Student information
       studentId: report.studentId || "",
       studentName: report.studentName || "",
       studentEmail: report.studentEmail || "",
 
-      // Report information
       title: report.title || "",
       category: report.category || "",
       description: report.description || "",
       priority: report.priority || "Normal",
       status: report.status || "Open",
 
-      // Facilitator response
       response: report.response || "",
       facilitatorId: report.facilitatorId || "",
       facilitatorName: report.facilitatorName || "",
       facilitatorEmail: report.facilitatorEmail || "",
       respondedAt: report.respondedAt || null,
 
-      // Facilitator visibility
+      createdAt: report.createdAt || null,
+      updatedAt: report.updatedAt || null,
+
       deletedByFacilitator:
         report.deletedByFacilitator || false,
 
       facilitatorDeletedAt:
         report.facilitatorDeletedAt || null,
-
-      // Dates
-      createdAt: report.createdAt || null,
-      updatedAt: report.updatedAt || null,
     }));
 
     return NextResponse.json(
       {
         reports: formattedReports,
       },
-      {
-        status: 200,
-      }
+      { status: 200 }
     );
   } catch (error) {
     console.error("GET REPORTS ERROR:", error);
@@ -272,18 +212,14 @@ export async function GET() {
       {
         message: "Unable to retrieve reports.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-// ---------------------------------------------------------
+// =========================================================
 // POST REPORT
-// ---------------------------------------------------------
-// Only students can submit reports.
-// ---------------------------------------------------------
+// =========================================================
 
 export async function POST(request) {
   try {
@@ -292,12 +228,8 @@ export async function POST(request) {
 
     if (!token) {
       return NextResponse.json(
-        {
-          message: "Unauthorized.",
-        },
-        {
-          status: 401,
-        }
+        { message: "Unauthorized." },
+        { status: 401 }
       );
     }
 
@@ -305,12 +237,8 @@ export async function POST(request) {
 
     if (!session) {
       return NextResponse.json(
-        {
-          message: "Invalid or expired session.",
-        },
-        {
-          status: 401,
-        }
+        { message: "Invalid or expired session." },
+        { status: 401 }
       );
     }
 
@@ -319,9 +247,7 @@ export async function POST(request) {
         {
           message: "Only students can submit reports.",
         },
-        {
-          status: 403,
-        }
+        { status: 403 }
       );
     }
 
@@ -330,7 +256,8 @@ export async function POST(request) {
     const title = body.title?.trim();
     const category = body.category?.trim();
     const description = body.description?.trim();
-    const priority = body.priority?.trim() || "Normal";
+    const priority =
+      body.priority?.trim() || "Normal";
 
     if (!title || !category || !description) {
       return NextResponse.json(
@@ -338,25 +265,24 @@ export async function POST(request) {
           message:
             "Title, category, and description are required.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
     const db = await getDatabase();
 
-    // Get the real logged-in student.
-    const studentUser = await getCurrentUser(session, db);
+    const studentUser = await getCurrentUser(
+      session,
+      db
+    );
 
     if (!studentUser) {
       return NextResponse.json(
         {
-          message: "Student account could not be found.",
+          message:
+            "Student account could not be found.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
@@ -378,9 +304,7 @@ export async function POST(request) {
           message:
             "Your account is not linked to a student record. Please contact a facilitator.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
@@ -390,39 +314,34 @@ export async function POST(request) {
           message:
             "Your account does not have a name configured. Please contact a facilitator.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
     const report = {
-      // REAL STUDENT INFORMATION
       studentId,
       studentName,
       studentEmail,
 
-      // REPORT INFORMATION
       title,
       category,
       description,
       priority,
 
-      // REPORT STATUS
       status: "Open",
 
-      // FACILITATOR RESPONSE
       response: "",
       facilitatorId: "",
       facilitatorName: "",
       facilitatorEmail: "",
       respondedAt: null,
 
-      // FACILITATOR VISIBILITY
+      /*
+       * New reports are visible to facilitators.
+       */
       deletedByFacilitator: false,
       facilitatorDeletedAt: null,
 
-      // DATES
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -434,15 +353,12 @@ export async function POST(request) {
     return NextResponse.json(
       {
         message: "Report submitted successfully.",
-
         report: {
           ...report,
           _id: result.insertedId.toString(),
         },
       },
-      {
-        status: 201,
-      }
+      { status: 201 }
     );
   } catch (error) {
     console.error("CREATE REPORT ERROR:", error);
@@ -451,23 +367,23 @@ export async function POST(request) {
       {
         message: "Unable to submit report.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-// ---------------------------------------------------------
-// DELETE REPORT
-// ---------------------------------------------------------
-// Student:
-//   - permanently deletes ONLY their own report
+// =========================================================
+// DELETE / REMOVE REPORT
+// =========================================================
 //
-// Facilitator:
-//   - HIDES the report from facilitator dashboard
-//   - DOES NOT delete the student's report
-// ---------------------------------------------------------
+// STUDENT:
+//   Permanently deletes ONLY their own report.
+//
+// FACILITATOR:
+//   Soft-removes the report from the facilitator dashboard.
+//   The student's report remains in MongoDB and remains visible
+//   to the student.
+// =========================================================
 
 export async function DELETE(request) {
   try {
@@ -476,12 +392,8 @@ export async function DELETE(request) {
 
     if (!token) {
       return NextResponse.json(
-        {
-          message: "Unauthorized.",
-        },
-        {
-          status: 401,
-        }
+        { message: "Unauthorized." },
+        { status: 401 }
       );
     }
 
@@ -492,57 +404,42 @@ export async function DELETE(request) {
         {
           message: "Invalid or expired session.",
         },
-        {
-          status: 401,
-        }
+        { status: 401 }
       );
     }
 
-    const { id } = await request.json();
+    const body = await request.json();
+    const id = body.id;
 
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(
         {
           message: "Invalid report ID.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
     const db = await getDatabase();
 
-    // -------------------------------------------------------
-    // FIND REPORT
-    // -------------------------------------------------------
-
-    const report = await db.collection("reports").findOne({
-      _id: new ObjectId(id),
-    });
+    const report = await db
+      .collection("reports")
+      .findOne({
+        _id: new ObjectId(id),
+      });
 
     if (!report) {
       return NextResponse.json(
         {
           message: "Report not found.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
-    // -------------------------------------------------------
-    // FACILITATOR DELETE
-    // -------------------------------------------------------
-    //
-    // DO NOT delete the MongoDB document.
-    //
-    // Instead, mark it as hidden from the facilitator.
-    //
-    // The student can still retrieve it because the student's
-    // GET query only filters by studentId.
-    // -------------------------------------------------------
+    // =======================================================
+    // FACILITATOR REMOVE
+    // =======================================================
 
     if (session.role === "facilitator") {
       const result = await db
@@ -563,11 +460,9 @@ export async function DELETE(request) {
       if (result.matchedCount === 0) {
         return NextResponse.json(
           {
-            message: "Report could not be hidden.",
+            message: "Report could not be removed.",
           },
-          {
-            status: 404,
-          }
+          { status: 404 }
         );
       }
 
@@ -576,27 +471,27 @@ export async function DELETE(request) {
           message:
             "Report removed from the facilitator dashboard.",
         },
-        {
-          status: 200,
-        }
+        { status: 200 }
       );
     }
 
-    // -------------------------------------------------------
+    // =======================================================
     // STUDENT DELETE
-    // -------------------------------------------------------
+    // =======================================================
 
     if (session.role === "student") {
-      const studentUser = await getCurrentUser(session, db);
+      const studentUser = await getCurrentUser(
+        session,
+        db
+      );
 
       if (!studentUser) {
         return NextResponse.json(
           {
-            message: "Student account could not be found.",
+            message:
+              "Student account could not be found.",
           },
-          {
-            status: 404,
-          }
+          { status: 404 }
         );
       }
 
@@ -611,95 +506,75 @@ export async function DELETE(request) {
             message:
               "Your account is not linked to a student record.",
           },
-          {
-            status: 400,
-          }
+          { status: 400 }
         );
       }
 
-      // -----------------------------------------------------
-      // SECURITY CHECK
-      // -----------------------------------------------------
-      //
-      // A student can ONLY delete a report belonging to
-      // their own studentId.
-      // -----------------------------------------------------
-
+      /*
+       * SECURITY:
+       * The logged-in student's ID must match the report owner.
+       */
       if (report.studentId !== studentId) {
         return NextResponse.json(
           {
             message:
               "You are not authorized to delete this report.",
           },
-          {
-            status: 403,
-          }
+          { status: 403 }
         );
       }
 
-      // -----------------------------------------------------
-      // PERMANENT STUDENT DELETE
-      // -----------------------------------------------------
-
+      /*
+       * Permanent deletion is allowed ONLY when the
+       * report belongs to the logged-in student.
+       */
       const result = await db
         .collection("reports")
         .deleteOne({
           _id: new ObjectId(id),
-          studentId: studentId,
+          studentId,
         });
 
       if (result.deletedCount === 0) {
         return NextResponse.json(
           {
-            message: "Report could not be deleted.",
+            message:
+              "Report could not be deleted.",
           },
-          {
-            status: 404,
-          }
+          { status: 404 }
         );
       }
 
       return NextResponse.json(
         {
-          message: "Your report was deleted successfully.",
+          message:
+            "Your report was deleted successfully.",
         },
-        {
-          status: 200,
-        }
+        { status: 200 }
       );
     }
-
-    // -------------------------------------------------------
-    // UNKNOWN ROLE
-    // -------------------------------------------------------
 
     return NextResponse.json(
       {
         message: "Unauthorized role.",
       },
-      {
-        status: 403,
-      }
+      { status: 403 }
     );
   } catch (error) {
     console.error("DELETE REPORT ERROR:", error);
 
     return NextResponse.json(
       {
-        message: "Unable to delete report.",
+        message: "Unable to process report deletion.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-// ---------------------------------------------------------
+// =========================================================
 // PATCH REPORT
-// ---------------------------------------------------------
-// Only facilitators can update reports.
-// ---------------------------------------------------------
+// =========================================================
 
 export async function PATCH(request) {
   try {
@@ -708,25 +583,23 @@ export async function PATCH(request) {
 
     if (!token) {
       return NextResponse.json(
-        {
-          message: "Unauthorized.",
-        },
-        {
-          status: 401,
-        }
+        { message: "Unauthorized." },
+        { status: 401 }
       );
     }
 
     const session = await verifySession(token);
 
-    if (!session || session.role !== "facilitator") {
+    if (
+      !session ||
+      session.role !== "facilitator"
+    ) {
       return NextResponse.json(
         {
-          message: "Only facilitators can update reports.",
+          message:
+            "Only facilitators can update reports.",
         },
-        {
-          status: 403,
-        }
+        { status: 403 }
       );
     }
 
@@ -734,16 +607,15 @@ export async function PATCH(request) {
 
     const id = body.id;
     const status = body.status?.trim();
-    const response = body.response?.trim() || "";
+    const response =
+      body.response?.trim() || "";
 
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(
         {
           message: "Invalid report ID.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
@@ -759,28 +631,22 @@ export async function PATCH(request) {
         {
           message: "Invalid report status.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
     const db = await getDatabase();
 
-    // Get the real logged-in facilitator.
-    const facilitatorUser = await getCurrentUser(
-      session,
-      db
-    );
+    const facilitatorUser =
+      await getCurrentUser(session, db);
 
     if (!facilitatorUser) {
       return NextResponse.json(
         {
-          message: "Facilitator account could not be found.",
+          message:
+            "Facilitator account could not be found.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
@@ -795,19 +661,7 @@ export async function PATCH(request) {
     const updateData = {
       status,
       updatedAt: new Date(),
-
-      /*
-       * If a facilitator responds to a report that was
-       * previously hidden, make it visible again on the
-       * facilitator dashboard.
-       */
-      deletedByFacilitator: false,
-      facilitatorDeletedAt: null,
     };
-
-    // -----------------------------------------------------
-    // SAVE RESPONSE
-    // -----------------------------------------------------
 
     if (response) {
       updateData.response = response;
@@ -825,9 +679,6 @@ export async function PATCH(request) {
 
       updateData.respondedAt = new Date();
     } else {
-      // If the facilitator intentionally saves an empty
-      // response, remove the existing response.
-
       updateData.response = "";
       updateData.facilitatorId = "";
       updateData.facilitatorName = "";
@@ -835,6 +686,13 @@ export async function PATCH(request) {
       updateData.respondedAt = null;
     }
 
+    /*
+     * IMPORTANT:
+     * Do NOT set deletedByFacilitator to false here.
+     *
+     * A facilitator's Remove action must stay removed
+     * from the facilitator dashboard.
+     */
     const result = await db
       .collection("reports")
       .updateOne(
@@ -851,26 +709,18 @@ export async function PATCH(request) {
         {
           message: "Report not found.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
-    // -----------------------------------------------------
-    // GET UPDATED REPORT
-    // -----------------------------------------------------
-
-    const updatedReport = await db
-      .collection("reports")
-      .findOne({
+    const updatedReport =
+      await db.collection("reports").findOne({
         _id: new ObjectId(id),
       });
 
     return NextResponse.json(
       {
         message: "Report updated successfully.",
-
         report: updatedReport
           ? {
               ...updatedReport,
@@ -878,9 +728,7 @@ export async function PATCH(request) {
             }
           : null,
       },
-      {
-        status: 200,
-      }
+      { status: 200 }
     );
   } catch (error) {
     console.error("UPDATE REPORT ERROR:", error);
@@ -889,9 +737,7 @@ export async function PATCH(request) {
       {
         message: "Unable to update report.",
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
