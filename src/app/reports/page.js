@@ -18,8 +18,7 @@ export default function ReportsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  // Used to tell individual report cards to clear
-  // their response textarea after a successful save.
+  // Used to clear the response textbox after saving.
   const [clearResponse, setClearResponse] = useState({});
 
   // ---------------------------------------------------------
@@ -87,7 +86,7 @@ export default function ReportsPage() {
         );
       }
 
-      // Update only the report that was changed.
+      // Keep the saved response and date in the report data.
       if (data.report) {
         setReports((currentReports) =>
           currentReports.map((report) =>
@@ -102,8 +101,7 @@ export default function ReportsPage() {
         );
       }
 
-      // Tell this specific ReportCard to clear its
-      // "Response to Student" textarea.
+      // Clear only the editable response textbox.
       setClearResponse((previous) => ({
         ...previous,
         [id]: Date.now(),
@@ -150,7 +148,6 @@ export default function ReportsPage() {
         );
       }
 
-      // Remove only the deleted report.
       setReports((currentReports) =>
         currentReports.filter(
           (report) => report._id !== id
@@ -341,9 +338,9 @@ function ReportCard({
     report.status || "Open"
   );
 
-  const [response, setResponse] = useState(
-    report.response || ""
-  );
+  // This is only the text currently being typed.
+  // It will be cleared after saving.
+  const [response, setResponse] = useState("");
 
   // ---------------------------------------------------------
   // Keep local status synchronized with the report.
@@ -441,13 +438,6 @@ function ReportCard({
 
       {/* =====================================================
           FACILITATOR CONTROLS
-          
-          IMPORTANT:
-          There is NO existing facilitator response display
-          on the facilitator page.
-
-          The facilitator only writes/updates the response.
-          The student sees the saved response.
       ===================================================== */}
 
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
@@ -498,10 +488,32 @@ function ReportCard({
 
           <p className="mt-2 text-xs text-slate-500">
             This response will be visible to the student after
-            you save the changes. The box will clear after saving.
+            you save the changes.
           </p>
         </div>
       </div>
+
+      {/* =====================================================
+          SAVED RESPONSE
+          
+          Only the saved response and date are displayed here.
+      ===================================================== */}
+
+      {report.response && (
+        <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-5">
+          <h3 className="mb-3 text-sm font-semibold text-green-800">
+            Saved Response
+          </h3>
+
+          <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
+            {report.response}
+          </p>
+
+          <p className="mt-4 text-xs text-slate-500">
+            Date: {formatDate(report.respondedAt)}
+          </p>
+        </div>
+      )}
 
       {/* =====================================================
           ACTIONS
