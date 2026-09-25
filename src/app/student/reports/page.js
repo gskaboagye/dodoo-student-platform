@@ -29,9 +29,12 @@ export default function ReportIssuePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function loadReports() {
+  async function loadReports(showLoading = true) {
     try {
-      setLoadingReports(true);
+      if (showLoading) {
+        setLoadingReports(true);
+      }
+
       setError("");
 
       const response = await fetch("/api/reports", {
@@ -52,12 +55,39 @@ export default function ReportIssuePage() {
       console.error("LOAD REPORTS ERROR:", error);
       setError(error.message);
     } finally {
-      setLoadingReports(false);
+      if (showLoading) {
+        setLoadingReports(false);
+      }
     }
   }
 
+  // Initial load + automatic refresh every 10 seconds.
   useEffect(() => {
     loadReports();
+
+    const interval = setInterval(() => {
+      loadReports(false);
+    }, 10000);
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        loadReports(false);
+      }
+    }
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      clearInterval(interval);
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
   }, []);
 
   function handleChange(event) {
@@ -102,7 +132,7 @@ export default function ReportIssuePage() {
         priority: "Normal",
       });
 
-      await loadReports();
+      await loadReports(false);
     } catch (error) {
       setError(error.message);
     } finally {
@@ -324,13 +354,13 @@ export default function ReportIssuePage() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-600">
-                Track the issues you have reported.
+                Track your submitted issues and facilitator responses.
               </p>
             </div>
 
             <button
               type="button"
-              onClick={loadReports}
+              onClick={() => loadReports()}
               disabled={loadingReports}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
@@ -407,7 +437,7 @@ export default function ReportIssuePage() {
                         report.priority
                       )}`}
                     >
-                      {report.priority} Priority
+                      {report.priority || "Normal"} Priority
                     </span>
                   </div>
 
@@ -419,7 +449,7 @@ export default function ReportIssuePage() {
                   </div>
 
                   {/* Facilitator Response */}
-                  {report.response && (
+                  {report.response?.trim() ? (
                     <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-5">
                       <div className="flex items-start gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
@@ -427,38 +457,45 @@ export default function ReportIssuePage() {
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="mb-2">
-                            <h4 className="font-semibold text-blue-800">
-                              Facilitator Response
-                            </h4>
+                          <h4 className="font-semibold text-blue-800">
+                            Facilitator Response
+                          </h4>
 
-                            <p className="mt-1 text-sm font-semibold text-blue-900">
-                              Responded by:{" "}
-                              {report.facilitatorName ||
-                                "Facilitator"}
+                          <p className="mt-1 text-sm font-semibold text-blue-900">
+                            Responded by:{" "}
+                            {report.facilitatorName ||
+                              "Facilitator"}
+                          </p>
+
+                          {report.facilitatorEmail && (
+                            <p className="mt-0.5 text-xs text-blue-700">
+                              {report.facilitatorEmail}
                             </p>
+                          )}
 
-                            {report.facilitatorEmail && (
-                              <p className="mt-0.5 text-xs text-blue-700">
-                                {report.facilitatorEmail}
-                              </p>
-                            )}
+                          {report.respondedAt && (
+                            <p className="mt-0.5 text-xs text-blue-600">
+                              {formatDateTime(
+                                report.respondedAt
+                              )}
+                            </p>
+                          )}
 
-                            {report.respondedAt && (
-                              <p className="mt-0.5 text-xs text-blue-600">
-                                {formatDateTime(
-                                  report.respondedAt
-                                )}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="border-t border-blue-200 pt-3">
+                          <div className="mt-3 border-t border-blue-200 pt-3">
                             <p className="whitespace-pre-wrap text-sm leading-6 text-blue-900">
                               {report.response}
                             </p>
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Clock size={16} />
+                        <span>
+                          Waiting for facilitator response.
+                        </span>
                       </div>
                     </div>
                   )}
