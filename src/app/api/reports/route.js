@@ -5,37 +5,61 @@ import { cookies } from "next/headers";
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
-// Get the database using the same database name everywhere.
+// ---------------------------------------------------------
+// DATABASE
+// ---------------------------------------------------------
+
 async function getDatabase() {
   const client = await clientPromise;
   const dbName = process.env.DB_NAME || "DCCPlatform";
+
   return client.db(dbName);
 }
 
-// Build the actual user's full name from the users collection.
+// ---------------------------------------------------------
+// USER NAME
+// ---------------------------------------------------------
+
 function getFullName(user) {
-  if (!user) return "";
+  if (!user) {
+    return "";
+  }
 
   const firstName = user.firstName?.trim() || "";
   const lastName = user.lastName?.trim() || "";
 
   const fullName = `${firstName} ${lastName}`.trim();
 
-  return fullName || user.name?.trim() || user.email?.trim() || "";
+  if (fullName) {
+    return fullName;
+  }
+
+  if (user.name?.trim()) {
+    return user.name.trim();
+  }
+
+  return user.email?.trim() || "";
 }
 
-// Find the logged-in user.
+// ---------------------------------------------------------
+// CURRENT USER
+// ---------------------------------------------------------
+
 async function getCurrentUser(session, db) {
-  if (!session?.userId) return null;
+  if (!session?.userId) {
+    return null;
+  }
 
   let user = null;
 
+  // Try ObjectId first.
   if (ObjectId.isValid(session.userId)) {
     user = await db.collection("users").findOne({
       _id: new ObjectId(session.userId),
     });
   }
 
+  // Some older records may use a string ID.
   if (!user) {
     user = await db.collection("users").findOne({
       _id: session.userId,
@@ -45,8 +69,22 @@ async function getCurrentUser(session, db) {
   return user;
 }
 
-// GET - Students see their own reports.
-// Facilitators see all reports.
+// ---------------------------------------------------------
+// GET REPORTS
+// ---------------------------------------------------------
+// Student:
+//   - sees only their own reports
+//
+// Facilitator:
+//   - sees all reports
+//
+// The complete report object is returned, including:
+//   response
+//   facilitatorName
+//   facilitatorEmail
+//   respondedAt
+// ---------------------------------------------------------
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -54,8 +92,12 @@ export async function GET() {
 
     if (!token) {
       return NextResponse.json(
-        { message: "Unauthorized." },
-        { status: 401 }
+        {
+          message: "Unauthorized.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
@@ -63,44 +105,91 @@ export async function GET() {
 
     if (!session) {
       return NextResponse.json(
-        { message: "Invalid or expired session." },
-        { status: 401 }
+        {
+          message: "Invalid or expired session.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
     const db = await getDatabase();
 
-    const query =
-      session.role === "facilitator"
-        ? {}
-        : { studentId: session.studentId };
+    let query = {};
+
+    if (session.role === "student") {
+      if (!session.studentId) {
+        return NextResponse.json(
+          {
+            message: "Student account is not linked to a student record.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      query = {
+        studentId: session.studentId,
+      };
+    }
 
     const reports = await db
       .collection("reports")
       .find(query)
-      .sort({ createdAt: -1 })
+      .sort({
+        createdAt: -1,
+      })
       .toArray();
 
     const formattedReports = reports.map((report) => ({
       ...report,
       _id: report._id.toString(),
+
+      // Always return these fields.
+      studentName: report.studentName || "",
+      studentEmail: report.studentEmail || "",
+
+      response: report.response || "",
+
+      facilitatorId: report.facilitatorId || "",
+      facilitatorName: report.facilitatorName || "",
+      facilitatorEmail: report.facilitatorEmail || "",
+      respondedAt: report.respondedAt || null,
     }));
 
     return NextResponse.json(
-      { reports: formattedReports },
-      { status: 200 }
+      {
+        reports: formattedReports,
+      },
+      {
+        status: 200,
+      }
     );
   } catch (error) {
     console.error("GET REPORTS ERROR:", error);
 
     return NextResponse.json(
-      { message: "Unable to retrieve reports." },
-      { status: 500 }
+      {
+        message: "Unable to retrieve reports.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
 
-// POST - Students submit a report.
+// ---------------------------------------------------------
+// POST REPORT
+// ---------------------------------------------------------
+// Only students can submit reports.
+//
+// The student's name and email are NOT taken from the form.
+// They are taken from the authenticated user's MongoDB record.
+// ---------------------------------------------------------
+
 export async function POST(request) {
   try {
     const cookieStore = await cookies();
@@ -108,8 +197,12 @@ export async function POST(request) {
 
     if (!token) {
       return NextResponse.json(
-        { message: "Unauthorized." },
-        { status: 401 }
+        {
+          message: "Unauthorized.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
@@ -117,15 +210,23 @@ export async function POST(request) {
 
     if (!session) {
       return NextResponse.json(
-        { message: "Invalid or expired session." },
-        { status: 401 }
+        {
+          message: "Invalid or expired session.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
     if (session.role !== "student") {
       return NextResponse.json(
-        { message: "Only students can submit reports." },
-        { status: 403 }
+        {
+          message: "Only students can submit reports.",
+        },
+        {
+          status: 403,
+        }
       );
     }
 
@@ -142,25 +243,51 @@ export async function POST(request) {
           message:
             "Title, category, and description are required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     const db = await getDatabase();
 
-    // Get the actual student account from MongoDB.
+    // Get the real logged-in student.
     const studentUser = await getCurrentUser(session, db);
 
     if (!studentUser) {
       return NextResponse.json(
-        { message: "Student account could not be found." },
-        { status: 404 }
+        {
+          message: "Student account could not be found.",
+        },
+        {
+          status: 404,
+        }
       );
     }
 
     const studentName = getFullName(studentUser);
+
     const studentEmail =
-      studentUser.email?.trim() || session.email || "";
+      studentUser.email?.trim() ||
+      session.email?.trim() ||
+      "";
+
+    const studentId =
+      studentUser.studentId ||
+      session.studentId ||
+      "";
+
+    if (!studentId) {
+      return NextResponse.json(
+        {
+          message:
+            "Your account is not linked to a student record. Please contact a facilitator.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     if (!studentName) {
       return NextResponse.json(
@@ -168,32 +295,35 @@ export async function POST(request) {
           message:
             "Your account does not have a name configured. Please contact a facilitator.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     const report = {
-      studentId:
-        studentUser.studentId || session.studentId || "",
-
-      // Actual student information from MongoDB.
+      // REAL STUDENT INFORMATION
+      studentId,
       studentName,
       studentEmail,
 
+      // REPORT INFORMATION
       title,
       category,
       description,
       priority,
 
+      // REPORT STATUS
       status: "Open",
 
-      // Facilitator response information.
+      // FACILITATOR RESPONSE
       response: "",
       facilitatorId: "",
       facilitatorName: "",
       facilitatorEmail: "",
       respondedAt: null,
 
+      // DATES
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -205,24 +335,36 @@ export async function POST(request) {
     return NextResponse.json(
       {
         message: "Report submitted successfully.",
+
         report: {
           ...report,
           _id: result.insertedId.toString(),
         },
       },
-      { status: 201 }
+      {
+        status: 201,
+      }
     );
   } catch (error) {
     console.error("CREATE REPORT ERROR:", error);
 
     return NextResponse.json(
-      { message: "Unable to submit report." },
-      { status: 500 }
+      {
+        message: "Unable to submit report.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
 
-// DELETE - Facilitators can delete reports.
+// ---------------------------------------------------------
+// DELETE REPORT
+// ---------------------------------------------------------
+// Only facilitators can delete reports.
+// ---------------------------------------------------------
+
 export async function DELETE(request) {
   try {
     const cookieStore = await cookies();
@@ -230,8 +372,12 @@ export async function DELETE(request) {
 
     if (!token) {
       return NextResponse.json(
-        { message: "Unauthorized." },
-        { status: 401 }
+        {
+          message: "Unauthorized.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
@@ -239,8 +385,12 @@ export async function DELETE(request) {
 
     if (!session || session.role !== "facilitator") {
       return NextResponse.json(
-        { message: "Only facilitators can delete reports." },
-        { status: 403 }
+        {
+          message: "Only facilitators can delete reports.",
+        },
+        {
+          status: 403,
+        }
       );
     }
 
@@ -248,39 +398,65 @@ export async function DELETE(request) {
 
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(
-        { message: "Invalid report ID." },
-        { status: 400 }
+        {
+          message: "Invalid report ID.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     const db = await getDatabase();
 
-    const result = await db.collection("reports").deleteOne({
-      _id: new ObjectId(id),
-    });
+    const result = await db
+      .collection("reports")
+      .deleteOne({
+        _id: new ObjectId(id),
+      });
 
     if (result.deletedCount === 0) {
       return NextResponse.json(
-        { message: "Report not found." },
-        { status: 404 }
+        {
+          message: "Report not found.",
+        },
+        {
+          status: 404,
+        }
       );
     }
 
     return NextResponse.json(
-      { message: "Report deleted successfully." },
-      { status: 200 }
+      {
+        message: "Report deleted successfully.",
+      },
+      {
+        status: 200,
+      }
     );
   } catch (error) {
     console.error("DELETE REPORT ERROR:", error);
 
     return NextResponse.json(
-      { message: "Unable to delete report." },
-      { status: 500 }
+      {
+        message: "Unable to delete report.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
 
-// PATCH - Facilitators can update report status and response.
+// ---------------------------------------------------------
+// PATCH REPORT
+// ---------------------------------------------------------
+// Only facilitators can update reports.
+//
+// When a facilitator submits a response, their REAL account
+// information is retrieved from MongoDB and saved.
+// ---------------------------------------------------------
+
 export async function PATCH(request) {
   try {
     const cookieStore = await cookies();
@@ -288,8 +464,12 @@ export async function PATCH(request) {
 
     if (!token) {
       return NextResponse.json(
-        { message: "Unauthorized." },
-        { status: 401 }
+        {
+          message: "Unauthorized.",
+        },
+        {
+          status: 401,
+        }
       );
     }
 
@@ -297,8 +477,12 @@ export async function PATCH(request) {
 
     if (!session || session.role !== "facilitator") {
       return NextResponse.json(
-        { message: "Only facilitators can update reports." },
-        { status: 403 }
+        {
+          message: "Only facilitators can update reports.",
+        },
+        {
+          status: 403,
+        }
       );
     }
 
@@ -310,8 +494,12 @@ export async function PATCH(request) {
 
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(
-        { message: "Invalid report ID." },
-        { status: 400 }
+        {
+          message: "Invalid report ID.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
@@ -324,14 +512,18 @@ export async function PATCH(request) {
 
     if (!allowedStatuses.includes(status)) {
       return NextResponse.json(
-        { message: "Invalid report status." },
-        { status: 400 }
+        {
+          message: "Invalid report status.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
     const db = await getDatabase();
 
-    // Get the actual facilitator account from MongoDB.
+    // Get the REAL logged-in facilitator.
     const facilitatorUser = await getCurrentUser(
       session,
       db
@@ -339,17 +531,22 @@ export async function PATCH(request) {
 
     if (!facilitatorUser) {
       return NextResponse.json(
-        { message: "Facilitator account could not be found." },
-        { status: 404 }
+        {
+          message: "Facilitator account could not be found.",
+        },
+        {
+          status: 404,
+        }
       );
     }
 
-    const facilitatorName =
-      getFullName(facilitatorUser);
+    const facilitatorName = getFullName(
+      facilitatorUser
+    );
 
     const facilitatorEmail =
       facilitatorUser.email?.trim() ||
-      session.email ||
+      session.email?.trim() ||
       "";
 
     const updateData = {
@@ -357,10 +554,14 @@ export async function PATCH(request) {
       updatedAt: new Date(),
     };
 
+    // -----------------------------------------------------
+    // SAVE RESPONSE
+    // -----------------------------------------------------
+
     if (response) {
       updateData.response = response;
 
-      // Actual facilitator information from MongoDB.
+      // REAL FACILITATOR INFORMATION
       updateData.facilitatorId =
         facilitatorUser._id?.toString() ||
         session.userId ||
@@ -374,6 +575,7 @@ export async function PATCH(request) {
 
       updateData.respondedAt = new Date();
     } else {
+      // If response is removed, clear facilitator info too.
       updateData.response = "";
       updateData.facilitatorId = "";
       updateData.facilitatorName = "";
@@ -381,34 +583,61 @@ export async function PATCH(request) {
       updateData.respondedAt = null;
     }
 
-    const result = await db.collection("reports").updateOne(
-      {
-        _id: new ObjectId(id),
-      },
-      {
-        $set: updateData,
-      }
-    );
+    const result = await db
+      .collection("reports")
+      .updateOne(
+        {
+          _id: new ObjectId(id),
+        },
+        {
+          $set: updateData,
+        }
+      );
 
     if (result.matchedCount === 0) {
       return NextResponse.json(
-        { message: "Report not found." },
-        { status: 404 }
+        {
+          message: "Report not found.",
+        },
+        {
+          status: 404,
+        }
       );
     }
+
+    // Return the updated report so the frontend
+    // immediately receives the facilitator information.
+    const updatedReport = await db
+      .collection("reports")
+      .findOne({
+        _id: new ObjectId(id),
+      });
 
     return NextResponse.json(
       {
         message: "Report updated successfully.",
+
+        report: updatedReport
+          ? {
+              ...updatedReport,
+              _id: updatedReport._id.toString(),
+            }
+          : null,
       },
-      { status: 200 }
+      {
+        status: 200,
+      }
     );
   } catch (error) {
     console.error("UPDATE REPORT ERROR:", error);
 
     return NextResponse.json(
-      { message: "Unable to update report." },
-      { status: 500 }
+      {
+        message: "Unable to update report.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
