@@ -77,12 +77,6 @@ async function getCurrentUser(session, db) {
 //
 // Facilitator:
 //   - sees all reports
-//
-// The complete report object is returned, including:
-//   response
-//   facilitatorName
-//   facilitatorEmail
-//   respondedAt
 // ---------------------------------------------------------
 
 export async function GET() {
@@ -118,11 +112,40 @@ export async function GET() {
 
     let query = {};
 
+    // -----------------------------------------------------
+    // STUDENT
+    // -----------------------------------------------------
     if (session.role === "student") {
-      if (!session.studentId) {
+      /*
+       * IMPORTANT:
+       * Do NOT rely only on session.studentId.
+       *
+       * Get the real logged-in student from MongoDB and
+       * use the studentId stored on that account.
+       */
+      const studentUser = await getCurrentUser(session, db);
+
+      if (!studentUser) {
         return NextResponse.json(
           {
-            message: "Student account is not linked to a student record.",
+            message: "Student account could not be found.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      const studentId =
+        studentUser.studentId ||
+        session.studentId ||
+        "";
+
+      if (!studentId) {
+        return NextResponse.json(
+          {
+            message:
+              "Your account is not linked to a student record.",
           },
           {
             status: 400,
@@ -130,10 +153,40 @@ export async function GET() {
         );
       }
 
+      /*
+       * This must match the studentId saved when the
+       * student originally submitted the report.
+       */
       query = {
-        studentId: session.studentId,
+        studentId: studentId,
       };
     }
+
+    // -----------------------------------------------------
+    // FACILITATOR
+    // -----------------------------------------------------
+    else if (session.role === "facilitator") {
+      // Facilitators can see all reports.
+      query = {};
+    }
+
+    // -----------------------------------------------------
+    // UNKNOWN ROLE
+    // -----------------------------------------------------
+    else {
+      return NextResponse.json(
+        {
+          message: "Unauthorized role.",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    // -----------------------------------------------------
+    // FIND REPORTS
+    // -----------------------------------------------------
 
     const reports = await db
       .collection("reports")
@@ -143,20 +196,37 @@ export async function GET() {
       })
       .toArray();
 
+    // -----------------------------------------------------
+    // FORMAT REPORTS
+    // -----------------------------------------------------
+
     const formattedReports = reports.map((report) => ({
       ...report,
+
       _id: report._id.toString(),
 
-      // Always return these fields.
+      // Student information
+      studentId: report.studentId || "",
       studentName: report.studentName || "",
       studentEmail: report.studentEmail || "",
 
-      response: report.response || "",
+      // Report information
+      title: report.title || "",
+      category: report.category || "",
+      description: report.description || "",
+      priority: report.priority || "Normal",
+      status: report.status || "Open",
 
+      // Facilitator response
+      response: report.response || "",
       facilitatorId: report.facilitatorId || "",
       facilitatorName: report.facilitatorName || "",
       facilitatorEmail: report.facilitatorEmail || "",
       respondedAt: report.respondedAt || null,
+
+      // Dates
+      createdAt: report.createdAt || null,
+      updatedAt: report.updatedAt || null,
     }));
 
     return NextResponse.json(
@@ -185,9 +255,6 @@ export async function GET() {
 // POST REPORT
 // ---------------------------------------------------------
 // Only students can submit reports.
-//
-// The student's name and email are NOT taken from the form.
-// They are taken from the authenticated user's MongoDB record.
 // ---------------------------------------------------------
 
 export async function POST(request) {
@@ -272,6 +339,10 @@ export async function POST(request) {
       session.email?.trim() ||
       "";
 
+    /*
+     * Always prefer the studentId from the MongoDB
+     * user account.
+     */
     const studentId =
       studentUser.studentId ||
       session.studentId ||
@@ -452,9 +523,6 @@ export async function DELETE(request) {
 // PATCH REPORT
 // ---------------------------------------------------------
 // Only facilitators can update reports.
-//
-// When a facilitator submits a response, their REAL account
-// information is retrieved from MongoDB and saved.
 // ---------------------------------------------------------
 
 export async function PATCH(request) {
@@ -523,7 +591,7 @@ export async function PATCH(request) {
 
     const db = await getDatabase();
 
-    // Get the REAL logged-in facilitator.
+    // Get the real logged-in facilitator.
     const facilitatorUser = await getCurrentUser(
       session,
       db
@@ -561,7 +629,6 @@ export async function PATCH(request) {
     if (response) {
       updateData.response = response;
 
-      // REAL FACILITATOR INFORMATION
       updateData.facilitatorId =
         facilitatorUser._id?.toString() ||
         session.userId ||
@@ -575,7 +642,6 @@ export async function PATCH(request) {
 
       updateData.respondedAt = new Date();
     } else {
-      // If response is removed, clear facilitator info too.
       updateData.response = "";
       updateData.facilitatorId = "";
       updateData.facilitatorName = "";
@@ -605,8 +671,6 @@ export async function PATCH(request) {
       );
     }
 
-    // Return the updated report so the frontend
-    // immediately receives the facilitator information.
     const updatedReport = await db
       .collection("reports")
       .findOne({
