@@ -10,7 +10,9 @@ import {
   Clock,
   MessageSquare,
   RefreshCw,
-  UserCheck,
+  User,
+  Mail,
+  CalendarDays,
 } from "lucide-react";
 
 export default function ReportIssuePage() {
@@ -29,12 +31,10 @@ export default function ReportIssuePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function loadReports(showLoading = true) {
+  // Load student's reports
+  async function loadReports() {
     try {
-      if (showLoading) {
-        setLoadingReports(true);
-      }
-
+      setLoadingReports(true);
       setError("");
 
       const response = await fetch("/api/reports", {
@@ -55,39 +55,12 @@ export default function ReportIssuePage() {
       console.error("LOAD REPORTS ERROR:", error);
       setError(error.message);
     } finally {
-      if (showLoading) {
-        setLoadingReports(false);
-      }
+      setLoadingReports(false);
     }
   }
 
-  // Initial load + automatic refresh every 10 seconds.
   useEffect(() => {
     loadReports();
-
-    const interval = setInterval(() => {
-      loadReports(false);
-    }, 10000);
-
-    function handleVisibilityChange() {
-      if (document.visibilityState === "visible") {
-        loadReports(false);
-      }
-    }
-
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange
-    );
-
-    return () => {
-      clearInterval(interval);
-
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange
-      );
-    };
   }, []);
 
   function handleChange(event) {
@@ -132,8 +105,10 @@ export default function ReportIssuePage() {
         priority: "Normal",
       });
 
-      await loadReports(false);
+      // Refresh reports so the new report appears immediately
+      await loadReports();
     } catch (error) {
+      console.error("SUBMIT REPORT ERROR:", error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -167,7 +142,13 @@ export default function ReportIssuePage() {
   function formatDate(date) {
     if (!date) return "Unknown date";
 
-    return new Date(date).toLocaleDateString("en-GH", {
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "Unknown date";
+    }
+
+    return parsedDate.toLocaleDateString("en-GH", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -175,9 +156,15 @@ export default function ReportIssuePage() {
   }
 
   function formatDateTime(date) {
-    if (!date) return "";
+    if (!date) return "Unknown date";
 
-    return new Date(date).toLocaleString("en-GH", {
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "Unknown date";
+    }
+
+    return parsedDate.toLocaleString("en-GH", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -216,7 +203,7 @@ export default function ReportIssuePage() {
           </p>
         </div>
 
-        {/* Success */}
+        {/* Success Message */}
         {message && (
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
             <CheckCircle
@@ -228,7 +215,7 @@ export default function ReportIssuePage() {
           </div>
         )}
 
-        {/* Error */}
+        {/* Error Message */}
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
             {error}
@@ -354,13 +341,13 @@ export default function ReportIssuePage() {
               </h2>
 
               <p className="mt-1 text-sm text-slate-600">
-                Track your submitted issues and facilitator responses.
+                Track the issues you have reported.
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => loadReports()}
+              onClick={loadReports}
               disabled={loadingReports}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
@@ -368,10 +355,12 @@ export default function ReportIssuePage() {
                 size={16}
                 className={loadingReports ? "animate-spin" : ""}
               />
+
               Refresh
             </button>
           </div>
 
+          {/* Loading */}
           {loadingReports ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
               <Clock
@@ -383,7 +372,10 @@ export default function ReportIssuePage() {
                 Loading your reports...
               </p>
             </div>
+
           ) : reports.length === 0 ? (
+
+            /* No Reports */
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
               <MessageSquare
                 size={32}
@@ -398,13 +390,17 @@ export default function ReportIssuePage() {
                 Any issues you submit will appear here.
               </p>
             </div>
+
           ) : (
+
+            /* Reports */
             <div className="space-y-4">
               {reports.map((report) => (
                 <div
                   key={report._id}
                   className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
                 >
+
                   {/* Report Header */}
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -437,7 +433,7 @@ export default function ReportIssuePage() {
                         report.priority
                       )}`}
                     >
-                      {report.priority || "Normal"} Priority
+                      {report.priority} Priority
                     </span>
                   </div>
 
@@ -448,57 +444,84 @@ export default function ReportIssuePage() {
                     </p>
                   </div>
 
-                  {/* Facilitator Response */}
-                  {report.response?.trim() ? (
-                    <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
-                          <UserCheck size={18} />
+                  {/* ================================================= */}
+                  {/* FACILITATOR RESPONSE - STUDENT SIDE ONLY         */}
+                  {/* ================================================= */}
+                  {report.response && report.response.trim() && (
+                    <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+
+                      {/* Response Header */}
+                      <div className="mb-4 flex items-center gap-2">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                          <MessageSquare size={18} />
                         </div>
 
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-semibold text-blue-800">
+                        <div>
+                          <h4 className="font-bold text-blue-900">
                             Facilitator Response
                           </h4>
 
-                          <p className="mt-1 text-sm font-semibold text-blue-900">
-                            Responded by:{" "}
+                          <p className="text-xs text-blue-700">
+                            Response from your facilitator
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Facilitator Information */}
+                      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+
+                        {/* Facilitator Name */}
+                        <div className="rounded-xl border border-blue-100 bg-white p-3">
+                          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <User size={14} />
+                            Responded by
+                          </div>
+
+                          <p className="font-semibold text-slate-800">
                             {report.facilitatorName ||
                               "Facilitator"}
                           </p>
+                        </div>
 
-                          {report.facilitatorEmail && (
-                            <p className="mt-0.5 text-xs text-blue-700">
-                              {report.facilitatorEmail}
-                            </p>
-                          )}
-
-                          {report.respondedAt && (
-                            <p className="mt-0.5 text-xs text-blue-600">
-                              {formatDateTime(
-                                report.respondedAt
-                              )}
-                            </p>
-                          )}
-
-                          <div className="mt-3 border-t border-blue-200 pt-3">
-                            <p className="whitespace-pre-wrap text-sm leading-6 text-blue-900">
-                              {report.response}
-                            </p>
+                        {/* Facilitator Email */}
+                        <div className="rounded-xl border border-blue-100 bg-white p-3">
+                          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <Mail size={14} />
+                            Email
                           </div>
+
+                          <p className="break-all font-medium text-slate-800">
+                            {report.facilitatorEmail ||
+                              "Not provided"}
+                          </p>
+                        </div>
+
+                        {/* Response Date */}
+                        <div className="rounded-xl border border-blue-100 bg-white p-3 sm:col-span-2">
+                          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <CalendarDays size={14} />
+                            Response Date
+                          </div>
+
+                          <p className="font-medium text-slate-800">
+                            {formatDateTime(report.respondedAt)}
+                          </p>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <Clock size={16} />
-                        <span>
-                          Waiting for facilitator response.
-                        </span>
+
+                      {/* Response Message */}
+                      <div className="rounded-xl border border-blue-100 bg-white p-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Message
+                        </p>
+
+                        <p className="whitespace-pre-wrap text-sm leading-7 text-slate-700">
+                          {report.response}
+                        </p>
                       </div>
                     </div>
                   )}
+
                 </div>
               ))}
             </div>
@@ -510,6 +533,7 @@ export default function ReportIssuePage() {
           Your reports are private and can only be viewed by you
           and authorized facilitators.
         </p>
+
       </div>
     </main>
   );
