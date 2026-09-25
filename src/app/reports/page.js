@@ -18,6 +18,10 @@ export default function ReportsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  // ---------------------------------------------------------
+  // LOAD REPORTS
+  // ---------------------------------------------------------
+
   async function loadReports() {
     try {
       setLoading(true);
@@ -49,6 +53,10 @@ export default function ReportsPage() {
     loadReports();
   }, []);
 
+  // ---------------------------------------------------------
+  // UPDATE REPORT
+  // ---------------------------------------------------------
+
   async function updateReport(id, status, responseText) {
     try {
       setUpdating(id);
@@ -75,11 +83,29 @@ export default function ReportsPage() {
         );
       }
 
-      setMessage("Report updated successfully.");
+      // -----------------------------------------------------
+      // IMPORTANT:
+      // Do NOT reload all reports here.
+      //
+      // The API already returns the updated report.
+      // Replace only the report that was changed.
+      // -----------------------------------------------------
 
-      // Reload the reports after saving.
-      // This ensures the facilitator sees the latest saved data.
-      await loadReports();
+      if (data.report) {
+        setReports((currentReports) =>
+          currentReports.map((report) =>
+            report._id === id
+              ? {
+                  ...report,
+                  ...data.report,
+                  _id: id,
+                }
+              : report
+          )
+        );
+      }
+
+      setMessage("Report updated successfully.");
     } catch (error) {
       console.error("UPDATE REPORT ERROR:", error);
       setError(error.message);
@@ -87,6 +113,10 @@ export default function ReportsPage() {
       setUpdating(null);
     }
   }
+
+  // ---------------------------------------------------------
+  // DELETE REPORT
+  // ---------------------------------------------------------
 
   async function deleteReport(id) {
     const confirmed = window.confirm(
@@ -116,9 +146,14 @@ export default function ReportsPage() {
         );
       }
 
-      setMessage("Report deleted successfully.");
+      // Remove only the deleted report.
+      setReports((currentReports) =>
+        currentReports.filter(
+          (report) => report._id !== id
+        )
+      );
 
-      await loadReports();
+      setMessage("Report deleted successfully.");
     } catch (error) {
       console.error("DELETE REPORT ERROR:", error);
       setError(error.message);
@@ -126,6 +161,10 @@ export default function ReportsPage() {
       setUpdating(null);
     }
   }
+
+  // ---------------------------------------------------------
+  // DATE
+  // ---------------------------------------------------------
 
   function formatDate(date) {
     if (!date) return "Unknown date";
@@ -143,6 +182,10 @@ export default function ReportsPage() {
     });
   }
 
+  // ---------------------------------------------------------
+  // STATUS STYLE
+  // ---------------------------------------------------------
+
   function getStatusStyle(status) {
     switch (status) {
       case "Resolved":
@@ -158,6 +201,10 @@ export default function ReportsPage() {
         return "bg-yellow-100 text-yellow-700";
     }
   }
+
+  // ---------------------------------------------------------
+  // PRIORITY STYLE
+  // ---------------------------------------------------------
 
   function getPriorityStyle(priority) {
     if (priority === "Urgent") {
@@ -272,6 +319,10 @@ export default function ReportsPage() {
   );
 }
 
+// =========================================================
+// REPORT CARD
+// =========================================================
+
 function ReportCard({
   report,
   updating,
@@ -289,10 +340,29 @@ function ReportCard({
     report.response || ""
   );
 
+  // ---------------------------------------------------------
+  // Keep local status synchronized with the report.
+  // ---------------------------------------------------------
+
+  useEffect(() => {
+    setStatus(report.status || "Open");
+  }, [report.status]);
+
+  // ---------------------------------------------------------
+  // Keep response textbox synchronized with saved response.
+  // ---------------------------------------------------------
+
+  useEffect(() => {
+    setResponse(report.response || "");
+  }, [report.response]);
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
-      {/* Report Header */}
+      {/* =====================================================
+          REPORT HEADER
+      ===================================================== */}
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 
         <div>
@@ -347,7 +417,10 @@ function ReportCard({
         </div>
       </div>
 
-      {/* Student Description */}
+      {/* =====================================================
+          STUDENT DESCRIPTION
+      ===================================================== */}
+
       <div className="mt-5 rounded-xl bg-slate-50 p-5">
         <h3 className="mb-2 text-sm font-semibold text-slate-700">
           Student's Description
@@ -358,16 +431,17 @@ function ReportCard({
         </p>
       </div>
 
-      {/* IMPORTANT:
-          There is intentionally NO
-          "Existing Facilitator Response" section here.
+      {/* =====================================================
+          FACILITATOR CONTROLS
           
-          The facilitator can write/update the response below,
-          but the actual response display belongs ONLY
-          on the student side.
-      */}
+          IMPORTANT:
+          There is intentionally NO separate
+          "Existing Facilitator Response" display here.
+          
+          The facilitator only writes/updates the response.
+          The student is the one who sees the saved response.
+      ===================================================== */}
 
-      {/* Facilitator Controls */}
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
 
         {/* Status */}
@@ -421,7 +495,10 @@ function ReportCard({
         </div>
       </div>
 
-      {/* Actions */}
+      {/* =====================================================
+          ACTIONS
+      ===================================================== */}
+
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
 
         {/* Delete */}
