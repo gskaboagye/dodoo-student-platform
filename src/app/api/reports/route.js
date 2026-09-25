@@ -98,8 +98,6 @@ export async function GET() {
 
     const db = await getDatabase();
 
-    let query = {};
-
     // =======================================================
     // STUDENT
     // =======================================================
@@ -132,96 +130,166 @@ export async function GET() {
       }
 
       /*
-       * Students ALWAYS see their own reports.
+       * Students always see their own reports.
        *
-       * We do NOT check deletedByFacilitator here.
-       * A facilitator removing a report from their dashboard
-       * must NOT remove it from the student's view.
+       * A facilitator hiding a report from their own
+       * dashboard does NOT hide it from the student.
        */
-      query = {
-        studentId,
-      };
+      const reports = await db
+        .collection("reports")
+        .find({
+          studentId,
+        })
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      const formattedReports = reports.map((report) => ({
+        ...report,
+
+        _id: report._id.toString(),
+
+        studentId: normalizeId(report.studentId),
+        studentName: report.studentName || "",
+        studentEmail: report.studentEmail || "",
+
+        title: report.title || "",
+        category: report.category || "",
+        description: report.description || "",
+        priority: report.priority || "Normal",
+        status: report.status || "Open",
+
+        response: report.response || "",
+        facilitatorId: report.facilitatorId || "",
+        facilitatorName: report.facilitatorName || "",
+        facilitatorEmail: report.facilitatorEmail || "",
+        respondedAt: report.respondedAt || null,
+
+        createdAt: report.createdAt || null,
+        updatedAt: report.updatedAt || null,
+
+        hiddenForFacilitators:
+          report.hiddenForFacilitators || [],
+      }));
+
+      return NextResponse.json(
+        {
+          reports: formattedReports,
+        },
+        { status: 200 }
+      );
     }
 
     // =======================================================
     // FACILITATOR
     // =======================================================
 
-    else if (session.role === "facilitator") {
+    if (session.role === "facilitator") {
+      const facilitatorUser = await getCurrentUser(
+        session,
+        db
+      );
+
+      if (!facilitatorUser) {
+        return NextResponse.json(
+          {
+            message:
+              "Facilitator account could not be found.",
+          },
+          { status: 404 }
+        );
+      }
+
       /*
-       * Facilitators only see reports that have not been
-       * removed from the facilitator dashboard.
+       * The unique ID of THIS facilitator.
        *
-       * Older reports without deletedByFacilitator are
-       * still visible.
+       * This is what makes report removal personal to
+       * the facilitator performing the removal.
        */
-      query = {
-        $or: [
+      const facilitatorId =
+        normalizeId(facilitatorUser._id) ||
+        normalizeId(session.userId);
+
+      if (!facilitatorId) {
+        return NextResponse.json(
           {
-            deletedByFacilitator: {
-              $exists: false,
-            },
+            message:
+              "Facilitator account ID could not be determined.",
           },
-          {
-            deletedByFacilitator: false,
+          { status: 400 }
+        );
+      }
+
+      /*
+       * A facilitator sees a report if their own ID is
+       * NOT inside hiddenForFacilitators.
+       *
+       * Therefore:
+       *
+       * Facilitator A removes report
+       *       ↓
+       * A's ID is added to hiddenForFacilitators
+       *       ↓
+       * A cannot see it
+       *       ↓
+       * Facilitator B can still see it
+       *       ↓
+       * Student can still see it
+       */
+      const reports = await db
+        .collection("reports")
+        .find({
+          hiddenForFacilitators: {
+            $nin: [facilitatorId],
           },
-        ],
-      };
+        })
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      const formattedReports = reports.map((report) => ({
+        ...report,
+
+        _id: report._id.toString(),
+
+        studentId: normalizeId(report.studentId),
+        studentName: report.studentName || "",
+        studentEmail: report.studentEmail || "",
+
+        title: report.title || "",
+        category: report.category || "",
+        description: report.description || "",
+        priority: report.priority || "Normal",
+        status: report.status || "Open",
+
+        response: report.response || "",
+        facilitatorId: report.facilitatorId || "",
+        facilitatorName: report.facilitatorName || "",
+        facilitatorEmail: report.facilitatorEmail || "",
+        respondedAt: report.respondedAt || null,
+
+        createdAt: report.createdAt || null,
+        updatedAt: report.updatedAt || null,
+
+        hiddenForFacilitators:
+          report.hiddenForFacilitators || [],
+      }));
+
+      return NextResponse.json(
+        {
+          reports: formattedReports,
+        },
+        { status: 200 }
+      );
     }
 
     // =======================================================
     // INVALID ROLE
     // =======================================================
 
-    else {
-      return NextResponse.json(
-        { message: "Unauthorized role." },
-        { status: 403 }
-      );
-    }
-
-    const reports = await db
-      .collection("reports")
-      .find(query)
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    const formattedReports = reports.map((report) => ({
-      ...report,
-
-      _id: report._id.toString(),
-
-      studentId: normalizeId(report.studentId),
-      studentName: report.studentName || "",
-      studentEmail: report.studentEmail || "",
-
-      title: report.title || "",
-      category: report.category || "",
-      description: report.description || "",
-      priority: report.priority || "Normal",
-      status: report.status || "Open",
-
-      response: report.response || "",
-      facilitatorId: report.facilitatorId || "",
-      facilitatorName: report.facilitatorName || "",
-      facilitatorEmail: report.facilitatorEmail || "",
-      respondedAt: report.respondedAt || null,
-
-      createdAt: report.createdAt || null,
-      updatedAt: report.updatedAt || null,
-
-      deletedByFacilitator:
-        report.deletedByFacilitator || false,
-
-      facilitatorDeletedAt:
-        report.facilitatorDeletedAt || null,
-    }));
-
     return NextResponse.json(
       {
-        reports: formattedReports,
+        message: "Unauthorized role.",
       },
-      { status: 200 }
+      { status: 403 }
     );
   } catch (error) {
     console.error("GET REPORTS ERROR:", error);
@@ -274,6 +342,7 @@ export async function POST(request) {
     const title = body.title?.trim();
     const category = body.category?.trim();
     const description = body.description?.trim();
+
     const priority =
       body.priority?.trim() || "Normal";
 
@@ -354,10 +423,20 @@ export async function POST(request) {
       respondedAt: null,
 
       /*
-       * New reports are visible to facilitators.
+       * IMPORTANT:
+       *
+       * This is now an array.
+       *
+       * Each facilitator gets their own hidden state.
+       *
+       * Example:
+       *
+       * hiddenForFacilitators: [
+       *   "facilitatorA",
+       *   "facilitatorB"
+       * ]
        */
-      deletedByFacilitator: false,
-      facilitatorDeletedAt: null,
+      hiddenForFacilitators: [],
 
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -370,6 +449,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         message: "Report submitted successfully.",
+
         report: {
           ...report,
           _id: result.insertedId.toString(),
@@ -397,9 +477,12 @@ export async function POST(request) {
 //   Permanently deletes ONLY their own report.
 //
 // FACILITATOR:
-//   Soft-removes the report from the facilitator dashboard.
-//   The student's report remains in MongoDB and remains visible
-//   to the student.
+//   Hides the report ONLY from that facilitator's dashboard.
+//
+//   It does NOT:
+//   - delete the report
+//   - hide it from students
+//   - hide it from other facilitators
 // =========================================================
 
 export async function DELETE(request) {
@@ -457,6 +540,40 @@ export async function DELETE(request) {
     // =======================================================
 
     if (session.role === "facilitator") {
+      const facilitatorUser =
+        await getCurrentUser(session, db);
+
+      if (!facilitatorUser) {
+        return NextResponse.json(
+          {
+            message:
+              "Facilitator account could not be found.",
+          },
+          { status: 404 }
+        );
+      }
+
+      const facilitatorId =
+        normalizeId(facilitatorUser._id) ||
+        normalizeId(session.userId);
+
+      if (!facilitatorId) {
+        return NextResponse.json(
+          {
+            message:
+              "Facilitator account ID could not be determined.",
+          },
+          { status: 400 }
+        );
+      }
+
+      /*
+       * Add THIS facilitator's ID to the hidden list.
+       *
+       * $addToSet prevents duplicate IDs.
+       *
+       * Other facilitators are completely unaffected.
+       */
       const result = await db
         .collection("reports")
         .updateOne(
@@ -464,9 +581,11 @@ export async function DELETE(request) {
             _id: new ObjectId(id),
           },
           {
+            $addToSet: {
+              hiddenForFacilitators: facilitatorId,
+            },
+
             $set: {
-              deletedByFacilitator: true,
-              facilitatorDeletedAt: new Date(),
               updatedAt: new Date(),
             },
           }
@@ -484,7 +603,7 @@ export async function DELETE(request) {
       return NextResponse.json(
         {
           message:
-            "Report removed from the facilitator dashboard.",
+            "Report removed from your dashboard.",
         },
         { status: 200 }
       );
@@ -511,12 +630,8 @@ export async function DELETE(request) {
       }
 
       /*
-       * Build a list of possible identifiers belonging
-       * to the currently logged-in student.
-       *
-       * This protects against situations where one part
-       * of the application stores the ID as a string and
-       * another part stores it as an ObjectId.
+       * Possible identifiers belonging to the
+       * currently logged-in student.
        */
       const possibleStudentIds = [
         normalizeId(studentUser.studentId),
@@ -525,14 +640,13 @@ export async function DELETE(request) {
         normalizeId(session.userId),
       ].filter(Boolean);
 
-      const reportStudentId = normalizeId(
-        report.studentId
-      );
+      const reportStudentId =
+        normalizeId(report.studentId);
 
       /*
        * SECURITY:
        *
-       * The report must belong to the logged-in student.
+       * The report must belong to this student.
        */
       const ownsReport =
         possibleStudentIds.includes(reportStudentId);
@@ -557,10 +671,11 @@ export async function DELETE(request) {
       }
 
       /*
-       * Ownership has already been verified above.
+       * Ownership has already been verified.
        *
-       * Delete by MongoDB _id only. This avoids an
-       * ObjectId-vs-string mismatch on studentId.
+       * Delete using MongoDB _id only so that an
+       * ObjectId/string mismatch on studentId does not
+       * prevent deletion.
        */
       const result = await db
         .collection("reports")
@@ -602,7 +717,8 @@ export async function DELETE(request) {
 
     return NextResponse.json(
       {
-        message: "Unable to process report deletion.",
+        message:
+          "Unable to process report deletion.",
       },
       { status: 500 }
     );
@@ -644,6 +760,7 @@ export async function PATCH(request) {
 
     const id = body.id;
     const status = body.status?.trim();
+
     const response =
       body.response?.trim() || "";
 
@@ -721,8 +838,7 @@ export async function PATCH(request) {
       updateData.respondedAt = new Date();
     } else {
       /*
-       * If the facilitator clears the response,
-       * remove the old response information too.
+       * Clearing the response removes the old response.
        */
       updateData.response = "";
       updateData.facilitatorId = "";
@@ -734,11 +850,12 @@ export async function PATCH(request) {
     /*
      * IMPORTANT:
      *
-     * Do NOT set deletedByFacilitator to false here.
+     * Do NOT modify hiddenForFacilitators here.
      *
-     * If a facilitator removed the report from the
-     * dashboard, saving changes should NOT make it
-     * appear again.
+     * If Facilitator A removed a report, updating the report
+     * should NOT automatically make it appear again for A.
+     *
+     * Other facilitators remain unaffected.
      */
     const result = await db
       .collection("reports")
@@ -768,6 +885,7 @@ export async function PATCH(request) {
     return NextResponse.json(
       {
         message: "Report updated successfully.",
+
         report: updatedReport
           ? {
               ...updatedReport,
