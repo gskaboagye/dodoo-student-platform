@@ -115,14 +115,15 @@ export async function GET() {
     // -----------------------------------------------------
     // STUDENT
     // -----------------------------------------------------
+
     if (session.role === "student") {
       /*
-       * IMPORTANT:
        * Do NOT rely only on session.studentId.
        *
        * Get the real logged-in student from MongoDB and
        * use the studentId stored on that account.
        */
+
       const studentUser = await getCurrentUser(session, db);
 
       if (!studentUser) {
@@ -157,6 +158,7 @@ export async function GET() {
        * This must match the studentId saved when the
        * student originally submitted the report.
        */
+
       query = {
         studentId: studentId,
       };
@@ -165,6 +167,7 @@ export async function GET() {
     // -----------------------------------------------------
     // FACILITATOR
     // -----------------------------------------------------
+
     else if (session.role === "facilitator") {
       // Facilitators can see all reports.
       query = {};
@@ -173,6 +176,7 @@ export async function GET() {
     // -----------------------------------------------------
     // UNKNOWN ROLE
     // -----------------------------------------------------
+
     else {
       return NextResponse.json(
         {
@@ -343,6 +347,7 @@ export async function POST(request) {
      * Always prefer the studentId from the MongoDB
      * user account.
      */
+
     const studentId =
       studentUser.studentId ||
       session.studentId ||
@@ -433,7 +438,11 @@ export async function POST(request) {
 // ---------------------------------------------------------
 // DELETE REPORT
 // ---------------------------------------------------------
-// Only facilitators can delete reports.
+// Students:
+//   - can delete ONLY their own reports
+//
+// Facilitators:
+//   - can delete reports from the facilitator dashboard
 // ---------------------------------------------------------
 
 export async function DELETE(request) {
@@ -454,13 +463,13 @@ export async function DELETE(request) {
 
     const session = await verifySession(token);
 
-    if (!session || session.role !== "facilitator") {
+    if (!session) {
       return NextResponse.json(
         {
-          message: "Only facilitators can delete reports.",
+          message: "Invalid or expired session.",
         },
         {
-          status: 403,
+          status: 401,
         }
       );
     }
@@ -480,13 +489,15 @@ export async function DELETE(request) {
 
     const db = await getDatabase();
 
-    const result = await db
-      .collection("reports")
-      .deleteOne({
-        _id: new ObjectId(id),
-      });
+    // -------------------------------------------------------
+    // FIND THE REPORT FIRST
+    // -------------------------------------------------------
 
-    if (result.deletedCount === 0) {
+    const report = await db.collection("reports").findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!report) {
       return NextResponse.json(
         {
           message: "Report not found.",
@@ -497,12 +508,131 @@ export async function DELETE(request) {
       );
     }
 
+    // -------------------------------------------------------
+    // FACILITATOR
+    // -------------------------------------------------------
+
+    if (session.role === "facilitator") {
+      const result = await db.collection("reports").deleteOne({
+        _id: new ObjectId(id),
+      });
+
+      if (result.deletedCount === 0) {
+        return NextResponse.json(
+          {
+            message: "Report could not be deleted.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          message: "Report deleted successfully.",
+        },
+        {
+          status: 200,
+        }
+      );
+    }
+
+    // -------------------------------------------------------
+    // STUDENT
+    // -------------------------------------------------------
+
+    if (session.role === "student") {
+      const studentUser = await getCurrentUser(session, db);
+
+      if (!studentUser) {
+        return NextResponse.json(
+          {
+            message: "Student account could not be found.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      const studentId =
+        studentUser.studentId ||
+        session.studentId ||
+        "";
+
+      if (!studentId) {
+        return NextResponse.json(
+          {
+            message:
+              "Your account is not linked to a student record.",
+          },
+          {
+            status: 400,
+          }
+        );
+      }
+
+      // -----------------------------------------------------
+      // SECURITY CHECK
+      // -----------------------------------------------------
+      // The report's studentId MUST match the logged-in
+      // student's studentId.
+      //
+      // This prevents a student from deleting another
+      // student's report by changing the report ID.
+      // -----------------------------------------------------
+
+      if (report.studentId !== studentId) {
+        return NextResponse.json(
+          {
+            message:
+              "You are not authorized to delete this report.",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+
+      // The studentId is included in the delete query as
+      // an additional ownership check.
+      const result = await db.collection("reports").deleteOne({
+        _id: new ObjectId(id),
+        studentId: studentId,
+      });
+
+      if (result.deletedCount === 0) {
+        return NextResponse.json(
+          {
+            message: "Report could not be deleted.",
+          },
+          {
+            status: 404,
+          }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          message: "Your report was deleted successfully.",
+        },
+        {
+          status: 200,
+        }
+      );
+    }
+
+    // -------------------------------------------------------
+    // UNKNOWN ROLE
+    // -------------------------------------------------------
+
     return NextResponse.json(
       {
-        message: "Report deleted successfully.",
+        message: "Unauthorized role.",
       },
       {
-        status: 200,
+        status: 403,
       }
     );
   } catch (error) {
@@ -608,9 +738,8 @@ export async function PATCH(request) {
       );
     }
 
-    const facilitatorName = getFullName(
-      facilitatorUser
-    );
+    const facilitatorName =
+      getFullName(facilitatorUser);
 
     const facilitatorEmail =
       facilitatorUser.email?.trim() ||
@@ -642,6 +771,8 @@ export async function PATCH(request) {
 
       updateData.respondedAt = new Date();
     } else {
+      // If the facilitator intentionally saves an empty
+      // response, remove the existing response.
       updateData.response = "";
       updateData.facilitatorId = "";
       updateData.facilitatorName = "";
@@ -671,6 +802,7 @@ export async function PATCH(request) {
       );
     }
 
+    // Get the updated report.
     const updatedReport = await db
       .collection("reports")
       .findOne({

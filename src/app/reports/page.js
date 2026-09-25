@@ -148,6 +148,7 @@ export default function ReportsPage() {
         );
       }
 
+      // Remove only the deleted report from the current page.
       setReports((currentReports) =>
         currentReports.filter(
           (report) => report._id !== id
@@ -338,8 +339,8 @@ function ReportCard({
     report.status || "Open"
   );
 
-  // This is only the text currently being typed.
-  // It will be cleared after saving.
+  // Only stores what the facilitator is currently typing.
+  // The saved response is stored in report.response.
   const [response, setResponse] = useState("");
 
   // ---------------------------------------------------------
@@ -496,7 +497,7 @@ function ReportCard({
       {/* =====================================================
           SAVED RESPONSE
           
-          Only the saved response and date are displayed here.
+          Only the saved response and date are displayed.
       ===================================================== */}
 
       {report.response && (
