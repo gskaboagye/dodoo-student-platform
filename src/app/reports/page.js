@@ -117,15 +117,17 @@ export default function ReportsPage() {
   }
 
   // ---------------------------------------------------------
-  // DELETE REPORT
+  // REMOVE REPORT FROM FACILITATOR DASHBOARD
   // ---------------------------------------------------------
 
   async function deleteReport(id) {
     const confirmed = window.confirm(
-      "Are you sure you want to delete this report?"
+      "Are you sure you want to remove this report from your dashboard?"
     );
 
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     try {
       setUpdating(id);
@@ -137,27 +139,37 @@ export default function ReportsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({
+          id,
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(
-          data.message || "Unable to delete report."
+          data.message ||
+            "Unable to remove report."
         );
       }
 
-      // Remove only the deleted report from the current page.
+      /*
+       * Remove the report from the facilitator's screen.
+       *
+       * The API now uses a soft delete for facilitators,
+       * so the actual student report remains in MongoDB.
+       */
       setReports((currentReports) =>
         currentReports.filter(
           (report) => report._id !== id
         )
       );
 
-      setMessage("Report deleted successfully.");
+      setMessage(
+        "Report removed from the facilitator dashboard."
+      );
     } catch (error) {
-      console.error("DELETE REPORT ERROR:", error);
+      console.error("REMOVE REPORT ERROR:", error);
       setError(error.message);
     } finally {
       setUpdating(null);
@@ -169,7 +181,9 @@ export default function ReportsPage() {
   // ---------------------------------------------------------
 
   function formatDate(date) {
-    if (!date) return "Unknown date";
+    if (!date) {
+      return "Unknown date";
+    }
 
     const parsedDate = new Date(date);
 
@@ -216,12 +230,18 @@ export default function ReportsPage() {
     return "bg-slate-100 text-slate-700";
   }
 
+  // ---------------------------------------------------------
+  // PAGE
+  // ---------------------------------------------------------
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
 
         {/* Header */}
+
         <div className="mb-8">
+
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
             <AlertCircle size={26} />
           </div>
@@ -233,17 +253,21 @@ export default function ReportsPage() {
           <p className="mt-2 text-slate-600">
             Review and respond to issues submitted by students.
           </p>
+
         </div>
 
         {/* Success Message */}
+
         {message && (
           <div className="mb-6 flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
             <CheckCircle size={20} />
+
             <p>{message}</p>
           </div>
         )}
 
         {/* Error Message */}
+
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
             {error}
@@ -251,7 +275,9 @@ export default function ReportsPage() {
         )}
 
         {/* Refresh */}
+
         <div className="mb-6 flex justify-end">
+
           <button
             type="button"
             onClick={loadReports}
@@ -260,15 +286,24 @@ export default function ReportsPage() {
           >
             <RefreshCw
               size={17}
-              className={loading ? "animate-spin" : ""}
+              className={
+                loading
+                  ? "animate-spin"
+                  : ""
+              }
             />
+
             Refresh Reports
           </button>
+
         </div>
 
         {/* Loading */}
+
         {loading ? (
+
           <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center">
+
             <Clock
               size={30}
               className="mx-auto mb-3 animate-pulse text-blue-600"
@@ -277,11 +312,15 @@ export default function ReportsPage() {
             <p className="text-slate-500">
               Loading student reports...
             </p>
+
           </div>
+
         ) : reports.length === 0 ? (
 
           /* Empty State */
+
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+
             <MessageSquare
               size={38}
               className="mx-auto mb-3 text-slate-400"
@@ -295,12 +334,15 @@ export default function ReportsPage() {
               Student issues will appear here when they are
               submitted.
             </p>
+
           </div>
 
         ) : (
 
           /* Reports */
+
           <div className="space-y-6">
+
             {reports.map((report) => (
               <ReportCard
                 key={report._id}
@@ -311,11 +353,15 @@ export default function ReportsPage() {
                 formatDate={formatDate}
                 getStatusStyle={getStatusStyle}
                 getPriorityStyle={getPriorityStyle}
-                clearResponse={clearResponse[report._id]}
+                clearResponse={
+                  clearResponse[report._id]
+                }
               />
             ))}
+
           </div>
         )}
+
       </div>
     </main>
   );
@@ -344,7 +390,7 @@ function ReportCard({
   const [response, setResponse] = useState("");
 
   // ---------------------------------------------------------
-  // Keep local status synchronized with the report.
+  // KEEP STATUS SYNCHRONIZED
   // ---------------------------------------------------------
 
   useEffect(() => {
@@ -371,12 +417,15 @@ function ReportCard({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
 
         <div>
+
           <h2 className="text-xl font-bold text-slate-900">
             {report.title}
           </h2>
 
           {/* Student Information */}
+
           <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
               <User size={17} />
               Student
@@ -395,10 +444,13 @@ function ReportCard({
             <p className="mt-1 text-xs text-slate-500">
               Submitted {formatDate(report.createdAt)}
             </p>
+
           </div>
+
         </div>
 
         {/* Report Badges */}
+
         <div className="flex flex-wrap gap-2">
 
           <span
@@ -420,7 +472,9 @@ function ReportCard({
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
             {report.category}
           </span>
+
         </div>
+
       </div>
 
       {/* =====================================================
@@ -428,6 +482,7 @@ function ReportCard({
       ===================================================== */}
 
       <div className="mt-5 rounded-xl bg-slate-50 p-5">
+
         <h3 className="mb-2 text-sm font-semibold text-slate-700">
           Student's Description
         </h3>
@@ -435,6 +490,7 @@ function ReportCard({
         <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
           {report.description}
         </p>
+
       </div>
 
       {/* =====================================================
@@ -444,7 +500,9 @@ function ReportCard({
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
 
         {/* Status */}
+
         <div>
+
           <label
             htmlFor={`status-${report._id}`}
             className="mb-2 block text-sm font-semibold text-slate-700"
@@ -460,15 +518,29 @@ function ReportCard({
             }
             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           >
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Resolved">Resolved</option>
-            <option value="Closed">Closed</option>
+            <option value="Open">
+              Open
+            </option>
+
+            <option value="In Progress">
+              In Progress
+            </option>
+
+            <option value="Resolved">
+              Resolved
+            </option>
+
+            <option value="Closed">
+              Closed
+            </option>
           </select>
+
         </div>
 
         {/* Response */}
+
         <div>
+
           <label
             htmlFor={`response-${report._id}`}
             className="mb-2 block text-sm font-semibold text-slate-700"
@@ -491,17 +563,18 @@ function ReportCard({
             This response will be visible to the student after
             you save the changes.
           </p>
+
         </div>
+
       </div>
 
       {/* =====================================================
           SAVED RESPONSE
-          
-          Only the saved response and date are displayed.
       ===================================================== */}
 
       {report.response && (
         <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-5">
+
           <h3 className="mb-3 text-sm font-semibold text-green-800">
             Saved Response
           </h3>
@@ -513,6 +586,7 @@ function ReportCard({
           <p className="mt-4 text-xs text-slate-500">
             Date: {formatDate(report.respondedAt)}
           </p>
+
         </div>
       )}
 
@@ -522,7 +596,8 @@ function ReportCard({
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
 
-        {/* Delete */}
+        {/* Remove from Facilitator Dashboard */}
+
         <button
           type="button"
           onClick={() => onDelete(report._id)}
@@ -530,10 +605,14 @@ function ReportCard({
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
         >
           <Trash2 size={17} />
-          Delete
+
+          {updating === report._id
+            ? "Removing..."
+            : "Remove"}
         </button>
 
-        {/* Save */}
+        {/* Save Changes */}
+
         <button
           type="button"
           onClick={() =>
@@ -552,7 +631,9 @@ function ReportCard({
             ? "Saving..."
             : "Save Changes"}
         </button>
+
       </div>
+
     </div>
   );
 }
