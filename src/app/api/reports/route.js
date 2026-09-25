@@ -116,12 +116,21 @@ export async function POST(request) {
       studentId: session.studentId,
       studentName: session.name || "",
       studentEmail: session.email || "",
+
       title,
       category,
       description,
       priority,
+
       status: "Open",
+
+      // Facilitator response information
       response: "",
+      facilitatorId: "",
+      facilitatorName: "",
+      facilitatorEmail: "",
+      respondedAt: null,
+
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -210,7 +219,6 @@ export async function DELETE(request) {
   }
 }
 
-
 // PATCH - Facilitators can update report status and response.
 export async function PATCH(request) {
   try {
@@ -264,16 +272,34 @@ export async function PATCH(request) {
     const dbName = process.env.DB_NAME || "DCCPlatform";
     const db = client.db(dbName);
 
+    // Save facilitator information only when a response is provided.
+    const updateData = {
+      status,
+      updatedAt: new Date(),
+    };
+
+    if (response) {
+      updateData.response = response;
+      updateData.facilitatorId = session.userId || "";
+      updateData.facilitatorName =
+        session.name || "Facilitator";
+      updateData.facilitatorEmail =
+        session.email || "";
+      updateData.respondedAt = new Date();
+    } else {
+      updateData.response = "";
+      updateData.facilitatorId = "";
+      updateData.facilitatorName = "";
+      updateData.facilitatorEmail = "";
+      updateData.respondedAt = null;
+    }
+
     const result = await db.collection("reports").updateOne(
       {
         _id: new ObjectId(id),
       },
       {
-        $set: {
-          status,
-          response,
-          updatedAt: new Date(),
-        },
+        $set: updateData,
       }
     );
 

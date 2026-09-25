@@ -10,6 +10,7 @@ import {
   Clock,
   MessageSquare,
   RefreshCw,
+  UserCheck,
 } from "lucide-react";
 
 export default function ReportIssuePage() {
@@ -28,10 +29,10 @@ export default function ReportIssuePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // Load student's reports
   async function loadReports() {
     try {
       setLoadingReports(true);
+      setError("");
 
       const response = await fetch("/api/reports", {
         method: "GET",
@@ -101,7 +102,6 @@ export default function ReportIssuePage() {
         priority: "Normal",
       });
 
-      // Refresh reports so the new report appears immediately
       await loadReports();
     } catch (error) {
       setError(error.message);
@@ -141,6 +141,18 @@ export default function ReportIssuePage() {
       year: "numeric",
       month: "short",
       day: "numeric",
+    });
+  }
+
+  function formatDateTime(date) {
+    if (!date) return "";
+
+    return new Date(date).toLocaleString("en-GH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
     });
   }
 
@@ -408,15 +420,46 @@ export default function ReportIssuePage() {
 
                   {/* Facilitator Response */}
                   {report.response && (
-                    <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4">
-                      <div className="mb-2 flex items-center gap-2 font-semibold text-blue-800">
-                        <MessageSquare size={17} />
-                        Facilitator Response
-                      </div>
+                    <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                          <UserCheck size={18} />
+                        </div>
 
-                      <p className="whitespace-pre-wrap text-sm leading-6 text-blue-900">
-                        {report.response}
-                      </p>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-2">
+                            <h4 className="font-semibold text-blue-800">
+                              Facilitator Response
+                            </h4>
+
+                            <p className="mt-1 text-sm font-semibold text-blue-900">
+                              Responded by:{" "}
+                              {report.facilitatorName ||
+                                "Facilitator"}
+                            </p>
+
+                            {report.facilitatorEmail && (
+                              <p className="mt-0.5 text-xs text-blue-700">
+                                {report.facilitatorEmail}
+                              </p>
+                            )}
+
+                            {report.respondedAt && (
+                              <p className="mt-0.5 text-xs text-blue-600">
+                                {formatDateTime(
+                                  report.respondedAt
+                                )}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="border-t border-blue-200 pt-3">
+                            <p className="whitespace-pre-wrap text-sm leading-6 text-blue-900">
+                              {report.response}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

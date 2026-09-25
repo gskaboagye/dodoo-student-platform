@@ -9,6 +9,7 @@ import {
   Trash2,
   MessageSquare,
   User,
+  UserCheck,
 } from "lucide-react";
 
 export default function ReportsPage() {
@@ -135,6 +136,18 @@ export default function ReportsPage() {
     });
   }
 
+  function formatDateTime(date) {
+    if (!date) return "";
+
+    return new Date(date).toLocaleString("en-GH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
   function getStatusStyle(status) {
     switch (status) {
       case "Resolved":
@@ -249,6 +262,7 @@ export default function ReportsPage() {
                 onUpdate={updateReport}
                 onDelete={deleteReport}
                 formatDate={formatDate}
+                formatDateTime={formatDateTime}
                 getStatusStyle={getStatusStyle}
                 getPriorityStyle={getPriorityStyle}
               />
@@ -266,6 +280,7 @@ function ReportCard({
   onUpdate,
   onDelete,
   formatDate,
+  formatDateTime,
   getStatusStyle,
   getPriorityStyle,
 }) {
@@ -288,22 +303,30 @@ function ReportCard({
             {report.title}
           </h2>
 
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-slate-500">
-            <span className="inline-flex items-center gap-1">
-              <User size={15} />
+          {/* Student Information */}
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <User size={17} />
+              Student
+            </div>
+
+            <p className="mt-2 text-sm font-semibold text-slate-900">
               {report.studentName || "Student"}
-            </span>
+            </p>
 
             {report.studentEmail && (
-              <span>{report.studentEmail}</span>
+              <p className="mt-1 text-sm text-slate-500">
+                {report.studentEmail}
+              </p>
             )}
 
-            <span>
+            <p className="mt-1 text-xs text-slate-500">
               Submitted {formatDate(report.createdAt)}
-            </span>
+            </p>
           </div>
         </div>
 
+        {/* Report Badges */}
         <div className="flex flex-wrap gap-2">
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(
@@ -338,6 +361,43 @@ function ReportCard({
         </p>
       </div>
 
+      {/* Existing Facilitator Response */}
+      {report.response && (
+        <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 font-semibold text-blue-800">
+                <UserCheck size={18} />
+                Facilitator Response
+              </div>
+
+              <p className="mt-2 text-sm font-semibold text-blue-900">
+                Responded by:{" "}
+                {report.facilitatorName || "Facilitator"}
+              </p>
+
+              {report.facilitatorEmail && (
+                <p className="mt-1 text-xs text-blue-700">
+                  {report.facilitatorEmail}
+                </p>
+              )}
+
+              {report.respondedAt && (
+                <p className="mt-1 text-xs text-blue-600">
+                  {formatDateTime(report.respondedAt)}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 border-t border-blue-200 pt-4">
+            <p className="whitespace-pre-wrap text-sm leading-6 text-blue-900">
+              {report.response}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Facilitator Controls */}
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
 
@@ -371,7 +431,9 @@ function ReportCard({
             htmlFor={`response-${report._id}`}
             className="mb-2 block text-sm font-semibold text-slate-700"
           >
-            Response to Student
+            {report.response
+              ? "Update Response"
+              : "Response to Student"}
           </label>
 
           <textarea
@@ -387,28 +449,12 @@ function ReportCard({
         </div>
       </div>
 
-      {/* Existing Response */}
-      {report.response && (
-        <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
-          <div className="mb-2 flex items-center gap-2 font-semibold text-blue-800">
-            <MessageSquare size={17} />
-            Current Response
-          </div>
-
-          <p className="whitespace-pre-wrap text-sm leading-6 text-blue-900">
-            {report.response}
-          </p>
-        </div>
-      )}
-
       {/* Actions */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
 
         <button
           type="button"
-          onClick={() =>
-            onDelete(report._id)
-          }
+          onClick={() => onDelete(report._id)}
           disabled={updating === report._id}
           className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
         >
