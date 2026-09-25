@@ -18,6 +18,10 @@ export default function ReportsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  // Used to tell individual report cards to clear
+  // their response textarea after a successful save.
+  const [clearResponse, setClearResponse] = useState({});
+
   // ---------------------------------------------------------
   // LOAD REPORTS
   // ---------------------------------------------------------
@@ -83,14 +87,7 @@ export default function ReportsPage() {
         );
       }
 
-      // -----------------------------------------------------
-      // IMPORTANT:
-      // Do NOT reload all reports here.
-      //
-      // The API already returns the updated report.
-      // Replace only the report that was changed.
-      // -----------------------------------------------------
-
+      // Update only the report that was changed.
       if (data.report) {
         setReports((currentReports) =>
           currentReports.map((report) =>
@@ -104,6 +101,13 @@ export default function ReportsPage() {
           )
         );
       }
+
+      // Tell this specific ReportCard to clear its
+      // "Response to Student" textarea.
+      setClearResponse((previous) => ({
+        ...previous,
+        [id]: Date.now(),
+      }));
 
       setMessage("Report updated successfully.");
     } catch (error) {
@@ -276,7 +280,6 @@ export default function ReportsPage() {
               Loading student reports...
             </p>
           </div>
-
         ) : reports.length === 0 ? (
 
           /* Empty State */
@@ -310,6 +313,7 @@ export default function ReportsPage() {
                 formatDate={formatDate}
                 getStatusStyle={getStatusStyle}
                 getPriorityStyle={getPriorityStyle}
+                clearResponse={clearResponse[report._id]}
               />
             ))}
           </div>
@@ -331,6 +335,7 @@ function ReportCard({
   formatDate,
   getStatusStyle,
   getPriorityStyle,
+  clearResponse,
 }) {
   const [status, setStatus] = useState(
     report.status || "Open"
@@ -349,12 +354,14 @@ function ReportCard({
   }, [report.status]);
 
   // ---------------------------------------------------------
-  // Keep response textbox synchronized with saved response.
+  // CLEAR RESPONSE TEXTBOX AFTER SUCCESSFUL SAVE
   // ---------------------------------------------------------
 
   useEffect(() => {
-    setResponse(report.response || "");
-  }, [report.response]);
+    if (clearResponse) {
+      setResponse("");
+    }
+  }, [clearResponse]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -395,6 +402,7 @@ function ReportCard({
 
         {/* Report Badges */}
         <div className="flex flex-wrap gap-2">
+
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(
               report.status
@@ -435,11 +443,11 @@ function ReportCard({
           FACILITATOR CONTROLS
           
           IMPORTANT:
-          There is intentionally NO separate
-          "Existing Facilitator Response" display here.
-          
+          There is NO existing facilitator response display
+          on the facilitator page.
+
           The facilitator only writes/updates the response.
-          The student is the one who sees the saved response.
+          The student sees the saved response.
       ===================================================== */}
 
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
@@ -490,7 +498,7 @@ function ReportCard({
 
           <p className="mt-2 text-xs text-slate-500">
             This response will be visible to the student after
-            you save the changes.
+            you save the changes. The box will clear after saving.
           </p>
         </div>
       </div>
