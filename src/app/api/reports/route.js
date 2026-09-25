@@ -63,29 +63,40 @@ function normalizeId(value) {
 // CURRENT USER
 // =========================================================
 
-async function getCurrentUser(session, db) {
+async function getCurrentUser(
+  session,
+  db
+) {
   if (!session?.userId) {
     return null;
   }
 
   let user = null;
 
-  // Try ObjectId first
-  if (ObjectId.isValid(session.userId)) {
-    user = await db
-      .collection("users")
-      .findOne({
-        _id: new ObjectId(session.userId),
-      });
+  if (
+    ObjectId.isValid(
+      session.userId
+    )
+  ) {
+    user =
+      await db
+        .collection("users")
+        .findOne({
+          _id:
+            new ObjectId(
+              session.userId
+            ),
+        });
   }
 
-  // Try string ID
   if (!user) {
-    user = await db
-      .collection("users")
-      .findOne({
-        _id: session.userId,
-      });
+    user =
+      await db
+        .collection("users")
+        .findOne({
+          _id:
+            session.userId,
+        });
   }
 
   return user;
@@ -99,10 +110,13 @@ function formatReport(report) {
   return {
     ...report,
 
-    _id: report._id.toString(),
+    _id:
+      report._id.toString(),
 
     studentId:
-      normalizeId(report.studentId),
+      normalizeId(
+        report.studentId
+      ),
 
     studentName:
       report.studentName || "",
@@ -199,11 +213,12 @@ export async function GET() {
       await getDatabase();
 
     // =======================================================
-    // STUDENT REPORTS
+    // STUDENT
     // =======================================================
 
     if (
-      session.role === "student"
+      session.role ===
+      "student"
     ) {
       const studentUser =
         await getCurrentUser(
@@ -241,21 +256,23 @@ export async function GET() {
       }
 
       const normalizedStudentId =
-        normalizeId(studentId);
+        normalizeId(
+          studentId
+        );
 
       /*
-       * Students only see:
+       * Student sees:
        *
-       * 1. Their own reports
-       * 2. Reports they have NOT hidden
+       * - Their own reports
+       * - Reports they have not hidden
        *
-       * Facilitator hiding does not affect this.
+       * Facilitator removal has no effect here.
        */
       const reports =
         await db
           .collection("reports")
           .find({
-            studentId: studentId,
+            studentId,
 
             hiddenForStudents: {
               $nin: [
@@ -268,13 +285,12 @@ export async function GET() {
           })
           .toArray();
 
-      const formattedReports =
-        reports.map(formatReport);
-
       return NextResponse.json(
         {
           reports:
-            formattedReports,
+            reports.map(
+              formatReport
+            ),
         },
         {
           status: 200,
@@ -283,7 +299,7 @@ export async function GET() {
     }
 
     // =======================================================
-    // FACILITATOR REPORTS
+    // FACILITATOR
     // =======================================================
 
     if (
@@ -329,14 +345,8 @@ export async function GET() {
       }
 
       /*
-       * Each facilitator has their own hidden list.
-       *
-       * If Facilitator A hides a report:
-       *
-       * hiddenForFacilitators:
-       * ["A"]
-       *
-       * Facilitator B will still see it.
+       * Each facilitator has an independent
+       * hidden list.
        */
       const reports =
         await db
@@ -353,23 +363,18 @@ export async function GET() {
           })
           .toArray();
 
-      const formattedReports =
-        reports.map(formatReport);
-
       return NextResponse.json(
         {
           reports:
-            formattedReports,
+            reports.map(
+              formatReport
+            ),
         },
         {
           status: 200,
         }
       );
     }
-
-    // =======================================================
-    // INVALID ROLE
-    // =======================================================
 
     return NextResponse.json(
       {
@@ -548,36 +553,19 @@ export async function POST(
       );
     }
 
-    // =======================================================
-    // NEW REPORT
-    // =======================================================
-
     const report = {
-      studentId:
-        studentId,
+      studentId,
+      studentName,
+      studentEmail,
 
-      studentName:
-        studentName,
-
-      studentEmail:
-        studentEmail,
-
-      title:
-        title,
-
-      category:
-        category,
-
-      description:
-        description,
-
-      priority:
-        priority,
+      title,
+      category,
+      description,
+      priority,
 
       status:
         "Open",
 
-      // Facilitator response
       response:
         "",
 
@@ -594,17 +582,13 @@ export async function POST(
         null,
 
       /*
-       * IMPORTANT:
-       *
-       * Student-specific hiding.
+       * Student-specific visibility.
        */
       hiddenForStudents:
         [],
 
       /*
-       * IMPORTANT:
-       *
-       * Facilitator-specific hiding.
+       * Facilitator-specific visibility.
        */
       hiddenForFacilitators:
         [],
@@ -661,17 +645,13 @@ export async function POST(
 // DELETE / HIDE REPORT
 // =========================================================
 //
-// IMPORTANT:
+// Nothing is physically deleted.
 //
-// No user physically deletes the report.
+// Student:
+//   Hide from that student only.
 //
-// STUDENT:
-//   Hides ONLY from themselves.
-//
-// FACILITATOR:
-//   Hides ONLY from themselves.
-//
-// The MongoDB report remains available to everyone else.
+// Facilitator:
+//   Hide from that facilitator only.
 // =========================================================
 
 export async function DELETE(
@@ -737,10 +717,6 @@ export async function DELETE(
     const db =
       await getDatabase();
 
-    // =======================================================
-    // FIND REPORT
-    // =======================================================
-
     const report =
       await db
         .collection("reports")
@@ -762,7 +738,7 @@ export async function DELETE(
     }
 
     // =======================================================
-    // FACILITATOR HIDE
+    // FACILITATOR REMOVE
     // =======================================================
 
     if (
@@ -808,14 +784,7 @@ export async function DELETE(
       }
 
       /*
-       * Add ONLY this facilitator's ID.
-       *
-       * $addToSet prevents duplicates.
-       *
-       * This does NOT:
-       * - delete the report
-       * - affect the student
-       * - affect another facilitator
+       * Hide ONLY from this facilitator.
        */
       const result =
         await db
@@ -865,7 +834,7 @@ export async function DELETE(
     }
 
     // =======================================================
-    // STUDENT HIDE
+    // STUDENT REMOVE
     // =======================================================
 
     if (
@@ -890,10 +859,6 @@ export async function DELETE(
         );
       }
 
-      /*
-       * Get all possible IDs belonging to the
-       * logged-in student.
-       */
       const possibleStudentIds = [
         normalizeId(
           studentUser.studentId
@@ -918,10 +883,8 @@ export async function DELETE(
         );
 
       /*
-       * SECURITY:
-       *
-       * Students may only hide reports
-       * belonging to themselves.
+       * Security check:
+       * student can only hide their own report.
        */
       const ownsReport =
         possibleStudentIds.includes(
@@ -949,10 +912,6 @@ export async function DELETE(
         );
       }
 
-      /*
-       * Determine the ID that was actually used
-       * to create the student's report.
-       */
       const studentId =
         normalizeId(
           studentUser.studentId
@@ -976,13 +935,11 @@ export async function DELETE(
       /*
        * IMPORTANT:
        *
-       * DO NOT use deleteOne().
+       * Do NOT delete the MongoDB document.
        *
-       * We only add this student's ID to
-       * hiddenForStudents.
+       * Only hide it from this student.
        *
-       * Facilitators will continue to see
-       * the report.
+       * Facilitators continue to see it.
        */
       const result =
         await db
@@ -1030,10 +987,6 @@ export async function DELETE(
         }
       );
     }
-
-    // =======================================================
-    // INVALID ROLE
-    // =======================================================
 
     return NextResponse.json(
       {
@@ -1192,15 +1145,13 @@ export async function PATCH(
       "";
 
     const updateData = {
-      status:
-        status,
-
+      status,
       updatedAt:
         new Date(),
     };
 
     // =======================================================
-    // SAVE FACILITATOR RESPONSE
+    // SAVE RESPONSE
     // =======================================================
 
     if (response) {
@@ -1222,9 +1173,6 @@ export async function PATCH(
       updateData.respondedAt =
         new Date();
     } else {
-      /*
-       * Clear the saved response.
-       */
       updateData.response =
         "";
 
@@ -1244,7 +1192,7 @@ export async function PATCH(
     /*
      * IMPORTANT:
      *
-     * Do NOT modify:
+     * Never modify either:
      *
      * hiddenForStudents
      * hiddenForFacilitators

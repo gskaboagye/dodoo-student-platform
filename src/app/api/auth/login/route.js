@@ -17,26 +17,41 @@ export async function POST(request) {
     const facilitatorCode =
       body.facilitatorCode?.trim();
 
+    // =======================================================
+    // VALIDATE INPUT
+    // =======================================================
+
     if (!email || !password || !role) {
       return NextResponse.json(
         {
           error:
             "Email, password, and role are required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     if (
-      !["student", "facilitator"].includes(role)
+      !["student", "facilitator"].includes(
+        role
+      )
     ) {
       return NextResponse.json(
         {
-          error: "Invalid account type.",
+          error:
+            "Invalid account type.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
+
+    // =======================================================
+    // FACILITATOR CODE
+    // =======================================================
 
     if (
       role === "facilitator" &&
@@ -47,9 +62,15 @@ export async function POST(request) {
           error:
             "Facilitator invitation code is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
+
+    // =======================================================
+    // DATABASE
+    // =======================================================
 
     const client =
       await clientPromise;
@@ -61,10 +82,16 @@ export async function POST(request) {
     const db =
       client.db(dbName);
 
+    // =======================================================
+    // FIND USER
+    // =======================================================
+
     const user =
       await db
         .collection("users")
-        .findOne({ email });
+        .findOne({
+          email,
+        });
 
     if (!user) {
       return NextResponse.json(
@@ -72,9 +99,15 @@ export async function POST(request) {
           error:
             "Invalid email or password.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
+
+    // =======================================================
+    // CHECK PASSWORD
+    // =======================================================
 
     const passwordMatch =
       await bcrypt.compare(
@@ -88,9 +121,15 @@ export async function POST(request) {
           error:
             "Invalid email or password.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
+
+    // =======================================================
+    // CHECK ROLE
+    // =======================================================
 
     if (user.role !== role) {
       return NextResponse.json(
@@ -98,9 +137,15 @@ export async function POST(request) {
           error:
             "The selected account type does not match this account.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
+
+    // =======================================================
+    // FACILITATOR INVITATION CODE
+    // =======================================================
 
     if (role === "facilitator") {
       const expectedCode =
@@ -115,10 +160,16 @@ export async function POST(request) {
             error:
               "Invalid facilitator invitation code.",
           },
-          { status: 403 }
+          {
+            status: 403,
+          }
         );
       }
     }
+
+    // =======================================================
+    // EMAIL VERIFICATION
+    // =======================================================
 
     if (!user.emailVerified) {
       return NextResponse.json(
@@ -126,9 +177,15 @@ export async function POST(request) {
           error:
             "Please verify your email before logging in.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
+
+    // =======================================================
+    // STUDENT STATUS
+    // =======================================================
 
     if (
       user.role === "student" &&
@@ -139,7 +196,9 @@ export async function POST(request) {
           error:
             "Your account is waiting for facilitator approval.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
@@ -152,9 +211,15 @@ export async function POST(request) {
           error:
             "Your student account was not approved.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
+
+    // =======================================================
+    // ACCOUNT STATUS
+    // =======================================================
 
     if (user.status !== "active") {
       return NextResponse.json(
@@ -162,17 +227,25 @@ export async function POST(request) {
           error:
             "Your account is not active.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    // Create 30-minute JWT session
+    // =======================================================
+    // CREATE SESSION
+    // =======================================================
+
     const token =
       await createSession({
         id: user._id.toString(),
+
         role: user.role,
+
         studentId:
           user.studentId || null,
+
         name:
           [
             user.firstName,
@@ -183,38 +256,53 @@ export async function POST(request) {
             .trim() ||
           user.name ||
           user.email,
-        email: user.email,
-        status: user.status,
+
+        email:
+          user.email,
+
+        status:
+          user.status,
       });
+
+    // =======================================================
+    // SESSION COOKIE
+    // =======================================================
 
     const cookieStore =
       await cookies();
 
     /*
-     * Session cookie:
+     * IMPORTANT:
      *
-     * No maxAge
-     * No expires
+     * There is intentionally NO:
      *
-     * Therefore:
-     * - Navigating between pages keeps the user logged in.
-     * - Closing the browser removes the cookie.
-     * - Reopening the site requires login again.
+     * maxAge
+     * expires
      *
-     * The JWT itself expires after 30 minutes.
+     * Therefore this is a browser session cookie.
+     *
+     * Students and facilitators use exactly
+     * the same cookie behavior.
      */
     cookieStore.set(
       "dcc_session",
       token,
       {
         httpOnly: true,
+
         secure:
           process.env.NODE_ENV ===
           "production",
+
         sameSite: "lax",
+
         path: "/",
       }
     );
+
+    // =======================================================
+    // SUCCESS
+    // =======================================================
 
     return NextResponse.json({
       message:
@@ -260,7 +348,9 @@ export async function POST(request) {
         error:
           "Something went wrong during login.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

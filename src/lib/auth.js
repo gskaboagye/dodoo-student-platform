@@ -10,7 +10,11 @@ const secretKey = new TextEncoder().encode(secret);
 
 /**
  * Create a login session.
- * Session expires after 30 minutes.
+ *
+ * The JWT expires after 30 minutes.
+ *
+ * The cookie itself is created as a session cookie
+ * inside the login API.
  */
 export async function createSession(user) {
   return await new SignJWT({
@@ -31,8 +35,16 @@ export async function createSession(user) {
 
 /**
  * Verify an existing login session.
+ *
+ * Returns the session payload when valid.
+ * Returns null when the session is expired
+ * or invalid.
  */
 export async function verifySession(token) {
+  if (!token) {
+    return null;
+  }
+
   try {
     const { payload } = await jwtVerify(
       token,
