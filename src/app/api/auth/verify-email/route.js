@@ -20,7 +20,7 @@ export async function POST(request) {
     if (!/^\d{6}$/.test(code)) {
       return NextResponse.json(
         {
-          error: "Verification code must contain exactly 6 digits.",
+          error: "Verification code must contain 6 digits.",
         },
         { status: 400 }
       );
@@ -30,9 +30,7 @@ export async function POST(request) {
     const dbName = process.env.DB_NAME || "DCCPlatform";
     const db = client.db(dbName);
 
-    const user = await db.collection("users").findOne({
-      email,
-    });
+    const user = await db.collection("users").findOne({ email });
 
     if (!user) {
       return NextResponse.json(
@@ -55,8 +53,7 @@ export async function POST(request) {
     if (!user.emailVerificationCode) {
       return NextResponse.json(
         {
-          error:
-            "No verification code is available for this account.",
+          error: "No verification code is available. Please register again.",
         },
         { status: 400 }
       );
@@ -85,9 +82,7 @@ export async function POST(request) {
     }
 
     await db.collection("users").updateOne(
-      {
-        _id: user._id,
-      },
+      { _id: user._id },
       {
         $set: {
           emailVerified: true,
@@ -103,18 +98,16 @@ export async function POST(request) {
     return NextResponse.json(
       {
         message:
-          "Email verified successfully. You can now log in.",
+          "Your email has been verified successfully. You can now log in.",
       },
       { status: 200 }
     );
   } catch (error) {
-    console.error("VERIFY EMAIL ERROR:", error);
+    console.error("EMAIL VERIFICATION ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          error?.message ||
-          "Something went wrong while verifying your email.",
+        error: "Something went wrong while verifying your email.",
       },
       { status: 500 }
     );
