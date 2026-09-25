@@ -11,6 +11,7 @@ import {
   ChartNoAxesCombined,
   BookOpen,
   FolderKanban,
+  AlertCircle,
   UserRound,
   LogIn,
   LogOut,
@@ -166,6 +167,11 @@ export default function Sidebar() {
       href: "/projects",
       icon: FolderKanban,
     },
+    {
+      name: "Student Reports",
+      href: "/reports",
+      icon: AlertCircle,
+    },
   ];
 
   // ==========================================
@@ -201,6 +207,11 @@ export default function Sidebar() {
       name: "Resources",
       href: "/resources",
       icon: BookOpen,
+    },
+    {
+      name: "Report an Issue",
+      href: "/student/reports",
+      icon: AlertCircle,
     },
   ];
 
