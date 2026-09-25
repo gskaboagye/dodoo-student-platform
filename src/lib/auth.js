@@ -10,8 +10,7 @@ const secretKey = new TextEncoder().encode(secret);
 
 /**
  * Create a login session.
- *
- * The session expires after 30 minutes.
+ * Session expires after 30 minutes.
  */
 export async function createSession(user) {
   return await new SignJWT({
@@ -32,17 +31,20 @@ export async function createSession(user) {
 
 /**
  * Verify an existing login session.
- *
- * Returns the session information when valid.
- * Returns null when the session is expired or invalid.
  */
 export async function verifySession(token) {
   try {
-    const { payload } = await jwtVerify(token, secretKey);
+    const { payload } = await jwtVerify(
+      token,
+      secretKey
+    );
 
     return payload;
   } catch (error) {
-    console.error("SESSION VERIFICATION ERROR:", error);
+    console.error(
+      "SESSION VERIFICATION ERROR:",
+      error
+    );
 
     return null;
   }
