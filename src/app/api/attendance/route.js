@@ -5,25 +5,21 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
-// =========================================================
-// DATABASE
-// =========================================================
+/* =========================================================
+   DATABASE
+========================================================= */
 
 async function getDatabase() {
   const client = await clientPromise;
-
-  return client.db(
-    process.env.DB_NAME || "DCCPlatform"
-  );
+  return client.db();
 }
 
-// =========================================================
-// SESSION
-// =========================================================
+/* =========================================================
+   SESSION
+========================================================= */
 
 async function getSession() {
   const cookieStore = await cookies();
-
   const token = cookieStore.get("dcc_session")?.value;
 
   if (!token) {
@@ -33,40 +29,12 @@ async function getSession() {
   return await verifySession(token);
 }
 
-// =========================================================
-// AUTHORIZATION
-// =========================================================
-
-async function requireFacilitator() {
-  const session = await getSession();
-
-  if (!session || session.role !== "facilitator") {
-    return null;
-  }
-
-  return session;
-}
-
-async function requireStudent() {
-  const session = await getSession();
-
-  if (
-    !session ||
-    session.role !== "student" ||
-    !session.studentId
-  ) {
-    return null;
-  }
-
-  return session;
-}
-
-// =========================================================
-// DATE VALIDATION
-// =========================================================
+/* =========================================================
+   DATE VALIDATION
+========================================================= */
 
 function isValidDateString(date) {
-  if (!date) {
+  if (!date || typeof date !== "string") {
     return false;
   }
 
@@ -75,44 +43,47 @@ function isValidDateString(date) {
     return false;
   }
 
-  const parsed = new Date(`${date}T00:00:00`);
+  const parsed = new Date(`${date}T00:00:00Z`);
 
   if (Number.isNaN(parsed.getTime())) {
     return false;
   }
 
-  const year = parsed.getFullYear();
-  const month = String(
-    parsed.getMonth() + 1
-  ).padStart(2, "0");
-  const day = String(
-    parsed.getDate()
-  ).padStart(2, "0");
+  const [year, month, day] = date.split("-").map(Number);
 
-  return `${year}-${month}-${day}` === date;
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() + 1 === month &&
+    parsed.getUTCDate() === day
+  );
 }
 
-// =========================================================
-// NORMALIZE DATE
-// =========================================================
+/* =========================================================
+   FORMAT ATTENDANCE RECORD
+========================================================= */
 
-function normalizeDate(date) {
-  if (!date) {
-    return null;
-  }
-
-  return String(date).trim();
+function formatAttendanceRecord(record) {
+  return {
+    ...record,
+    _id: record._id?.toString(),
+    studentId:
+      record.studentId instanceof ObjectId
+        ? record.studentId.toString()
+        : record.studentId,
+  };
 }
 
-// =========================================================
-// NORMALIZE STUDENT ID
-// =========================================================
+/* =========================================================
+   STUDENT ID QUERY
+========================================================= */
 
 function buildStudentIdQuery(studentId) {
-  const values = [String(studentId)];
+  const idString = String(studentId);
 
-  if (ObjectId.isValid(studentId)) {
-    values.push(new ObjectId(studentId));
+  const values = [idString];
+
+  if (ObjectId.isValid(idString)) {
+    values.push(new ObjectId(idString));
   }
 
   return {
@@ -120,42 +91,9 @@ function buildStudentIdQuery(studentId) {
   };
 }
 
-// =========================================================
-// FORMAT ATTENDANCE RECORD
-// =========================================================
-
-function formatAttendanceRecord(record) {
-  return {
-    ...record,
-
-    _id: record._id?.toString(),
-
-    studentId:
-      record.studentId?.toString() || null,
-
-    date: record.date || null,
-
-    status: record.status || null,
-
-    studentName:
-      record.studentName || "",
-  };
-}
-
-// =========================================================
-// GET
-//
-// Facilitator:
-//   View attendance for all students.
-//
-// Student:
-//   View ONLY their own attendance.
-//
-// Date:
-//   ?date=2026-09-26
-//
-// If a date is supplied, ONLY that day's records are returned.
-// =========================================================
+/* =========================================================
+   GET ATTENDANCE
+========================================================= */
 
 export async function GET(request) {
   try {
@@ -164,249 +102,188 @@ export async function GET(request) {
     if (!session) {
       return NextResponse.json(
         {
-          error: "Authentication required.",
+          message: "Unauthorized. Please log in again.",
         },
-        {
-          status: 401,
-        }
+        { status: 401 }
       );
     }
 
-    const { searchParams } =
-      new URL(request.url);
+    const { searchParams } = new URL(request.url);
 
-    const requestedDate =
-      searchParams.get("date");
-
-    const date = normalizeDate(
-      requestedDate
-    );
-
-    // -------------------------------------------------------
-    // Validate date
-    // -------------------------------------------------------
-
-    if (date && !isValidDateString(date)) {
-      return NextResponse.json(
-        {
-          error:
-            "Invalid date. Use YYYY-MM-DD.",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
+    const date = searchParams.get("date");
 
     const db = await getDatabase();
 
-    // =======================================================
-    // STUDENT
-    // =======================================================
+    const attendanceCollection = db.collection("attendance");
+
+    /* =====================================================
+       STUDENT
+    ===================================================== */
 
     if (session.role === "student") {
-      const studentSession =
-        await requireStudent();
-
-      if (!studentSession) {
+      if (!session.studentId) {
         return NextResponse.json(
           {
-            error:
-              "Student profile is not linked.",
+            message: "Student ID was not found in your session.",
           },
-          {
-            status: 403,
-          }
+          { status: 400 }
         );
       }
 
-      const studentId =
-        studentSession.studentId;
-
       const query = {
-        studentId:
-          buildStudentIdQuery(studentId),
+        studentId: buildStudentIdQuery(session.studentId),
       };
 
-      // -----------------------------------------------------
-      // If date exists, return ONLY that day.
-      // Otherwise return complete history.
-      // -----------------------------------------------------
-
+      /*
+       * If the student selected a specific date,
+       * only return attendance for that date.
+       */
       if (date) {
+        if (!isValidDateString(date)) {
+          return NextResponse.json(
+            {
+              message: "Invalid date format. Use YYYY-MM-DD.",
+            },
+            { status: 400 }
+          );
+        }
+
         query.date = date;
       }
 
-      const records = await db
-        .collection("attendance")
+      const attendance = await attendanceCollection
         .find(query)
         .sort({
           date: -1,
-          createdAt: -1,
         })
         .toArray();
 
       return NextResponse.json({
-        attendance:
-          records.map(
-            formatAttendanceRecord
-          ),
+        attendance: attendance.map(formatAttendanceRecord),
       });
     }
 
-    // =======================================================
-    // FACILITATOR
-    // =======================================================
+    /* =====================================================
+       FACILITATOR
+    ===================================================== */
 
     if (session.role === "facilitator") {
       const query = {};
 
-      // -----------------------------------------------------
-      // When a date is selected, return ONLY that date.
-      // -----------------------------------------------------
-
+      /*
+       * Facilitators can view attendance for a specific day.
+       */
       if (date) {
+        if (!isValidDateString(date)) {
+          return NextResponse.json(
+            {
+              message: "Invalid date format. Use YYYY-MM-DD.",
+            },
+            { status: 400 }
+          );
+        }
+
         query.date = date;
       }
 
-      const records = await db
-        .collection("attendance")
+      const attendance = await attendanceCollection
         .find(query)
         .sort({
           date: -1,
-          createdAt: -1,
+          studentName: 1,
         })
         .toArray();
 
       return NextResponse.json({
-        attendance:
-          records.map(
-            formatAttendanceRecord
-          ),
+        attendance: attendance.map(formatAttendanceRecord),
       });
     }
 
-    // =======================================================
-    // UNKNOWN ROLE
-    // =======================================================
-
     return NextResponse.json(
       {
-        error: "Access denied.",
+        message: "You do not have permission to view attendance.",
       },
-      {
-        status: 403,
-      }
+      { status: 403 }
     );
   } catch (error) {
-    console.error(
-      "Attendance GET Error:",
-      error
-    );
+    console.error("GET ATTENDANCE ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Unable to load attendance.",
+        message: "Failed to load attendance.",
+        error: error.message,
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-// =========================================================
-// POST
-//
-// ONLY FACILITATORS.
-//
-// Creates attendance if the student has no record for
-// the selected date.
-//
-// If the record already exists for:
-//     studentId + date
-//
-// the existing record is UPDATED instead.
-//
-// Therefore:
-//
-// September 26 + Student A
-// = ONE attendance record.
-//
-// September 27 + Student A
-// = ANOTHER attendance record.
-//
-// =========================================================
+/* =========================================================
+   POST ATTENDANCE
+   Facilitators only
+========================================================= */
 
 export async function POST(request) {
   try {
-    const session =
-      await requireFacilitator();
+    const session = await getSession();
 
     if (!session) {
       return NextResponse.json(
         {
-          error:
-            "Only facilitators can take attendance.",
+          message: "Unauthorized. Please log in again.",
         },
+        { status: 401 }
+      );
+    }
+
+    if (session.role !== "facilitator") {
+      return NextResponse.json(
         {
-          status: 403,
-        }
+          message: "Only facilitators can record attendance.",
+        },
+        { status: 403 }
       );
     }
 
     const body = await request.json();
 
-    const studentId =
-      body.studentId;
+    const {
+      studentId,
+      studentName,
+      date,
+      status,
+    } = body;
 
-    const date = normalizeDate(
-      body.date
-    );
+    /* =====================================================
+       VALIDATION
+    ===================================================== */
 
-    const status =
-      body.status;
-
-    // -------------------------------------------------------
-    // Required fields
-    // -------------------------------------------------------
-
-    if (
-      !studentId ||
-      !date ||
-      !status
-    ) {
+    if (!studentId) {
       return NextResponse.json(
         {
-          error:
-            "Student, date and attendance status are required.",
+          message: "Student ID is required.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    // -------------------------------------------------------
-    // Validate date
-    // -------------------------------------------------------
+    if (!date) {
+      return NextResponse.json(
+        {
+          message: "Attendance date is required.",
+        },
+        { status: 400 }
+      );
+    }
 
     if (!isValidDateString(date)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid attendance date. Use YYYY-MM-DD.",
+          message: "Invalid date. Use YYYY-MM-DD.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
-
-    // -------------------------------------------------------
-    // Validate status
-    // -------------------------------------------------------
 
     const allowedStatuses = [
       "Present",
@@ -414,514 +291,378 @@ export async function POST(request) {
       "Absent",
     ];
 
-    if (
-      !allowedStatuses.includes(
-        status
-      )
-    ) {
+    if (!allowedStatuses.includes(status)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid attendance status. Use Present, Late or Absent.",
+          message:
+            "Invalid attendance status. Use Present, Late, or Absent.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    // -------------------------------------------------------
-    // Validate student ID
-    // -------------------------------------------------------
-
-    if (
-      !ObjectId.isValid(
-        studentId
-      )
-    ) {
+    if (!ObjectId.isValid(studentId)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid student ID.",
+          message: "Invalid student ID.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    const db =
-      await getDatabase();
+    const db = await getDatabase();
 
-    const studentObjectId =
-      new ObjectId(studentId);
+    const attendanceCollection =
+      db.collection("attendance");
 
-    // =======================================================
-    // VERIFY STUDENT EXISTS
-    // =======================================================
+    const usersCollection = db.collection("users");
 
-    const student =
-      await db
-        .collection("students")
-        .findOne({
-          _id: studentObjectId,
-        });
+    const studentObjectId = new ObjectId(studentId);
+
+    /* =====================================================
+       VERIFY STUDENT
+    ===================================================== */
+
+    const student = await usersCollection.findOne({
+      _id: studentObjectId,
+      role: "student",
+    });
 
     if (!student) {
       return NextResponse.json(
         {
-          error:
-            "Student not found.",
+          message: "Student account was not found.",
         },
-        {
-          status: 404,
-        }
+        { status: 404 }
       );
     }
 
-    // =======================================================
-    // FIND EXISTING RECORD
-    //
-    // We support both ObjectId and string studentId records
-    // because older records may have been saved differently.
-    // =======================================================
+    /*
+     * Always use the student's actual name from the
+     * database when possible.
+     */
+    const finalStudentName =
+      student.name ||
+      student.fullName ||
+      studentName ||
+      "Student";
 
-    const existing =
-      await db
-        .collection("attendance")
-        .findOne({
-          studentId: {
-            $in: [
-              studentObjectId,
-              String(studentId),
-            ],
-          },
-          date,
-        });
+    /* =====================================================
+       FIND EXISTING ATTENDANCE
+    ===================================================== */
 
-    // =======================================================
-    // UPDATE EXISTING RECORD
-    // =======================================================
+    /*
+     * We check both ObjectId and string formats.
+     *
+     * This is important because older attendance records
+     * may have studentId stored as a string while newer
+     * records use MongoDB ObjectId.
+     */
 
-    if (existing) {
-      const updateResult =
-        await db
-          .collection("attendance")
-          .updateOne(
-            {
-              _id: existing._id,
-            },
-            {
-              $set: {
-                studentId:
-                  studentObjectId,
-
-                studentName:
-                  `${student.firstName || ""} ${
-                    student.lastName || ""
-                  }`.trim(),
-
-                date,
-
-                status,
-
-                updatedAt:
-                  new Date(),
-              },
-            }
-          );
-
-      if (
-        updateResult.matchedCount ===
-        0
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "Attendance record could not be updated.",
-          },
-          {
-            status: 500,
-          }
-        );
-      }
-
-      return NextResponse.json({
-        message:
-          "Attendance updated successfully.",
-
-        attendance: {
-          _id:
-            existing._id.toString(),
-
-          studentId:
-            studentObjectId.toString(),
-
-          studentName:
-            `${student.firstName || ""} ${
-              student.lastName || ""
-            }`.trim(),
-
-          date,
-
-          status,
-        },
-      });
-    }
-
-    // =======================================================
-    // CREATE NEW RECORD
-    // =======================================================
-
-    const now =
-      new Date();
-
-    const result =
-      await db
-        .collection("attendance")
-        .insertOne({
-          studentId:
+    const existingRecord =
+      await attendanceCollection.findOne({
+        studentId: {
+          $in: [
             studentObjectId,
+            studentObjectId.toString(),
+          ],
+        },
+        date,
+      });
 
-          studentName:
-            `${student.firstName || ""} ${
-              student.lastName || ""
-            }`.trim(),
+    /* =====================================================
+       UPDATE EXISTING RECORD
+    ===================================================== */
 
-          date,
+    if (existingRecord) {
+      await attendanceCollection.updateOne(
+        {
+          _id: existingRecord._id,
+        },
+        {
+          $set: {
+            studentId: studentObjectId,
+            studentName: finalStudentName,
+            date,
+            status,
+            updatedAt: new Date(),
+          },
+        }
+      );
 
-          status,
-
-          createdAt: now,
-
-          updatedAt: now,
+      const updatedRecord =
+        await attendanceCollection.findOne({
+          _id: existingRecord._id,
         });
 
-    return NextResponse.json(
-      {
-        message:
-          "Attendance recorded successfully.",
-
-        attendance: {
-          _id:
-            result.insertedId.toString(),
-
-          studentId:
-            studentObjectId.toString(),
-
-          studentName:
-            `${student.firstName || ""} ${
-              student.lastName || ""
-            }`.trim(),
-
-          date,
-
-          status,
-        },
-      },
-      {
-        status: 201,
-      }
-    );
-  } catch (error) {
-    console.error(
-      "Attendance POST Error:",
-      error
-    );
-
-    // -------------------------------------------------------
-    // Duplicate-key protection
-    // -------------------------------------------------------
-
-    if (
-      error?.code === 11000
-    ) {
       return NextResponse.json(
         {
-          error:
-            "Attendance already exists for this student and date. Please reload and try again.",
+          message: "Attendance updated successfully.",
+          attendance: formatAttendanceRecord(
+            updatedRecord
+          ),
         },
+        { status: 200 }
+      );
+    }
+
+    /* =====================================================
+       CREATE NEW ATTENDANCE RECORD
+    ===================================================== */
+
+    const newRecord = {
+      studentId: studentObjectId,
+      studentName: finalStudentName,
+      date,
+      status,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const result =
+      await attendanceCollection.insertOne(newRecord);
+
+    const createdRecord =
+      await attendanceCollection.findOne({
+        _id: result.insertedId,
+      });
+
+    return NextResponse.json(
+      {
+        message: "Attendance recorded successfully.",
+        attendance: formatAttendanceRecord(
+          createdRecord
+        ),
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    console.error("POST ATTENDANCE ERROR:", error);
+
+    /*
+     * Handle duplicate attendance records gracefully.
+     */
+    if (error?.code === 11000) {
+      return NextResponse.json(
         {
-          status: 409,
-        }
+          message:
+            "Attendance already exists for this student and date.",
+        },
+        { status: 409 }
       );
     }
 
     return NextResponse.json(
       {
-        error:
-          "Unable to save attendance.",
+        message: "Failed to save attendance.",
+        error: error.message,
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-// =========================================================
-// PUT
-//
-// ONLY FACILITATORS.
-//
-// Updates an existing attendance record by ID.
-// =========================================================
+/* =========================================================
+   PUT ATTENDANCE
+   Facilitators only
+========================================================= */
 
 export async function PUT(request) {
   try {
-    const session =
-      await requireFacilitator();
+    const session = await getSession();
 
     if (!session) {
       return NextResponse.json(
         {
-          error:
-            "Only facilitators can edit attendance.",
+          message: "Unauthorized. Please log in again.",
         },
-        {
-          status: 403,
-        }
+        { status: 401 }
       );
     }
 
-    const body =
-      await request.json();
-
-    const id =
-      body.id;
-
-    const status =
-      body.status;
-
-    // -------------------------------------------------------
-    // Required fields
-    // -------------------------------------------------------
-
-    if (!id || !status) {
+    if (session.role !== "facilitator") {
       return NextResponse.json(
         {
-          error:
-            "Attendance ID and status are required.",
+          message: "Only facilitators can update attendance.",
         },
-        {
-          status: 400,
-        }
+        { status: 403 }
       );
     }
 
-    // -------------------------------------------------------
-    // Validate status
-    // -------------------------------------------------------
+    const body = await request.json();
 
-    if (
-      ![
-        "Present",
-        "Late",
-        "Absent",
-      ].includes(status)
-    ) {
+    const {
+      attendanceId,
+      status,
+    } = body;
+
+    if (!attendanceId) {
       return NextResponse.json(
         {
-          error:
-            "Invalid attendance status.",
+          message: "Attendance ID is required.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    // -------------------------------------------------------
-    // Validate ID
-    // -------------------------------------------------------
-
-    if (
-      !ObjectId.isValid(id)
-    ) {
+    if (!ObjectId.isValid(attendanceId)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid attendance ID.",
+          message: "Invalid attendance ID.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    const db =
-      await getDatabase();
+    const allowedStatuses = [
+      "Present",
+      "Late",
+      "Absent",
+    ];
 
-    // -------------------------------------------------------
-    // Find attendance first
-    // -------------------------------------------------------
-
-    const existing =
-      await db
-        .collection("attendance")
-        .findOne({
-          _id:
-            new ObjectId(id),
-        });
-
-    if (!existing) {
+    if (!allowedStatuses.includes(status)) {
       return NextResponse.json(
         {
-          error:
-            "Attendance record not found.",
+          message:
+            "Invalid attendance status. Use Present, Late, or Absent.",
         },
-        {
-          status: 404,
-        }
+        { status: 400 }
       );
     }
 
-    // -------------------------------------------------------
-    // Update status
-    // -------------------------------------------------------
+    const db = await getDatabase();
 
-    await db
-      .collection("attendance")
-      .updateOne(
+    const attendanceCollection =
+      db.collection("attendance");
+
+    const result =
+      await attendanceCollection.updateOne(
         {
-          _id:
-            new ObjectId(id),
+          _id: new ObjectId(attendanceId),
         },
         {
           $set: {
             status,
-
-            updatedAt:
-              new Date(),
+            updatedAt: new Date(),
           },
         }
       );
 
+    if (result.matchedCount === 0) {
+      return NextResponse.json(
+        {
+          message: "Attendance record not found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    const updatedRecord =
+      await attendanceCollection.findOne({
+        _id: new ObjectId(attendanceId),
+      });
+
     return NextResponse.json({
-      message:
-        "Attendance updated successfully.",
-
-      attendance: {
-        _id:
-          existing._id.toString(),
-
-        studentId:
-          existing.studentId?.toString() ||
-          null,
-
-        date:
-          existing.date || null,
-
-        status,
-      },
+      message: "Attendance updated successfully.",
+      attendance: formatAttendanceRecord(
+        updatedRecord
+      ),
     });
   } catch (error) {
-    console.error(
-      "Attendance PUT Error:",
-      error
-    );
+    console.error("PUT ATTENDANCE ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Unable to update attendance.",
+        message: "Failed to update attendance.",
+        error: error.message,
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
 
-// =========================================================
-// DELETE
-//
-// ONLY FACILITATORS.
-//
-// Deletes one attendance record.
-// =========================================================
+/* =========================================================
+   DELETE ATTENDANCE
+   Facilitators only
+========================================================= */
 
 export async function DELETE(request) {
   try {
-    const session =
-      await requireFacilitator();
+    const session = await getSession();
 
     if (!session) {
       return NextResponse.json(
         {
-          error:
-            "Only facilitators can delete attendance.",
+          message: "Unauthorized. Please log in again.",
         },
+        { status: 401 }
+      );
+    }
+
+    if (session.role !== "facilitator") {
+      return NextResponse.json(
         {
-          status: 403,
-        }
+          message: "Only facilitators can delete attendance.",
+        },
+        { status: 403 }
       );
     }
 
     const { searchParams } =
       new URL(request.url);
 
-    const id =
+    const attendanceId =
       searchParams.get("id");
 
-    if (
-      !id ||
-      !ObjectId.isValid(id)
-    ) {
+    if (!attendanceId) {
       return NextResponse.json(
         {
-          error:
-            "Valid attendance ID is required.",
+          message: "Attendance ID is required.",
         },
-        {
-          status: 400,
-        }
+        { status: 400 }
       );
     }
 
-    const db =
-      await getDatabase();
-
-    const result =
-      await db
-        .collection("attendance")
-        .deleteOne({
-          _id:
-            new ObjectId(id),
-        });
-
-    if (
-      result.deletedCount === 0
-    ) {
+    if (!ObjectId.isValid(attendanceId)) {
       return NextResponse.json(
         {
-          error:
-            "Attendance record not found.",
+          message: "Invalid attendance ID.",
         },
+        { status: 400 }
+      );
+    }
+
+    const db = await getDatabase();
+
+    const attendanceCollection =
+      db.collection("attendance");
+
+    const result =
+      await attendanceCollection.deleteOne({
+        _id: new ObjectId(attendanceId),
+      });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json(
         {
-          status: 404,
-        }
+          message: "Attendance record not found.",
+        },
+        { status: 404 }
       );
     }
 
     return NextResponse.json({
-      message:
-        "Attendance deleted successfully.",
+      message: "Attendance deleted successfully.",
     });
   } catch (error) {
-    console.error(
-      "Attendance DELETE Error:",
-      error
-    );
+    console.error("DELETE ATTENDANCE ERROR:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Unable to delete attendance.",
+        message: "Failed to delete attendance.",
+        error: error.message,
       },
-      {
-        status: 500,
-      }
+      { status: 500 }
     );
   }
 }
