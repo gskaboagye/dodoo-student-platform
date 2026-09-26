@@ -91,6 +91,20 @@ export default function Dashboard() {
       // =====================================================
 
       if (currentUser.role === "student") {
+
+        // =====================================================
+        // PENDING STUDENT
+        // =====================================================
+
+        if (currentUser.status === "pending") {
+          setStudentData({
+            pending: true,
+            email: currentUser.email || "",
+          });
+
+          return;
+        }
+
         const [
           profileResponse,
           attendanceResponse,
@@ -516,6 +530,98 @@ export default function Dashboard() {
 
         <Announcements role={user?.role} />
 
+      </div>
+    );
+  }
+
+  // =========================================================
+  // PENDING STUDENT
+  // =========================================================
+
+  if (user?.role === "student" && studentData?.pending) {
+    return (
+      <div className="p-4 sm:p-6">
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <div className="w-full max-w-2xl rounded-2xl border border-blue-200 bg-blue-50 p-6 shadow-sm sm:p-8">
+
+            <div className="text-center">
+
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+                <AlertCircle className="h-8 w-8 text-blue-600" />
+              </div>
+
+              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                Application Pending Approval
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
+                Your application has been submitted successfully
+                and is currently being reviewed by a facilitator.
+              </p>
+
+            </div>
+
+            <div className="mt-6 rounded-xl border border-blue-200 bg-white p-5">
+
+              <div className="flex items-start gap-3">
+
+                <div className="mt-0.5 shrink-0">
+                  <span className="text-xl">📧</span>
+                </div>
+
+                <div>
+
+                  <h2 className="font-semibold text-slate-900">
+                    Check Your Email for Approval
+                  </h2>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Please check the email address you used to
+                    register for an approval notification from
+                    Dodoo Coding Club.
+                  </p>
+
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    If you do not see the message in your Inbox,
+                    please check your{" "}
+                    <strong>Spam/Junk</strong> folder.
+                  </p>
+
+                  {studentData.email && (
+                    <div className="mt-4 rounded-lg bg-slate-50 p-3">
+                      <p className="text-xs text-slate-500">
+                        Notification email
+                      </p>
+
+                      <p className="mt-1 break-all text-sm font-medium text-slate-800">
+                        {studentData.email}
+                      </p>
+                    </div>
+                  )}
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 text-center">
+
+              <p className="text-sm text-slate-500">
+                <strong className="text-slate-700">
+                  Status: Pending Review
+                </strong>
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                You will receive an email once a facilitator
+                reviews your application.
+              </p>
+
+            </div>
+
+          </div>
+        </div>
       </div>
     );
   }

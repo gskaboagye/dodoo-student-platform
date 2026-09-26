@@ -7,6 +7,8 @@ import {
   Clock3,
   AlertCircle,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 function getToday() {
@@ -16,6 +18,32 @@ function getToday() {
   return new Date(date.getTime() - offset * 60000)
     .toISOString()
     .split("T")[0];
+}
+
+function changeDate(currentDate, days) {
+  const date = new Date(`${currentDate}T00:00:00`);
+  date.setDate(date.getDate() + days);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDate(dateString) {
+  if (!dateString) {
+    return "";
+  }
+
+  const date = new Date(`${dateString}T00:00:00`);
+
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export default function AttendancePage() {
@@ -31,6 +59,8 @@ export default function AttendancePage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const today = getToday();
 
   useEffect(() => {
     initializePage();
@@ -83,7 +113,9 @@ export default function AttendancePage() {
 
       if (!response.ok) {
         throw new Error(
-          data.error || data.message || "Failed to load students."
+          data.error ||
+            data.message ||
+            "Failed to load students."
         );
       }
 
@@ -104,7 +136,7 @@ export default function AttendancePage() {
       setError("");
 
       const response = await fetch(
-        `/api/attendance?date=${selectedDate}`,
+        `/api/attendance?date=${encodeURIComponent(selectedDate)}`,
         {
           cache: "no-store",
         }
@@ -129,7 +161,9 @@ export default function AttendancePage() {
       setAttendance(records);
     } catch (err) {
       setAttendance([]);
-      setError(err.message || "Failed to load attendance.");
+      setError(
+        err.message || "Failed to load attendance."
+      );
     }
   }
 
@@ -174,16 +208,48 @@ export default function AttendancePage() {
       }
 
       setMessage(
-        `${student.firstName} ${student.lastName}: ${status}`
+        `${student.firstName} ${student.lastName}: ${status} for ${formatDate(date)}`
       );
 
       await loadAttendance(date);
     } catch (err) {
-      setError(err.message || "Failed to save attendance.");
+      setError(
+        err.message || "Failed to save attendance."
+      );
     } finally {
       setSavingId(null);
     }
   }
+
+  function goToPreviousDay() {
+    setMessage("");
+    setError("");
+    setDate((currentDate) =>
+      changeDate(currentDate, -1)
+    );
+  }
+
+  function goToNextDay() {
+    setMessage("");
+    setError("");
+
+    const nextDate = changeDate(date, 1);
+
+    // Do not allow navigation into the future.
+    if (nextDate <= today) {
+      setDate(nextDate);
+    }
+  }
+
+  function goToToday() {
+    setMessage("");
+    setError("");
+    setDate(today);
+  }
+
+  const isToday = date === today;
+  const nextDate = changeDate(date, 1);
+  const canGoForward = nextDate <= today;
 
   const filteredStudents = useMemo(() => {
     const value = search.toLowerCase().trim();
@@ -200,8 +266,12 @@ export default function AttendancePage() {
 
       return (
         name.includes(value) ||
-        student.email?.toLowerCase().includes(value) ||
-        student.program?.toLowerCase().includes(value)
+        student.email
+          ?.toLowerCase()
+          .includes(value) ||
+        student.program
+          ?.toLowerCase()
+          .includes(value)
       );
     });
   }, [students, search]);
@@ -245,9 +315,13 @@ export default function AttendancePage() {
     <main className="p-6 md:p-8">
       <div className="mx-auto max-w-7xl">
 
-        {/* Header */}
+        {/* =====================================================
+            HEADER
+        ===================================================== */}
+
         <div className="mb-8">
           <div className="flex items-center gap-3">
+
             <div className="rounded-xl bg-blue-100 p-3 text-blue-600">
               <CalendarCheck className="h-6 w-6" />
             </div>
@@ -261,14 +335,18 @@ export default function AttendancePage() {
 
               <p className="mt-1 text-sm text-slate-500">
                 {isFacilitator
-                  ? "Record and monitor student attendance."
-                  : "View your attendance records."}
+                  ? "Record and monitor student attendance by day."
+                  : "View your attendance records by day."}
               </p>
             </div>
+
           </div>
         </div>
 
-        {/* Messages */}
+        {/* =====================================================
+            MESSAGES
+        ===================================================== */}
+
         {message && (
           <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-700">
             {message}
@@ -281,9 +359,15 @@ export default function AttendancePage() {
           </div>
         )}
 
-        {/* Controls */}
+        {/* =====================================================
+            DATE CONTROLS
+        ===================================================== */}
+
         <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+
+            {/* DATE PICKER */}
 
             <div>
               <label className="mb-2 block text-sm font-semibold text-slate-700">
@@ -293,12 +377,59 @@ export default function AttendancePage() {
               <input
                 type="date"
                 value={date}
-                onChange={(event) =>
-                  setDate(event.target.value)
-                }
+                max={today}
+                onChange={(event) => {
+                  setMessage("");
+                  setError("");
+                  setDate(event.target.value);
+                }}
                 className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
+
+            {/* DAY NAVIGATION */}
+
+            <div className="flex flex-wrap items-center gap-2">
+
+              <button
+                type="button"
+                onClick={goToPreviousDay}
+                className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous Day
+              </button>
+
+              <button
+                type="button"
+                onClick={goToToday}
+                disabled={isToday}
+                className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                  isToday
+                    ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+              >
+                Today
+              </button>
+
+              <button
+                type="button"
+                onClick={goToNextDay}
+                disabled={!canGoForward}
+                className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition ${
+                  canGoForward
+                    ? "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                }`}
+              >
+                Next Day
+                <ChevronRight className="h-4 w-4" />
+              </button>
+
+            </div>
+
+            {/* SEARCH */}
 
             {isFacilitator && (
               <div>
@@ -307,6 +438,7 @@ export default function AttendancePage() {
                 </label>
 
                 <div className="relative">
+
                   <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
 
                   <input
@@ -318,14 +450,39 @@ export default function AttendancePage() {
                     placeholder="Search by name, email or program..."
                     className="w-full rounded-xl border border-slate-300 py-3 pl-10 pr-4 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-80"
                   />
+
                 </div>
               </div>
             )}
 
           </div>
+
+          {/* SELECTED DATE */}
+
+          <div className="mt-5 rounded-xl bg-slate-50 p-4 text-center">
+
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Selected Attendance Day
+            </p>
+
+            <p className="mt-1 text-lg font-bold text-slate-900">
+              {formatDate(date)}
+            </p>
+
+            {isToday && (
+              <span className="mt-2 inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                Today
+              </span>
+            )}
+
+          </div>
+
         </div>
 
-        {/* Facilitator statistics */}
+        {/* =====================================================
+            FACILITATOR STATISTICS
+        ===================================================== */}
+
         {isFacilitator && (
           <div className="mb-8 grid gap-5 sm:grid-cols-3">
 
@@ -337,6 +494,10 @@ export default function AttendancePage() {
               <p className="mt-2 text-3xl font-bold text-green-600">
                 {stats.present}
               </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                {formatDate(date)}
+              </p>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -346,6 +507,10 @@ export default function AttendancePage() {
 
               <p className="mt-2 text-3xl font-bold text-yellow-600">
                 {stats.late}
+              </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                {formatDate(date)}
               </p>
             </div>
 
@@ -357,35 +522,67 @@ export default function AttendancePage() {
               <p className="mt-2 text-3xl font-bold text-red-600">
                 {stats.absent}
               </p>
+
+              <p className="mt-1 text-xs text-slate-400">
+                {formatDate(date)}
+              </p>
             </div>
 
           </div>
         )}
 
-        {/* Facilitator view */}
+        {/* =====================================================
+            FACILITATOR VIEW
+        ===================================================== */}
+
         {isFacilitator && (
           <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
 
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900">
-                Student Attendance
-              </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    Student Attendance
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formatDate(date)}
+                  </p>
+                </div>
+
+                {attendance.length > 0 && (
+                  <span className="w-fit rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                    Attendance Recorded
+                  </span>
+                )}
+
+              </div>
+
+              <p className="mt-3 text-sm text-slate-500">
                 Select the attendance status for each student.
+                Previous dates load their saved attendance records.
               </p>
+
             </div>
 
             {filteredStudents.length === 0 ? (
+
               <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500">
                 No students found.
               </div>
+
             ) : (
+
               <div className="space-y-4">
 
                 {filteredStudents.map((student) => {
+
                   const record = getAttendance(student._id);
+
                   const currentStatus = record?.status;
+
                   const isSaving =
                     savingId === String(student._id);
 
@@ -394,24 +591,34 @@ export default function AttendancePage() {
                       key={String(student._id)}
                       className="rounded-2xl border border-slate-200 p-5 transition hover:shadow-sm"
                     >
+
                       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+
+                        {/* STUDENT */}
 
                         <div className="flex items-center gap-4">
 
                           {student.profileImage ? (
+
                             <img
                               src={student.profileImage}
                               alt={`${student.firstName} ${student.lastName}`}
                               className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-100"
                             />
+
                           ) : (
+
                             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
+
                               {student.firstName?.[0]}
                               {student.lastName?.[0]}
+
                             </div>
+
                           )}
 
                           <div>
+
                             <h3 className="font-bold text-slate-900">
                               {student.firstName}{" "}
                               {student.lastName}
@@ -425,9 +632,18 @@ export default function AttendancePage() {
                             <p className="text-sm text-slate-500">
                               {student.email}
                             </p>
+
+                            {currentStatus && (
+                              <p className="mt-1 text-xs font-medium text-blue-600">
+                                Saved: {currentStatus}
+                              </p>
+                            )}
+
                           </div>
 
                         </div>
+
+                        {/* STATUS BUTTONS */}
 
                         <div className="flex flex-wrap gap-2">
 
@@ -488,32 +704,60 @@ export default function AttendancePage() {
                         </div>
 
                       </div>
+
                     </div>
                   );
                 })}
 
               </div>
+
             )}
 
           </section>
         )}
 
-        {/* Student view */}
+        {/* =====================================================
+            STUDENT VIEW
+        ===================================================== */}
+
         {isStudent && (
           <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
 
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-900">
-                My Attendance Record
-              </h2>
 
-              <p className="mt-1 text-sm text-slate-500">
-                Your attendance for the selected date.
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
+                <div>
+
+                  <h2 className="text-xl font-bold text-slate-900">
+                    My Attendance Record
+                  </h2>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formatDate(date)}
+                  </p>
+
+                </div>
+
+                {attendance.length > 0 && (
+                  <span className="w-fit rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
+                    Record Found
+                  </span>
+                )}
+
+              </div>
+
+              <p className="mt-3 text-sm text-slate-500">
+                Use the date controls above to view your attendance
+                for previous days.
               </p>
+
             </div>
 
             {attendance.length === 0 ? (
+
               <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center">
+
                 <CalendarCheck className="mx-auto h-10 w-10 text-slate-300" />
 
                 <p className="mt-3 text-sm font-medium text-slate-600">
@@ -523,8 +767,11 @@ export default function AttendancePage() {
                 <p className="mt-1 text-xs text-slate-400">
                   Your facilitator records your attendance.
                 </p>
+
               </div>
+
             ) : (
+
               <div className="space-y-4">
 
                 {attendance.map((record) => {
@@ -535,11 +782,13 @@ export default function AttendancePage() {
                       className:
                         "border-green-200 bg-green-50 text-green-700",
                     },
+
                     Late: {
                       icon: Clock3,
                       className:
                         "border-yellow-200 bg-yellow-50 text-yellow-700",
                     },
+
                     Absent: {
                       icon: AlertCircle,
                       className:
@@ -558,10 +807,13 @@ export default function AttendancePage() {
                       key={String(record._id)}
                       className={`flex items-center justify-between rounded-xl border p-5 ${config.className}`}
                     >
+
                       <div className="flex items-center gap-3">
+
                         <StatusIcon className="h-6 w-6" />
 
                         <div>
+
                           <p className="font-semibold">
                             {record.status}
                           </p>
@@ -569,17 +821,21 @@ export default function AttendancePage() {
                           <p className="text-sm opacity-80">
                             {record.date || date}
                           </p>
+
                         </div>
+
                       </div>
 
                       <span className="text-sm font-medium">
                         Attendance
                       </span>
+
                     </div>
                   );
                 })}
 
               </div>
+
             )}
 
           </section>
