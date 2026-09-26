@@ -1,15 +1,29 @@
 import { ObjectId } from "mongodb";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
 // =====================================================
-// GET CURRENT STUDENT SESSION
+// DATABASE
 // =====================================================
 
-async function getStudentSession() {
+async function getDatabase() {
+  const client = await clientPromise;
+
+  return client.db(
+    process.env.DB_NAME || "DCCPlatform"
+  );
+}
+
+// =====================================================
+// GET CURRENT SESSION
+// =====================================================
+
+async function getSession() {
   const cookieStore = await cookies();
+
   const token = cookieStore.get("dcc_session")?.value;
 
   if (!token) {
@@ -18,15 +32,60 @@ async function getStudentSession() {
 
   const session = await verifySession(token);
 
-  if (
-    !session ||
-    session.role !== "student" ||
-    !session.studentId
-  ) {
+  if (!session || session.role !== "student") {
     return null;
   }
 
   return session;
+}
+
+// =====================================================
+// FIND CURRENT USER
+// =====================================================
+
+async function getCurrentUser(session, db) {
+  if (!session?.userId) {
+    return null;
+  }
+
+  let user = null;
+
+  // Normal MongoDB ObjectId
+  if (ObjectId.isValid(String(session.userId))) {
+    user = await db.collection("users").findOne({
+      _id: new ObjectId(String(session.userId)),
+    });
+  }
+
+  // Support older records that may use a string _id
+  if (!user) {
+    user = await db.collection("users").findOne({
+      _id: session.userId,
+    });
+  }
+
+  return user;
+}
+
+// =====================================================
+// GET STUDENT ID FROM USER
+// =====================================================
+
+function getStudentId(user) {
+  if (!user?.studentId) {
+    return null;
+  }
+
+  const studentId =
+    user.studentId instanceof ObjectId
+      ? user.studentId.toString()
+      : String(user.studentId);
+
+  if (!ObjectId.isValid(studentId)) {
+    return null;
+  }
+
+  return studentId;
 }
 
 // =====================================================
@@ -35,7 +94,7 @@ async function getStudentSession() {
 
 export async function GET() {
   try {
-    const session = await getStudentSession();
+    const session = await getSession();
 
     if (!session) {
       return NextResponse.json(
@@ -46,25 +105,47 @@ export async function GET() {
       );
     }
 
-    if (!ObjectId.isValid(session.studentId)) {
+    const db = await getDatabase();
+
+    // =================================================
+    // GET THE REAL USER FROM MONGODB
+    // =================================================
+
+    const user = await getCurrentUser(session, db);
+
+    if (!user) {
       return NextResponse.json(
         {
-          error: "Invalid student account.",
+          error: "Student account could not be found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // =================================================
+    // GET CURRENT STUDENT ID FROM USER RECORD
+    // =================================================
+
+    const studentId = getStudentId(user);
+
+    if (!studentId) {
+      return NextResponse.json(
+        {
+          error:
+            "Your account is not linked to a student profile. Please contact a facilitator.",
         },
         { status: 400 }
       );
     }
 
-    const client = await clientPromise;
-
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
+    // =================================================
+    // FIND STUDENT PROFILE
+    // =================================================
 
     const student = await db
       .collection("students")
       .findOne({
-        _id: new ObjectId(session.studentId),
+        _id: new ObjectId(studentId),
       });
 
     if (!student) {
@@ -103,7 +184,7 @@ export async function GET() {
 
 export async function PUT(request) {
   try {
-    const session = await getStudentSession();
+    const session = await getSession();
 
     if (!session) {
       return NextResponse.json(
@@ -114,20 +195,47 @@ export async function PUT(request) {
       );
     }
 
-    if (!ObjectId.isValid(session.studentId)) {
+    const db = await getDatabase();
+
+    // =================================================
+    // GET THE REAL USER FROM MONGODB
+    // =================================================
+
+    const user = await getCurrentUser(session, db);
+
+    if (!user) {
       return NextResponse.json(
         {
-          error: "Invalid student account.",
+          error: "Student account could not be found.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // =================================================
+    // GET CURRENT STUDENT ID
+    // =================================================
+
+    const studentId = getStudentId(user);
+
+    if (!studentId) {
+      return NextResponse.json(
+        {
+          error:
+            "Your account is not linked to a student profile. Please contact a facilitator.",
         },
         { status: 400 }
       );
     }
 
+    // =================================================
+    // READ REQUEST BODY
+    // =================================================
+
     const body = await request.json();
 
     // =================================================
-    // ONLY THE LOGGED-IN STUDENT'S PROFILE FIELDS
-    // CAN BE EDITED
+    // PROFILE UPDATES
     // =================================================
 
     const updates = {
@@ -156,7 +264,6 @@ export async function PUT(request) {
           ? body.gender.trim()
           : "",
 
-      // STUDENT CAN NOW SAVE THEIR PREFERRED PROGRAM
       program:
         typeof body.program === "string"
           ? body.program.trim()
@@ -187,7 +294,6 @@ export async function PUT(request) {
           ? body.emergencyContactPhone.trim()
           : "",
 
-      // Cloudinary image URL
       profileImage:
         typeof body.profileImage === "string"
           ? body.profileImage.trim()
@@ -197,7 +303,7 @@ export async function PUT(request) {
     };
 
     // =================================================
-    // VALIDATE REQUIRED INFORMATION
+    // VALIDATE REQUIRED FIELDS
     // =================================================
 
     if (!updates.firstName || !updates.lastName) {
@@ -211,20 +317,14 @@ export async function PUT(request) {
     }
 
     // =================================================
-    // UPDATE ONLY THE LOGGED-IN STUDENT
+    // UPDATE ONLY THIS STUDENT
     // =================================================
-
-    const client = await clientPromise;
-
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
 
     const result = await db
       .collection("students")
       .updateOne(
         {
-          _id: new ObjectId(session.studentId),
+          _id: new ObjectId(studentId),
         },
         {
           $set: updates,
@@ -247,7 +347,7 @@ export async function PUT(request) {
     const updatedStudent = await db
       .collection("students")
       .findOne({
-        _id: new ObjectId(session.studentId),
+        _id: new ObjectId(studentId),
       });
 
     if (!updatedStudent) {
