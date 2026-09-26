@@ -12,8 +12,7 @@ import { verifySession } from "@/lib/auth";
 async function getSession() {
   const cookieStore = await cookies();
 
-  const token =
-    cookieStore.get("dcc_session")?.value;
+  const token = cookieStore.get("dcc_session")?.value;
 
   if (!token) {
     return null;
@@ -46,8 +45,7 @@ async function requireFacilitator() {
     return {
       error: NextResponse.json(
         {
-          error:
-            "Only facilitators can perform this action.",
+          error: "Only facilitators can perform this action.",
         },
         {
           status: 403,
@@ -62,18 +60,28 @@ async function requireFacilitator() {
 }
 
 // =========================================================
+// HTML ESCAPE
+// =========================================================
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+// =========================================================
 // SEND STUDENT APPROVAL EMAIL
 // =========================================================
 
-async function sendApprovalEmail({
-  name,
-  email,
-}) {
-  const apiKey =
-    process.env.RESEND_API_KEY;
+async function sendApprovalEmail({ name, email }) {
+  const apiKey = process.env.RESEND_API_KEY;
 
   const fromEmail =
-    process.env.EMAIL_FROM;
+    process.env.EMAIL_FROM ||
+    "Dodoo Coding Club <hello@dccstudentplatform.com>";
 
   // -------------------------------------------------------
   // Check Resend configuration
@@ -91,12 +99,21 @@ async function sendApprovalEmail({
     );
   }
 
+  if (!email) {
+    throw new Error(
+      "Student email address is missing."
+    );
+  }
+
   // -------------------------------------------------------
   // Student name
   // -------------------------------------------------------
 
   const studentName =
     name?.trim() || "Student";
+
+  const safeStudentName =
+    escapeHtml(studentName);
 
   // -------------------------------------------------------
   // Email HTML
@@ -179,7 +196,7 @@ async function sendApprovalEmail({
                   font-size: 14px;
                 "
               >
-                Student Success & Impact Platform
+                Student Success &amp; Impact Platform
               </p>
             </td>
           </tr>
@@ -212,7 +229,7 @@ async function sendApprovalEmail({
                 "
               >
                 Hello
-                <strong>${studentName}</strong>,
+                <strong>${safeStudentName}</strong>,
               </p>
 
               <p
@@ -224,7 +241,9 @@ async function sendApprovalEmail({
               >
                 We are pleased to let you know that
                 your request to join the
-                <strong>Dodoo Coding Club Student Platform</strong>
+                <strong>
+                  Dodoo Coding Club Student Platform
+                </strong>
                 has been approved.
               </p>
 
@@ -303,7 +322,7 @@ async function sendApprovalEmail({
                   Dodoo Coding Club
                 </strong><br />
 
-                Student Success & Impact Platform
+                Student Success &amp; Impact Platform
               </p>
 
             </td>
@@ -342,8 +361,38 @@ async function sendApprovalEmail({
 `;
 
   // -------------------------------------------------------
+  // Plain-text email
+  // -------------------------------------------------------
+
+  const text = `Hello ${studentName},
+
+Your request to join the Dodoo Coding Club Student Platform has been approved.
+
+Your student account is now active.
+
+You can log in to the platform here:
+
+https://dccstudentplatform.com/login
+
+You can now access your student resources, profile, attendance, progress, projects, and other available features.
+
+Welcome to Dodoo Coding Club!
+
+Best regards,
+Dodoo Coding Club
+Student Success & Impact Platform`;
+
+  // -------------------------------------------------------
   // Send through Resend
   // -------------------------------------------------------
+
+  console.log(
+    "SENDING STUDENT APPROVAL EMAIL:",
+    {
+      to: email,
+      from: fromEmail,
+    }
+  );
 
   const response = await fetch(
     "https://api.resend.com/emails",
@@ -352,9 +401,7 @@ async function sendApprovalEmail({
 
       headers: {
         Authorization: `Bearer ${apiKey}`,
-
-        "Content-Type":
-          "application/json",
+        "Content-Type": "application/json",
       },
 
       body: JSON.stringify({
@@ -365,25 +412,69 @@ async function sendApprovalEmail({
         subject:
           "Your Dodoo Coding Club Application Has Been Approved",
 
+        text,
+
         html,
       }),
     }
   );
 
-  const data =
-    await response.json();
+  // -------------------------------------------------------
+  // Read Resend response
+  // -------------------------------------------------------
+
+  let data = {};
+
+  try {
+    data = await response.json();
+  } catch (jsonError) {
+    console.error(
+      "RESEND RESPONSE JSON ERROR:",
+      jsonError
+    );
+  }
+
+  console.log(
+    "RESEND APPROVAL EMAIL RESPONSE:",
+    {
+      status: response.status,
+      ok: response.ok,
+      data,
+    }
+  );
+
+  // -------------------------------------------------------
+  // Handle Resend failure
+  // -------------------------------------------------------
 
   if (!response.ok) {
     console.error(
       "RESEND APPROVAL EMAIL ERROR:",
-      data
+      {
+        status: response.status,
+        data,
+        recipient: email,
+      }
     );
 
     throw new Error(
       data?.message ||
-        "Failed to send approval email."
+        data?.error ||
+        `Resend request failed with status ${response.status}.`
     );
   }
+
+  // -------------------------------------------------------
+  // Successful email
+  // -------------------------------------------------------
+
+  console.log(
+    "RESEND APPROVAL EMAIL SUCCESS:",
+    {
+      id: data?.id || null,
+      recipient: email,
+    }
+  );
 
   return data;
 }
@@ -416,9 +507,7 @@ export async function GET() {
         .collection("users")
         .find({
           role: "student",
-
           status: "pending",
-
           emailVerified: true,
         })
         .sort({
@@ -427,32 +516,28 @@ export async function GET() {
         .toArray();
 
     const formattedRequests =
-      requests.map(
-        (user) => ({
-          id:
-            user._id.toString(),
+      requests.map((user) => ({
+        id:
+          user._id.toString(),
 
-          name:
-            user.name || "",
+        name:
+          user.name || "",
 
-          email:
-            user.email || "",
+        email:
+          user.email || "",
 
-          program:
-            user.program || "",
+        program:
+          user.program || "",
 
-          status:
-            user.status,
+        status:
+          user.status,
 
-          emailVerified:
-            user.emailVerified ===
-            true,
+        emailVerified:
+          user.emailVerified === true,
 
-          createdAt:
-            user.createdAt ||
-            null,
-        })
-      );
+        createdAt:
+          user.createdAt || null,
+      }));
 
     return NextResponse.json({
       requests:
@@ -480,9 +565,7 @@ export async function GET() {
 // ACCEPT / REJECT STUDENT REQUEST
 // =========================================================
 
-export async function POST(
-  request
-) {
+export async function POST(request) {
   try {
     const auth =
       await requireFacilitator();
@@ -532,11 +615,7 @@ export async function POST(
       );
     }
 
-    if (
-      !ObjectId.isValid(
-        userId
-      )
-    ) {
+    if (!ObjectId.isValid(userId)) {
       return NextResponse.json(
         {
           error:
@@ -571,9 +650,7 @@ export async function POST(
         .collection("users")
         .findOne({
           _id:
-            new ObjectId(
-              userId
-            ),
+            new ObjectId(userId),
 
           role: "student",
 
@@ -798,22 +875,40 @@ export async function POST(
     let emailSent =
       false;
 
-    try {
-      await sendApprovalEmail({
-        name:
-          user.name ||
-          `${user.firstName || ""} ${
-            user.lastName || ""
-          }`.trim(),
+    let emailResponseId =
+      null;
 
-        email:
-          user.email,
-      });
+    let emailErrorMessage =
+      "";
+
+    try {
+      const emailResult =
+        await sendApprovalEmail({
+          name:
+            user.name ||
+            `${user.firstName || ""} ${
+              user.lastName || ""
+            }`.trim(),
+
+          email:
+            user.email,
+        });
 
       emailSent = true;
 
+      emailResponseId =
+        emailResult?.id ||
+        null;
+
       console.log(
-        `Student approval email sent to ${user.email}`
+        "STUDENT APPROVAL EMAIL SENT:",
+        {
+          studentEmail:
+            user.email,
+
+          resendId:
+            emailResponseId,
+        }
       );
     } catch (emailError) {
       /*
@@ -821,11 +916,25 @@ export async function POST(
        *
        * The student has already been approved.
        * We do not undo the approval if Resend
-       * temporarily fails.
+       * fails.
        */
+
+      emailErrorMessage =
+        emailError?.message ||
+        "Unknown email error.";
+
       console.error(
         "STUDENT APPROVAL EMAIL FAILED:",
-        emailError
+        {
+          message:
+            emailError?.message,
+
+          stack:
+            emailError?.stack,
+
+          studentEmail:
+            user.email,
+        }
       );
     }
 
@@ -843,6 +952,13 @@ export async function POST(
         studentId.toString(),
 
       emailSent,
+
+      emailResponseId,
+
+      emailError:
+        emailSent
+          ? null
+          : emailErrorMessage,
     });
   } catch (error) {
     console.error(
