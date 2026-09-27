@@ -46,10 +46,7 @@ function safePercentage(value) {
     return 0;
   }
 
-  return Math.min(
-    Math.max(Math.round(number), 0),
-    100
-  );
+  return Math.min(Math.max(Math.round(number), 0), 100);
 }
 
 // =====================================================
@@ -98,20 +95,13 @@ export default function ProgressPage() {
       // Get logged-in user
       // -----------------------------------------------
 
-      const userResponse = await fetch(
-        "/api/auth/me",
-        {
-          cache: "no-store",
-        }
-      );
+      const userResponse = await fetch("/api/auth/me", {
+        cache: "no-store",
+      });
 
-      const userData =
-        await userResponse.json();
+      const userData = await userResponse.json();
 
-      if (
-        !userResponse.ok ||
-        !userData?.user
-      ) {
+      if (!userResponse.ok || !userData?.user) {
         window.location.href = "/login";
         return;
       }
@@ -122,15 +112,11 @@ export default function ProgressPage() {
       // Get progress
       // -----------------------------------------------
 
-      const response = await fetch(
-        "/api/progress",
-        {
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/progress", {
+        cache: "no-store",
+      });
 
-      const result =
-        await response.json();
+      const result = await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -142,10 +128,7 @@ export default function ProgressPage() {
 
       setData(result);
     } catch (err) {
-      console.error(
-        "Progress error:",
-        err
-      );
+      console.error("Progress error:", err);
 
       setError(
         err.message ||
@@ -204,43 +187,41 @@ export default function ProgressPage() {
     return null;
   }
 
-  const isFacilitator =
-    user.role === "facilitator";
+  // ===================================================
+  // ROLE-BASED ACCESS
+  // ===================================================
 
-  const isStudent =
-    user.role === "student";
+  const role = String(user.role || "")
+    .trim()
+    .toLowerCase();
+
+  const isFacilitator = role === "facilitator";
+  const isStudent = role === "student";
 
   // ===================================================
   // IMPORTANT
   // ===================================================
   //
-  // For students, /api/progress already resolves
-  // the correct student from:
+  // STUDENT:
+  // Only use data.student.
   //
-  // users.studentId
-  // OR
-  // session.studentId
-  // OR
-  // email
+  // FACILITATOR:
+  // Use the complete data.students array.
   //
-  // Therefore we DO NOT filter using user.studentId
-  // here. That could reject a valid student record
-  // when the session contains an old studentId.
+  // The API MUST ALSO enforce this rule server-side.
+  // The frontend should never be the only security layer.
   //
   // ===================================================
 
-  const allStudents =
-    Array.isArray(data?.students)
-      ? data.students
-      : [];
+  const allStudents = Array.isArray(data?.students)
+    ? data.students
+    : [];
 
-  const students = isStudent
-    ? data?.student
-      ? [data.student]
-      : allStudents.length === 1
-      ? allStudents
-      : []
-    : allStudents;
+  const students = isFacilitator
+    ? allStudents
+    : isStudent && data?.student
+    ? [data.student]
+    : [];
 
   // ===================================================
   // FACILITATOR VIEW
@@ -251,9 +232,7 @@ export default function ProgressPage() {
       <div className="p-6 md:p-8">
         <div className="mx-auto max-w-7xl">
 
-          {/* =========================================
-              HEADER
-          ========================================= */}
+          {/* HEADER */}
 
           <div className="mb-8">
             <div className="flex items-center gap-3">
@@ -275,28 +254,22 @@ export default function ProgressPage() {
                 </h1>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Monitor automatically calculated progress
-                  across the student program.
+                  View and monitor the progress of all
+                  students in the program.
                 </p>
               </div>
 
             </div>
           </div>
 
-          {/* =========================================
-              STATISTICS
-          ========================================= */}
+          {/* STATISTICS */}
 
           <div className="mb-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
             <StatCard
               title="Total Students"
-              value={
-                data?.totalStudents || 0
-              }
-              icon={
-                <Users size={20} />
-              }
+              value={data?.totalStudents || 0}
+              icon={<Users size={20} />}
             />
 
             <StatCard
@@ -304,47 +277,33 @@ export default function ProgressPage() {
               value={`${safePercentage(
                 data?.averageProgress
               )}%`}
-              icon={
-                <TrendingUp size={20} />
-              }
+              icon={<TrendingUp size={20} />}
             />
 
             <StatCard
               title="Completed"
-              value={
-                data?.completed || 0
-              }
-              icon={
-                <CheckCircle size={20} />
-              }
+              value={data?.completed || 0}
+              icon={<CheckCircle size={20} />}
             />
 
             <StatCard
               title="Needs Attention"
-              value={
-                data?.needsAttention || 0
-              }
-              icon={
-                <AlertCircle size={20} />
-              }
+              value={data?.needsAttention || 0}
+              icon={<AlertCircle size={20} />}
             />
 
           </div>
 
-          {/* =========================================
-              CALCULATION METHOD
-          ========================================= */}
+          {/* CALCULATION METHOD */}
 
           <ProgressMethod />
 
-          {/* =========================================
-              STUDENT LIST
-          ========================================= */}
+          {/* ALL STUDENTS */}
 
           <ProgressList
             students={students}
             title="All Student Progress"
-            description="Progress is automatically calculated from projects, attendance, and the 24-month program timeline."
+            description="View the progress of every student in the program."
           />
 
         </div>
@@ -415,16 +374,14 @@ export default function ProgressPage() {
     }
 
     // -------------------------------------------------
-    // Student progress
+    // STUDENT PERSONAL PROGRESS
     // -------------------------------------------------
 
     return (
       <div className="p-6 md:p-8">
         <div className="mx-auto max-w-5xl">
 
-          {/* =========================================
-              HEADER
-          ========================================= */}
+          {/* HEADER */}
 
           <div className="mb-8">
             <div className="flex items-center gap-3">
@@ -446,16 +403,15 @@ export default function ProgressPage() {
                 </h1>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Your progress is calculated automatically.
+                  View your personal progress, attendance,
+                  projects, and program timeline.
                 </p>
               </div>
 
             </div>
           </div>
 
-          {/* =========================================
-              OVERALL PROGRESS
-          ========================================= */}
+          {/* OVERALL PROGRESS */}
 
           <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
 
@@ -519,20 +475,16 @@ export default function ProgressPage() {
 
           </div>
 
-          {/* =========================================
-              CALCULATION METHOD
-          ========================================= */}
+          {/* CALCULATION METHOD */}
 
           <ProgressMethod />
 
-          {/* =========================================
-              PERSONAL PROGRESS
-          ========================================= */}
+          {/* PERSONAL PROGRESS */}
 
           <ProgressList
             students={[student]}
             title="My Progress Details"
-            description="These values are calculated automatically from your projects, attendance, and program timeline."
+            description="Only your own progress information is displayed here."
           />
 
         </div>
@@ -540,7 +492,25 @@ export default function ProgressPage() {
     );
   }
 
-  return null;
+  // ===================================================
+  // UNKNOWN / UNSUPPORTED ROLE
+  // ===================================================
+
+  return (
+    <div className="p-6 md:p-8">
+      <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+
+        <h1 className="text-lg font-semibold text-slate-900">
+          Progress access is unavailable
+        </h1>
+
+        <p className="mt-2 text-sm text-slate-500">
+          Your account does not have a supported progress role.
+        </p>
+
+      </div>
+    </div>
+  );
 }
 
 // =====================================================
@@ -752,14 +722,6 @@ function StudentProgressCard({
   const details =
     student.progressDetails || {};
 
-  // ---------------------------------------------------
-  // IMPORTANT:
-  // Read from top-level API fields first.
-  //
-  // This keeps the page compatible with the
-  // updated /api/progress route.
-  // ---------------------------------------------------
-
   const projectProgress =
     student.projectProgress ??
     details.projectProgress ??
@@ -781,10 +743,6 @@ function StudentProgressCard({
     details.overallProgress ??
     0;
 
-  // ---------------------------------------------------
-  // Counts
-  // ---------------------------------------------------
-
   const projectCount =
     student.projectCount ??
     details.projectCount ??
@@ -800,10 +758,6 @@ function StudentProgressCard({
   const completedProjects =
     student.completedProjects ??
     0;
-
-  // ---------------------------------------------------
-  // Timeline information
-  // ---------------------------------------------------
 
   const enrollmentDate =
     student.enrollmentDate ??
@@ -837,9 +791,7 @@ function StudentProgressCard({
   return (
     <div className="p-6">
 
-      {/* =========================================
-          STUDENT HEADER
-      ========================================= */}
+      {/* STUDENT HEADER */}
 
       <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-center">
 
@@ -891,9 +843,7 @@ function StudentProgressCard({
 
       </div>
 
-      {/* =========================================
-          OVERALL BAR
-      ========================================= */}
+      {/* OVERALL BAR */}
 
       <div className="mb-6">
 
@@ -918,9 +868,7 @@ function StudentProgressCard({
 
       </div>
 
-      {/* =========================================
-          COMPONENT PROGRESS
-      ========================================= */}
+      {/* COMPONENT PROGRESS */}
 
       <div className="grid gap-4 md:grid-cols-3">
 
@@ -953,9 +901,7 @@ function StudentProgressCard({
 
       </div>
 
-      {/* =========================================
-          WEIGHTED CONTRIBUTIONS
-      ========================================= */}
+      {/* WEIGHTED CONTRIBUTIONS */}
 
       <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
 
@@ -987,9 +933,7 @@ function StudentProgressCard({
 
       </div>
 
-      {/* =========================================
-          PROGRAM INFORMATION
-      ========================================= */}
+      {/* PROGRAM INFORMATION */}
 
       <div className="mt-5 grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
 
@@ -1019,9 +963,7 @@ function StudentProgressCard({
 
       </div>
 
-      {/* =========================================
-          EXTRA SUMMARY
-      ========================================= */}
+      {/* EXTRA SUMMARY */}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
 
@@ -1220,8 +1162,6 @@ function calculateMonthsCompleted(
     (now.getMonth() -
       start.getMonth());
 
-  // Adjust if the current day has not
-  // reached the enrollment day yet.
   if (
     now.getDate() <
     start.getDate()
