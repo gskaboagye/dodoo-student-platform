@@ -42,7 +42,6 @@ function isValidDateString(date) {
     return false;
   }
 
-  // Must be YYYY-MM-DD
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return false;
   }
@@ -106,6 +105,79 @@ function buildStudentIdQuery(studentId) {
 }
 
 /* =========================================================
+   RESOLVE STUDENT PROFILE
+========================================================= */
+
+/*
+ * This is important.
+ *
+ * Instead of trusting only session.studentId, we first try
+ * to find the current user in the users collection.
+ *
+ * Then we use that user's studentId to find the actual
+ * student profile in the students collection.
+ *
+ * We also have fallbacks for older sessions.
+ */
+
+async function resolveStudentProfile(db, session) {
+  const usersCollection = db.collection("users");
+  const studentsCollection = db.collection("students");
+
+  let studentId = session?.studentId || null;
+
+  /* -------------------------------------------------------
+     Try to resolve from the current user account
+  ------------------------------------------------------- */
+
+  if (
+    session?.userId &&
+    ObjectId.isValid(String(session.userId))
+  ) {
+    const user = await usersCollection.findOne({
+      _id: new ObjectId(String(session.userId)),
+    });
+
+    if (user?.studentId) {
+      studentId = user.studentId;
+    }
+  }
+
+  /* -------------------------------------------------------
+     Find student using studentId
+  ------------------------------------------------------- */
+
+  if (
+    studentId &&
+    ObjectId.isValid(String(studentId))
+  ) {
+    const student = await studentsCollection.findOne({
+      _id: new ObjectId(String(studentId)),
+    });
+
+    if (student) {
+      return student;
+    }
+  }
+
+  /* -------------------------------------------------------
+     Fallback: find student by email
+  ------------------------------------------------------- */
+
+  if (session?.email) {
+    const student = await studentsCollection.findOne({
+      email: String(session.email).toLowerCase(),
+    });
+
+    if (student) {
+      return student;
+    }
+  }
+
+  return null;
+}
+
+/* =========================================================
    GET ATTENDANCE
 ========================================================= */
 
@@ -138,25 +210,40 @@ export async function GET(request) {
     ===================================================== */
 
     if (session.role === "student") {
-      if (!session.studentId) {
+      /*
+       * Resolve the student's actual profile.
+       */
+      const student =
+        await resolveStudentProfile(
+          db,
+          session
+        );
+
+      if (!student) {
         return NextResponse.json(
           {
             message:
-              "Your student account is not linked to a student profile.",
+              "Your account is not linked to a student profile.",
           },
           { status: 400 }
         );
       }
 
+      /*
+       * Find attendance using the student's actual
+       * database _id.
+       *
+       * This supports both ObjectId and string records.
+       */
       const query = {
         studentId: buildStudentIdQuery(
-          session.studentId
+          student._id
         ),
       };
 
       /*
-       * If a date was selected,
-       * only return attendance for that date.
+       * If a date was selected, return only
+       * that day's attendance.
        */
       if (date) {
         if (!isValidDateString(date)) {
@@ -172,6 +259,10 @@ export async function GET(request) {
         query.date = date;
       }
 
+      /*
+       * Without a date, ALL attendance records
+       * for the student are returned.
+       */
       const attendance =
         await attendanceCollection
           .find(query)
@@ -196,8 +287,7 @@ export async function GET(request) {
       const query = {};
 
       /*
-       * Facilitators can select any date and
-       * view attendance for that day.
+       * Facilitators can select any date.
        */
       if (date) {
         if (!isValidDateString(date)) {
@@ -245,7 +335,8 @@ export async function GET(request) {
 
     return NextResponse.json(
       {
-        message: "Failed to load attendance.",
+        message:
+          "Failed to load attendance.",
         error: error.message,
       },
       { status: 500 }
@@ -358,14 +449,6 @@ export async function POST(request) {
     const attendanceCollection =
       db.collection("attendance");
 
-    /*
-     * IMPORTANT:
-     *
-     * Student profiles are stored in the
-     * "students" collection.
-     *
-     * Do NOT use the "users" collection here.
-     */
     const studentsCollection =
       db.collection("students");
 
@@ -421,13 +504,6 @@ export async function POST(request) {
        FIND EXISTING ATTENDANCE
     ===================================================== */
 
-    /*
-     * Check both ObjectId and string formats.
-     *
-     * This keeps older attendance records working
-     * if their studentId was saved as a string.
-     */
-
     const existingRecord =
       await attendanceCollection.findOne({
         studentId: {
@@ -436,7 +512,6 @@ export async function POST(request) {
             studentObjectId.toString(),
           ],
         },
-
         date,
       });
 
@@ -525,9 +600,6 @@ export async function POST(request) {
       error
     );
 
-    /*
-     * Handle duplicate records gracefully.
-     */
     if (error?.code === 11000) {
       return NextResponse.json(
         {
