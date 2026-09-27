@@ -40,11 +40,12 @@ export default function StudentsPage() {
 
       const data = await response.json();
 
-      if (!data.user) {
+      if (!data?.user) {
         router.replace("/login");
         return;
       }
 
+      // STUDENT MANAGEMENT IS FACILITATOR ONLY
       if (data.user.role !== "facilitator") {
         router.replace("/");
         return;
@@ -67,6 +68,14 @@ export default function StudentsPage() {
     try {
       setLoading(true);
       setError("");
+
+      // Extra protection:
+      // Do not request the student list unless the
+      // authenticated user is a facilitator.
+      if (!user || user.role !== "facilitator") {
+        router.replace("/");
+        return;
+      }
 
       const response = await fetch("/api/students", {
         cache: "no-store",
@@ -188,6 +197,13 @@ export default function StudentsPage() {
     setMessage("");
     setError("");
 
+    // Extra client-side protection
+    if (!user || user.role !== "facilitator") {
+      setError("Only facilitators can manage students.");
+      router.replace("/");
+      return;
+    }
+
     const confirmed = window.confirm(
       "Are you sure you want to delete this student? This will also remove the student's login account."
     );
@@ -265,6 +281,10 @@ export default function StudentsPage() {
     );
   }
 
+  // =====================================================
+  // BLOCK NON-FACILITATORS
+  // =====================================================
+
   if (!user || user.role !== "facilitator") {
     return null;
   }
@@ -292,6 +312,7 @@ export default function StudentsPage() {
         <div className="mx-auto max-w-7xl">
 
           {/* BACK TO STUDENTS */}
+
           <button
             type="button"
             onClick={handleBackToStudents}
@@ -301,6 +322,7 @@ export default function StudentsPage() {
           </button>
 
           {/* SUCCESS MESSAGE */}
+
           {message && (
             <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-700">
               {message}
@@ -308,6 +330,7 @@ export default function StudentsPage() {
           )}
 
           {/* ERROR MESSAGE */}
+
           {error && (
             <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
               {error}
@@ -315,13 +338,16 @@ export default function StudentsPage() {
           )}
 
           {/* PROFILE */}
+
           <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
 
             {/* PROFILE HEADER */}
+
             <div className="bg-slate-900 px-6 py-8 md:px-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center">
 
                 {/* PROFILE IMAGE */}
+
                 {selectedStudent.profileImage ? (
                   <img
                     src={selectedStudent.profileImage}
@@ -335,6 +361,7 @@ export default function StudentsPage() {
                 )}
 
                 {/* NAME */}
+
                 <div className="flex-1">
                   <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">
                     Student Profile
@@ -351,6 +378,7 @@ export default function StudentsPage() {
                 </div>
 
                 {/* STATUS */}
+
                 <div>
                   <span
                     className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${
@@ -371,6 +399,7 @@ export default function StudentsPage() {
             <div className="p-6 md:p-8">
 
               {/* PERSONAL INFORMATION */}
+
               <section>
                 <h2 className="text-xl font-bold text-slate-900">
                   Personal Information
@@ -439,6 +468,7 @@ export default function StudentsPage() {
               </section>
 
               {/* EMERGENCY CONTACT */}
+
               <section className="mt-10 border-t border-slate-200 pt-8">
                 <h2 className="text-xl font-bold text-slate-900">
                   Emergency Contact
@@ -469,6 +499,7 @@ export default function StudentsPage() {
               </section>
 
               {/* PROGRAM INFORMATION */}
+
               <section className="mt-10 border-t border-slate-200 pt-8">
                 <h2 className="text-xl font-bold text-slate-900">
                   Program Information
@@ -515,6 +546,7 @@ export default function StudentsPage() {
               </section>
 
               {/* PROGRESS */}
+
               <section className="mt-10 border-t border-slate-200 pt-8">
 
                 <div className="flex items-center justify-between">
@@ -548,6 +580,7 @@ export default function StudentsPage() {
               </section>
 
               {/* ACTIONS */}
+
               <section className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row sm:justify-between">
 
                 <button
@@ -586,6 +619,7 @@ export default function StudentsPage() {
       <div className="mx-auto max-w-7xl">
 
         {/* HEADER */}
+
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900">
             Students
@@ -597,6 +631,7 @@ export default function StudentsPage() {
         </div>
 
         {/* SUCCESS MESSAGE */}
+
         {message && (
           <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-700">
             {message}
@@ -604,6 +639,7 @@ export default function StudentsPage() {
         )}
 
         {/* ERROR MESSAGE */}
+
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
             {error}
@@ -611,9 +647,11 @@ export default function StudentsPage() {
         )}
 
         {/* STUDENT RECORDS */}
+
         <section className="rounded-2xl bg-white p-7 shadow-sm ring-1 ring-slate-200">
 
           {/* SECTION HEADER */}
+
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
             <div>
@@ -640,6 +678,7 @@ export default function StudentsPage() {
           </div>
 
           {/* LOADING */}
+
           {loading ? (
             <div className="py-12 text-center text-slate-500">
               Loading students...
@@ -677,6 +716,7 @@ export default function StudentsPage() {
                     <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md">
 
                       {/* STUDENT HEADER */}
+
                       <div className="flex items-start gap-4">
 
                         {student.profileImage ? (
@@ -705,6 +745,7 @@ export default function StudentsPage() {
                       </div>
 
                       {/* BASIC INFORMATION */}
+
                       <div className="mt-5 space-y-3">
 
                         {student.studentId && (
@@ -746,6 +787,7 @@ export default function StudentsPage() {
                       </div>
 
                       {/* PROGRESS */}
+
                       <div className="mt-5 border-t border-slate-100 pt-5">
 
                         <div className="mb-2 flex items-center justify-between">
@@ -773,6 +815,7 @@ export default function StudentsPage() {
                       </div>
 
                       {/* STATUS + VIEW PROFILE */}
+
                       <div className="mt-5 flex items-center justify-between">
 
                         <span

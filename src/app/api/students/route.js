@@ -4,15 +4,84 @@ import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
-async function getSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("dcc_session")?.value;
+// =====================================================
+// SESSION
+// =====================================================
 
-  if (!token) {
+async function getSession() {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("dcc_session")?.value;
+
+    if (!token) {
+      return null;
+    }
+
+    const session = await verifySession(token);
+
+    return session || null;
+  } catch (error) {
+    console.error("GET SESSION ERROR:", error);
     return null;
   }
+}
 
-  return await verifySession(token);
+// =====================================================
+// FACILITATOR AUTHORIZATION
+// =====================================================
+
+async function requireFacilitator() {
+  const session = await getSession();
+
+  if (!session) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        {
+          message: "Authentication required.",
+        },
+        { status: 401 }
+      ),
+    };
+  }
+
+  if (session.role !== "facilitator") {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        {
+          message:
+            "Only facilitators can access the student management system.",
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return {
+    authorized: true,
+    session,
+  };
+}
+
+// =====================================================
+// DATABASE
+// =====================================================
+
+async function getDatabase() {
+  const client = await clientPromise;
+
+  return client.db(
+    process.env.DB_NAME || "DCCPlatform"
+  );
+}
+
+// =====================================================
+// HELPERS
+// =====================================================
+
+function isValidObjectId(id) {
+  return Boolean(id) && ObjectId.isValid(id);
 }
 
 function addMonths(date, months) {
@@ -21,43 +90,56 @@ function addMonths(date, months) {
   return result;
 }
 
-function isValidObjectId(id) {
-  return ObjectId.isValid(id);
+function cleanString(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value.trim();
+}
+
+function cleanEmail(value) {
+  return cleanString(value).toLowerCase();
+}
+
+function isValidDate(value) {
+  if (!value) {
+    return false;
+  }
+
+  const date = new Date(value);
+
+  return !Number.isNaN(date.getTime());
 }
 
 // =====================================================
 // GET
+// =====================================================
 // Facilitators can view all students.
+// Students are NOT allowed to access this endpoint.
 // =====================================================
 
 export async function GET() {
   try {
-    const session = await getSession();
+    // ---------------------------------------------
+    // FACILITATOR AUTHORIZATION
+    // ---------------------------------------------
 
-    if (!session) {
-      return NextResponse.json(
-        {
-          message: "Authentication required.",
-        },
-        { status: 401 }
-      );
+    const auth = await requireFacilitator();
+
+    if (!auth.authorized) {
+      return auth.response;
     }
 
-    if (session.role !== "facilitator") {
-      return NextResponse.json(
-        {
-          message:
-            "Only facilitators can access the student management list.",
-        },
-        { status: 403 }
-      );
-    }
+    // ---------------------------------------------
+    // DATABASE
+    // ---------------------------------------------
 
-    const client = await clientPromise;
+    const db = await getDatabase();
 
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
+    // ---------------------------------------------
+    // GET STUDENTS
+    // ---------------------------------------------
 
     const students = await db
       .collection("students")
@@ -67,10 +149,7 @@ export async function GET() {
 
     return NextResponse.json(students);
   } catch (error) {
-    console.error(
-      "Students GET Error:",
-      error
-    );
+    console.error("Students GET Error:", error);
 
     return NextResponse.json(
       {
@@ -83,60 +162,71 @@ export async function GET() {
 
 // =====================================================
 // PUT
+// =====================================================
 // Facilitators can edit student records.
 // =====================================================
 
 export async function PUT(request) {
   try {
-    const session = await getSession();
+    // ---------------------------------------------
+    // FACILITATOR AUTHORIZATION
+    // ---------------------------------------------
 
-    if (!session) {
-      return NextResponse.json(
-        {
-          message: "Authentication required.",
-        },
-        { status: 401 }
-      );
+    const auth = await requireFacilitator();
+
+    if (!auth.authorized) {
+      return auth.response;
     }
 
-    if (session.role !== "facilitator") {
+    // ---------------------------------------------
+    // READ REQUEST BODY
+    // ---------------------------------------------
+
+    let body;
+
+    try {
+      body = await request.json();
+    } catch (error) {
       return NextResponse.json(
         {
-          message:
-            "Only facilitators can edit student records.",
-        },
-        { status: 403 }
-      );
-    }
-
-    const body = await request.json();
-    const id = body.id;
-
-    if (!id || !isValidObjectId(id)) {
-      return NextResponse.json(
-        {
-          message:
-            "A valid student ID is required.",
+          message: "Invalid request body.",
         },
         { status: 400 }
       );
     }
 
-    const client = await clientPromise;
+    // ---------------------------------------------
+    // VALIDATE STUDENT ID
+    // ---------------------------------------------
 
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
+    const id = body?.id;
 
-    const studentObjectId =
-      new ObjectId(id);
+    if (!id || !isValidObjectId(id)) {
+      return NextResponse.json(
+        {
+          message: "A valid student ID is required.",
+        },
+        { status: 400 }
+      );
+    }
 
-    const existingStudent =
-      await db
-        .collection("students")
-        .findOne({
-          _id: studentObjectId,
-        });
+    // ---------------------------------------------
+    // DATABASE
+    // ---------------------------------------------
+
+    const db = await getDatabase();
+
+    const studentObjectId = new ObjectId(id);
+
+    // ---------------------------------------------
+    // FIND EXISTING STUDENT
+    // ---------------------------------------------
+
+    const existingStudent = await db
+      .collection("students")
+      .findOne({
+        _id: studentObjectId,
+      });
 
     if (!existingStudent) {
       return NextResponse.json(
@@ -147,58 +237,177 @@ export async function PUT(request) {
       );
     }
 
+    // ---------------------------------------------
+    // PREPARE UPDATE
+    // ---------------------------------------------
+
     const updateData = {
       updatedAt: new Date(),
     };
 
+    // ---------------------------------------------
+    // FIRST NAME
+    // ---------------------------------------------
+
     if (body.firstName !== undefined) {
-      updateData.firstName =
-        body.firstName.trim();
+      const firstName = cleanString(body.firstName);
+
+      if (!firstName) {
+        return NextResponse.json(
+          {
+            message: "First name cannot be empty.",
+          },
+          { status: 400 }
+        );
+      }
+
+      updateData.firstName = firstName;
     }
+
+    // ---------------------------------------------
+    // LAST NAME
+    // ---------------------------------------------
 
     if (body.lastName !== undefined) {
-      updateData.lastName =
-        body.lastName.trim();
+      const lastName = cleanString(body.lastName);
+
+      if (!lastName) {
+        return NextResponse.json(
+          {
+            message: "Last name cannot be empty.",
+          },
+          { status: 400 }
+        );
+      }
+
+      updateData.lastName = lastName;
     }
+
+    // ---------------------------------------------
+    // EMAIL
+    // ---------------------------------------------
 
     if (body.email !== undefined) {
-      updateData.email =
-        body.email.trim().toLowerCase();
+      const email = cleanEmail(body.email);
+
+      if (!email) {
+        return NextResponse.json(
+          {
+            message: "Email cannot be empty.",
+          },
+          { status: 400 }
+        );
+      }
+
+      // Check whether another student already
+      // uses this email address.
+      const emailOwner = await db
+        .collection("students")
+        .findOne({
+          email,
+          _id: {
+            $ne: studentObjectId,
+          },
+        });
+
+      if (emailOwner) {
+        return NextResponse.json(
+          {
+            message:
+              "Another student is already using this email address.",
+          },
+          { status: 409 }
+        );
+      }
+
+      updateData.email = email;
     }
+
+    // ---------------------------------------------
+    // PHONE
+    // ---------------------------------------------
 
     if (body.phone !== undefined) {
-      updateData.phone =
-        body.phone.trim();
+      updateData.phone = cleanString(body.phone);
     }
+
+    // ---------------------------------------------
+    // PROGRAM
+    // ---------------------------------------------
 
     if (body.program !== undefined) {
-      updateData.program =
-        body.program.trim();
+      updateData.program = cleanString(body.program);
     }
 
+    // ---------------------------------------------
+    // STATUS
+    // ---------------------------------------------
+
     if (body.status !== undefined) {
+      const allowedStatuses = [
+        "active",
+        "inactive",
+        "pending",
+        "completed",
+        "suspended",
+      ];
+
+      if (
+        typeof body.status !== "string" ||
+        !allowedStatuses.includes(
+          body.status.toLowerCase()
+        )
+      ) {
+        return NextResponse.json(
+          {
+            message: "Invalid student status.",
+          },
+          { status: 400 }
+        );
+      }
+
       updateData.status =
-        body.status;
+        body.status.toLowerCase();
     }
+
+    // ---------------------------------------------
+    // PROFILE IMAGE
+    // ---------------------------------------------
 
     if (body.profileImage !== undefined) {
       updateData.profileImage =
         body.profileImage;
     }
 
+    // ---------------------------------------------
+    // ENROLLMENT DATE
+    // ---------------------------------------------
+
     if (body.enrollmentDate !== undefined) {
-      const enrollmentDate =
-        new Date(body.enrollmentDate);
+      if (!isValidDate(body.enrollmentDate)) {
+        return NextResponse.json(
+          {
+            message:
+              "A valid enrollment date is required.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const enrollmentDate = new Date(
+        body.enrollmentDate
+      );
 
       updateData.enrollmentDate =
         enrollmentDate;
 
       updateData.expectedCompletionDate =
-        addMonths(
-          enrollmentDate,
-          24
-        );
+        addMonths(enrollmentDate, 24);
     }
+
+    // ---------------------------------------------
+    // UPDATE STUDENT
+    // ---------------------------------------------
 
     await db
       .collection("students")
@@ -211,28 +420,26 @@ export async function PUT(request) {
         }
       );
 
-    const updatedStudent =
-      await db
-        .collection("students")
-        .findOne({
-          _id: studentObjectId,
-        });
+    // ---------------------------------------------
+    // GET UPDATED STUDENT
+    // ---------------------------------------------
+
+    const updatedStudent = await db
+      .collection("students")
+      .findOne({
+        _id: studentObjectId,
+      });
 
     return NextResponse.json({
-      message:
-        "Student updated successfully.",
+      message: "Student updated successfully.",
       student: updatedStudent,
     });
   } catch (error) {
-    console.error(
-      "Students PUT Error:",
-      error
-    );
+    console.error("Students PUT Error:", error);
 
     return NextResponse.json(
       {
-        message:
-          "Failed to update student.",
+        message: "Failed to update student.",
       },
       { status: 500 }
     );
@@ -241,40 +448,33 @@ export async function PUT(request) {
 
 // =====================================================
 // DELETE
+// =====================================================
 // Facilitators can permanently remove students.
 //
 // This deletes:
 // 1. Student record
 // 2. Student login account
 //
-// The user account is found using BOTH:
+// The linked user account is found using:
 // - studentId
-// - student email
+// - OR student email
 // =====================================================
 
 export async function DELETE(request) {
   try {
-    const session = await getSession();
+    // ---------------------------------------------
+    // FACILITATOR AUTHORIZATION
+    // ---------------------------------------------
 
-    if (!session) {
-      return NextResponse.json(
-        {
-          message:
-            "Authentication required.",
-        },
-        { status: 401 }
-      );
+    const auth = await requireFacilitator();
+
+    if (!auth.authorized) {
+      return auth.response;
     }
 
-    if (session.role !== "facilitator") {
-      return NextResponse.json(
-        {
-          message:
-            "Only facilitators can delete students.",
-        },
-        { status: 403 }
-      );
-    }
+    // ---------------------------------------------
+    // GET STUDENT ID
+    // ---------------------------------------------
 
     const { searchParams } =
       new URL(request.url);
@@ -291,11 +491,11 @@ export async function DELETE(request) {
       );
     }
 
-    const client = await clientPromise;
+    // ---------------------------------------------
+    // DATABASE
+    // ---------------------------------------------
 
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
+    const db = await getDatabase();
 
     const studentObjectId =
       new ObjectId(id);
@@ -304,18 +504,16 @@ export async function DELETE(request) {
     // FIND STUDENT
     // ---------------------------------------------
 
-    const student =
-      await db
-        .collection("students")
-        .findOne({
-          _id: studentObjectId,
-        });
+    const student = await db
+      .collection("students")
+      .findOne({
+        _id: studentObjectId,
+      });
 
     if (!student) {
       return NextResponse.json(
         {
-          message:
-            "Student not found.",
+          message: "Student not found.",
         },
         { status: 404 }
       );
@@ -325,36 +523,57 @@ export async function DELETE(request) {
     // DELETE STUDENT RECORD
     // ---------------------------------------------
 
-    await db
-      .collection("students")
-      .deleteOne({
-        _id: studentObjectId,
-      });
+    const studentDeleteResult =
+      await db
+        .collection("students")
+        .deleteOne({
+          _id: studentObjectId,
+        });
+
+    if (
+      studentDeleteResult.deletedCount !== 1
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            "The student record could not be deleted.",
+        },
+        { status: 500 }
+      );
+    }
 
     // ---------------------------------------------
     // DELETE LINKED LOGIN ACCOUNT
     //
     // Match using studentId OR email.
+    //
     // This protects against older accounts that
     // may not have studentId stored correctly.
     // ---------------------------------------------
+
+    const userDeleteConditions = [
+      {
+        studentId: studentObjectId,
+      },
+    ];
+
+    if (student.email) {
+      userDeleteConditions.push({
+        email: cleanEmail(student.email),
+      });
+    }
 
     const userDeleteResult =
       await db
         .collection("users")
         .deleteMany({
           role: "student",
-          $or: [
-            {
-              studentId:
-                studentObjectId,
-            },
-            {
-              email:
-                student.email,
-            },
-          ],
+          $or: userDeleteConditions,
         });
+
+    // ---------------------------------------------
+    // SUCCESS
+    // ---------------------------------------------
 
     return NextResponse.json({
       message:
