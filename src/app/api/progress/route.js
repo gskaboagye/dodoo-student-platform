@@ -64,14 +64,6 @@ async function getCurrentUser(db, session) {
 // =====================================================
 // RESOLVE STUDENT
 // =====================================================
-//
-// users._id
-//     |
-//     | users.studentId
-//     v
-// students._id
-//
-// =====================================================
 
 async function resolveStudent(db, session) {
   if (!session || session.role !== "student") {
@@ -144,14 +136,6 @@ async function resolveStudent(db, session) {
 // =====================================================
 // STUDENT ID QUERY
 // =====================================================
-//
-// Attendance and projects may contain studentId as:
-// - ObjectId
-// - string ObjectId
-//
-// Support both.
-//
-// =====================================================
 
 function buildStudentIdQuery(studentId) {
   const values = [];
@@ -195,17 +179,6 @@ function normalizePercentage(value) {
 
 // =====================================================
 // TIMELINE PROGRESS
-// =====================================================
-//
-// Program Timeline = 20%
-//
-// Uses:
-// enrollmentDate
-// expectedCompletionDate
-//
-// If expectedCompletionDate does not exist,
-// the program is assumed to be 24 months.
-//
 // =====================================================
 
 function calculateTimelineProgress(student) {
@@ -271,14 +244,6 @@ function calculateTimelineProgress(student) {
 // =====================================================
 // ATTENDANCE PROGRESS
 // =====================================================
-//
-// Present = 100
-// Late    = 50
-// Absent  = 0
-//
-// Attendance = 30%
-//
-// =====================================================
 
 function calculateAttendanceProgress(
   attendance
@@ -317,13 +282,6 @@ function calculateAttendanceProgress(
 // =====================================================
 // PROJECT PROGRESS
 // =====================================================
-//
-// Project progress is the average progress
-// of all projects belonging to the student.
-//
-// Projects = 50%
-//
-// =====================================================
 
 function calculateProjectProgress(
   projects
@@ -350,12 +308,6 @@ function calculateProjectProgress(
 
 // =====================================================
 // OVERALL PROGRESS
-// =====================================================
-//
-// Timeline = 20%
-// Attendance = 30%
-// Projects = 50%
-//
 // =====================================================
 
 function calculateOverallProgress({
@@ -387,10 +339,19 @@ function calculateOverallProgress({
 }
 
 // =====================================================
-// FORMAT STUDENT
+// FORMAT STUDENT SUMMARY
 // =====================================================
+//
+// Used for the facilitator student list.
+//
+// IMPORTANT:
+// We deliberately DO NOT include the full
+// attendance/project arrays here.
+// Those are loaded only when the facilitator
+// selects a specific student.
+//
 
-function formatStudent(
+function formatStudentSummary(
   student,
   attendance,
   projects
@@ -417,41 +378,6 @@ function formatStudent(
       projectProgress,
     });
 
-  // ---------------------------------------------------
-  // Attendance counts
-  // ---------------------------------------------------
-
-  const presentCount =
-    attendance.filter(
-      (record) =>
-        String(record?.status || "")
-          .trim()
-          .toLowerCase() ===
-        "present"
-    ).length;
-
-  const lateCount =
-    attendance.filter(
-      (record) =>
-        String(record?.status || "")
-          .trim()
-          .toLowerCase() ===
-        "late"
-    ).length;
-
-  const absentCount =
-    attendance.filter(
-      (record) =>
-        String(record?.status || "")
-          .trim()
-          .toLowerCase() ===
-        "absent"
-    ).length;
-
-  // ---------------------------------------------------
-  // Project counts
-  // ---------------------------------------------------
-
   const completedProjects =
     projects.filter((project) => {
       const status = String(
@@ -470,23 +396,6 @@ function formatStudent(
         status === "completed"
       );
     }).length;
-
-  // ---------------------------------------------------
-  // IMPORTANT
-  // ---------------------------------------------------
-  //
-  // The progress page expects:
-  //
-  // student.progress
-  //
-  // and:
-  //
-  // student.progressDetails
-  //
-  // So we provide BOTH the new names and
-  // the detailed values.
-  //
-  // ---------------------------------------------------
 
   return {
     _id: student._id
@@ -526,30 +435,27 @@ function formatStudent(
       student.expectedCompletionDate ||
       null,
 
-    // -------------------------------------------------
-    // Component progress
-    // -------------------------------------------------
-
+    // Progress
     timelineProgress,
 
     attendanceProgress,
 
     projectProgress,
 
-    // -------------------------------------------------
-    // FINAL OVERALL PROGRESS
-    // -------------------------------------------------
-
     overallProgress,
 
-    // IMPORTANT:
-    // progress page uses student.progress
     progress: overallProgress,
 
-    // -------------------------------------------------
-    // Progress details
-    // -------------------------------------------------
+    // Summary counts only
+    projectCount:
+      projects.length,
 
+    completedProjects,
+
+    attendanceCount:
+      attendance.length,
+
+    // Keep this lightweight
     progressDetails: {
       timelineProgress,
       attendanceProgress,
@@ -575,11 +481,137 @@ function formatStudent(
           projectProgress * 0.5
         ),
     },
+  };
+}
 
-    // -------------------------------------------------
-    // Attendance details
-    // -------------------------------------------------
+// =====================================================
+// FORMAT STUDENT DETAILS
+// =====================================================
+//
+// Used when one specific student is selected.
+//
+// This includes the complete projects,
+// attendance and progress information.
+//
 
+function formatStudentDetails(
+  student,
+  attendance,
+  projects
+) {
+  const summary =
+    formatStudentSummary(
+      student,
+      attendance,
+      projects
+    );
+
+  const timelineProgress =
+    summary.timelineProgress;
+
+  const attendanceProgress =
+    summary.attendanceProgress;
+
+  const projectProgress =
+    summary.projectProgress;
+
+  const overallProgress =
+    summary.overallProgress;
+
+  // Attendance counts
+  const presentCount =
+    attendance.filter(
+      (record) =>
+        String(
+          record?.status || ""
+        )
+          .trim()
+          .toLowerCase() ===
+        "present"
+    ).length;
+
+  const lateCount =
+    attendance.filter(
+      (record) =>
+        String(
+          record?.status || ""
+        )
+          .trim()
+          .toLowerCase() ===
+        "late"
+    ).length;
+
+  const absentCount =
+    attendance.filter(
+      (record) =>
+        String(
+          record?.status || ""
+        )
+          .trim()
+          .toLowerCase() ===
+        "absent"
+    ).length;
+
+  // Timeline information
+  const enrollmentDate =
+    student.enrollmentDate ||
+    null;
+
+  const expectedCompletionDate =
+    student.expectedCompletionDate ||
+    null;
+
+  const monthsCompleted =
+    calculateMonthsCompleted(
+      enrollmentDate
+    );
+
+  const monthsRemaining =
+    calculateMonthsRemaining(
+      enrollmentDate,
+      expectedCompletionDate
+    );
+
+  const programYear =
+    calculateProgramYear(
+      enrollmentDate
+    );
+
+  return {
+    ...summary,
+
+    // Detailed progress
+    progressDetails: {
+      timelineProgress,
+      attendanceProgress,
+      projectProgress,
+      overallProgress,
+
+      timelineWeight: 20,
+      attendanceWeight: 30,
+      projectWeight: 50,
+
+      timelineContribution:
+        Math.round(
+          timelineProgress * 0.2
+        ),
+
+      attendanceContribution:
+        Math.round(
+          attendanceProgress * 0.3
+        ),
+
+      projectContribution:
+        Math.round(
+          projectProgress * 0.5
+        ),
+
+      monthsCompleted,
+      monthsRemaining,
+      programYear,
+    },
+
+    // Detailed attendance
     attendanceCount:
       attendance.length,
 
@@ -591,17 +623,200 @@ function formatStudent(
 
     attendance,
 
-    // -------------------------------------------------
-    // Project details
-    // -------------------------------------------------
-
+    // Detailed projects
     projectCount:
       projects.length,
 
-    completedProjects,
+    completedProjects:
+      summary.completedProjects,
 
     projects,
   };
+}
+
+// =====================================================
+// LOAD STUDENT RECORDS
+// =====================================================
+
+async function loadStudentData(
+  db,
+  student
+) {
+  const studentId =
+    student._id;
+
+  // -----------------------------------------------
+  // Attendance
+  // -----------------------------------------------
+
+  const attendance =
+    await db
+      .collection("attendance")
+      .find(
+        buildStudentIdQuery(
+          studentId
+        )
+      )
+      .sort({
+        date: -1,
+      })
+      .toArray();
+
+  // -----------------------------------------------
+  // Projects
+  // -----------------------------------------------
+
+  const projects =
+    await db
+      .collection("projects")
+      .find(
+        buildStudentIdQuery(
+          studentId
+        )
+      )
+      .sort({
+        createdAt: -1,
+      })
+      .toArray();
+
+  return {
+    attendance,
+    projects,
+  };
+}
+
+// =====================================================
+// CALCULATE MONTHS COMPLETED
+// =====================================================
+
+function calculateMonthsCompleted(
+  enrollmentDate
+) {
+  if (!enrollmentDate) {
+    return 0;
+  }
+
+  const start =
+    new Date(enrollmentDate);
+
+  if (
+    Number.isNaN(
+      start.getTime()
+    )
+  ) {
+    return 0;
+  }
+
+  const now = new Date();
+
+  if (now <= start) {
+    return 0;
+  }
+
+  let months =
+    (now.getFullYear() -
+      start.getFullYear()) *
+      12 +
+    (now.getMonth() -
+      start.getMonth());
+
+  if (
+    now.getDate() <
+    start.getDate()
+  ) {
+    months -= 1;
+  }
+
+  return Math.min(
+    Math.max(months, 0),
+    24
+  );
+}
+
+// =====================================================
+// CALCULATE MONTHS REMAINING
+// =====================================================
+
+function calculateMonthsRemaining(
+  enrollmentDate,
+  expectedCompletionDate
+) {
+  if (
+    !enrollmentDate &&
+    !expectedCompletionDate
+  ) {
+    return 24;
+  }
+
+  const end =
+    expectedCompletionDate
+      ? new Date(
+          expectedCompletionDate
+        )
+      : (() => {
+          const date =
+            new Date(
+              enrollmentDate
+            );
+
+          date.setMonth(
+            date.getMonth() + 24
+          );
+
+          return date;
+        })();
+
+  if (
+    Number.isNaN(
+      end.getTime()
+    )
+  ) {
+    return 0;
+  }
+
+  const now = new Date();
+
+  if (now >= end) {
+    return 0;
+  }
+
+  let months =
+    (end.getFullYear() -
+      now.getFullYear()) *
+      12 +
+    (end.getMonth() -
+      now.getMonth());
+
+  if (
+    end.getDate() <
+    now.getDate()
+  ) {
+    months -= 1;
+  }
+
+  return Math.max(
+    months,
+    0
+  );
+}
+
+// =====================================================
+// CALCULATE PROGRAM YEAR
+// =====================================================
+
+function calculateProgramYear(
+  enrollmentDate
+) {
+  const months =
+    calculateMonthsCompleted(
+      enrollmentDate
+    );
+
+  if (months < 12) {
+    return 1;
+  }
+
+  return 2;
 }
 
 // =====================================================
@@ -676,89 +891,32 @@ export async function GET() {
         );
       }
 
-      const studentId =
-        student._id;
-
-      // ------------------------------------------------
-      // Attendance
-      // ------------------------------------------------
-
-      const attendance =
-        await db
-          .collection(
-            "attendance"
-          )
-          .find(
-            buildStudentIdQuery(
-              studentId
-            )
-          )
-          .sort({
-            date: -1,
-          })
-          .toArray();
-
-      // ------------------------------------------------
-      // Projects
-      // ------------------------------------------------
-
-      const projects =
-        await db
-          .collection(
-            "projects"
-          )
-          .find(
-            buildStudentIdQuery(
-              studentId
-            )
-          )
-          .sort({
-            createdAt: -1,
-          })
-          .toArray();
-
-      // ------------------------------------------------
-      // Format
-      // ------------------------------------------------
+      const {
+        attendance,
+        projects,
+      } =
+        await loadStudentData(
+          db,
+          student
+        );
 
       const formatted =
-        formatStudent(
+        formatStudentDetails(
           student,
           attendance,
           projects
         );
 
-      console.log(
-        "STUDENT PROGRESS:",
-        {
-          student:
-            formatted.name,
-
-          timeline:
-            formatted.timelineProgress,
-
-          attendance:
-            formatted.attendanceProgress,
-
-          projects:
-            formatted.projectProgress,
-
-          overall:
-            formatted.overallProgress,
-        }
-      );
-
       return NextResponse.json({
+        student:
+          formatted,
+
         students: [
           formatted,
         ],
 
-        student:
-          formatted,
-
         totalStudents: 1,
 
-        // Useful for the student progress page
         progress:
           formatted.overallProgress,
 
@@ -777,9 +935,7 @@ export async function GET() {
     ) {
       const students =
         await db
-          .collection(
-            "students"
-          )
+          .collection("students")
           .find({})
           .sort({
             createdAt: -1,
@@ -792,49 +948,29 @@ export async function GET() {
       for (
         const student of students
       ) {
-        const studentId =
-          student._id;
+        const {
+          attendance,
+          projects,
+        } =
+          await loadStudentData(
+            db,
+            student
+          );
 
-        // ----------------------------------------------
-        // Attendance
-        // ----------------------------------------------
+        /*
+          IMPORTANT:
 
-        const attendance =
-          await db
-            .collection(
-              "attendance"
-            )
-            .find(
-              buildStudentIdQuery(
-                studentId
-              )
-            )
-            .sort({
-              date: -1,
-            })
-            .toArray();
+          Only the summary is returned here.
 
-        // ----------------------------------------------
-        // Projects
-        // ----------------------------------------------
+          Projects and attendance details are NOT
+          sent for every student.
 
-        const projects =
-          await db
-            .collection(
-              "projects"
-            )
-            .find(
-              buildStudentIdQuery(
-                studentId
-              )
-            )
-            .sort({
-              createdAt: -1,
-            })
-            .toArray();
+          The frontend can request the selected
+          student's details separately.
+        */
 
         formattedStudents.push(
-          formatStudent(
+          formatStudentSummary(
             student,
             attendance,
             projects
@@ -853,10 +989,14 @@ export async function GET() {
         totalStudents > 0
           ? normalizePercentage(
               formattedStudents.reduce(
-                (sum, student) =>
+                (
+                  sum,
+                  student
+                ) =>
                   sum +
                   Number(
-                    student.progress || 0
+                    student.progress ||
+                      0
                   ),
                 0
               ) /
@@ -868,7 +1008,8 @@ export async function GET() {
         formattedStudents.filter(
           (student) =>
             Number(
-              student.progress || 0
+              student.progress ||
+                0
             ) >= 100
         ).length;
 
@@ -876,7 +1017,8 @@ export async function GET() {
         formattedStudents.filter(
           (student) =>
             Number(
-              student.progress || 0
+              student.progress ||
+                0
             ) < 50
         ).length;
 
