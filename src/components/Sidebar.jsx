@@ -30,6 +30,7 @@ export default function Sidebar() {
   // ==========================================
   // LOAD CURRENT USER
   // ==========================================
+
   useEffect(() => {
     let cancelled = false;
 
@@ -37,11 +38,14 @@ export default function Sidebar() {
       try {
         setLoading(true);
 
-        const response = await fetch("/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        });
+        const response = await fetch(
+          "/api/auth/me",
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
 
         if (!response.ok) {
           if (!cancelled) {
@@ -51,13 +55,19 @@ export default function Sidebar() {
           return;
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!cancelled) {
-          setUser(data.user || null);
+          setUser(
+            data.user || null
+          );
         }
       } catch (error) {
-        console.error("Failed to load user:", error);
+        console.error(
+          "Failed to load user:",
+          error
+        );
 
         if (!cancelled) {
           setUser(null);
@@ -79,6 +89,7 @@ export default function Sidebar() {
   // ==========================================
   // CLOSE MOBILE MENU WHEN ROUTE CHANGES
   // ==========================================
+
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
@@ -86,21 +97,26 @@ export default function Sidebar() {
   // ==========================================
   // PREVENT BACKGROUND SCROLL
   // ==========================================
+
   useEffect(() => {
     if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
+      document.body.style.overflow =
+        "hidden";
     } else {
-      document.body.style.overflow = "";
+      document.body.style.overflow =
+        "";
     }
 
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow =
+        "";
     };
   }, [mobileMenuOpen]);
 
   // ==========================================
   // LOGOUT
   // ==========================================
+
   function handleLogout() {
     if (loggingOut) {
       return;
@@ -108,29 +124,35 @@ export default function Sidebar() {
 
     setLoggingOut(true);
 
-    // Immediately clear the local user state.
+    // Immediately clear local user state.
     setUser(null);
 
-    // Close the mobile menu.
+    // Close mobile menu.
     setMobileMenuOpen(false);
 
-    // Clear the server session in the background.
+    // Clear server session in background.
     fetch("/api/auth/logout", {
       method: "POST",
       credentials: "include",
       cache: "no-store",
       keepalive: true,
     }).catch((error) => {
-      console.error("Logout request failed:", error);
+      console.error(
+        "Logout request failed:",
+        error
+      );
     });
 
-    // Immediately leave the protected page.
-    window.location.replace("/login");
+    // Leave protected page immediately.
+    window.location.replace(
+      "/login"
+    );
   }
 
   // ==========================================
   // FACILITATOR LINKS
   // ==========================================
+
   const facilitatorLinks = [
     {
       name: "Dashboard",
@@ -177,6 +199,7 @@ export default function Sidebar() {
   // ==========================================
   // STUDENT LINKS
   // ==========================================
+
   const studentLinks = [
     {
       name: "Dashboard",
@@ -188,11 +211,15 @@ export default function Sidebar() {
       href: "/student/profile",
       icon: UserRound,
     },
+
+    // IMPORTANT:
+    // Students use the student attendance page.
     {
       name: "My Attendance",
-      href: "/attendance",
+      href: "/student/attendance",
       icon: CalendarCheck,
     },
+
     {
       name: "My Progress",
       href: "/progress",
@@ -218,6 +245,7 @@ export default function Sidebar() {
   // ==========================================
   // SELECT LINKS BASED ON ROLE
   // ==========================================
+
   const links =
     user?.role === "facilitator"
       ? facilitatorLinks
@@ -228,6 +256,7 @@ export default function Sidebar() {
   // ==========================================
   // ACTIVE LINK
   // ==========================================
+
   function isActiveLink(href) {
     if (href === "/") {
       return pathname === "/";
@@ -235,13 +264,16 @@ export default function Sidebar() {
 
     return (
       pathname === href ||
-      pathname.startsWith(`${href}/`)
+      pathname.startsWith(
+        `${href}/`
+      )
     );
   }
 
   // ==========================================
   // CLOSE MOBILE MENU
   // ==========================================
+
   function closeMobileMenu() {
     setMobileMenuOpen(false);
   }
@@ -249,18 +281,25 @@ export default function Sidebar() {
   // ==========================================
   // NAVIGATION
   // ==========================================
+
   function renderNavigation() {
     return (
       <nav className="px-3 py-5">
         {links.map((link) => {
           const Icon = link.icon;
-          const isActive = isActiveLink(link.href);
+
+          const isActive =
+            isActiveLink(
+              link.href
+            );
 
           return (
             <Link
               key={link.href}
               href={link.href}
-              onClick={closeMobileMenu}
+              onClick={
+                closeMobileMenu
+              }
               className={`mb-1 flex min-h-[44px] items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
                 isActive
                   ? "bg-blue-50 text-blue-700"
@@ -272,7 +311,9 @@ export default function Sidebar() {
                 className="shrink-0"
               />
 
-              <span>{link.name}</span>
+              <span>
+                {link.name}
+              </span>
             </Link>
           );
         })}
@@ -283,6 +324,7 @@ export default function Sidebar() {
   // ==========================================
   // USER INFORMATION
   // ==========================================
+
   function renderUserInformation() {
     if (loading || !user) {
       return null;
@@ -291,19 +333,22 @@ export default function Sidebar() {
     return (
       <div className="border-b border-slate-200 px-5 py-4">
         <div className="flex items-center gap-3">
+
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
             <UserRound size={19} />
           </div>
 
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-800">
-              {user.name || "User"}
+              {user.name ||
+                "User"}
             </p>
 
             <p className="text-xs capitalize text-slate-500">
               {user.role}
             </p>
           </div>
+
         </div>
       </div>
     );
@@ -312,6 +357,7 @@ export default function Sidebar() {
   // ==========================================
   // LOGIN / LOGOUT BUTTON
   // ==========================================
+
   function renderAuthButton() {
     if (loading) {
       return null;
@@ -321,8 +367,12 @@ export default function Sidebar() {
       return (
         <button
           type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
+          onClick={
+            handleLogout
+          }
+          disabled={
+            loggingOut
+          }
           className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <LogOut
@@ -342,7 +392,9 @@ export default function Sidebar() {
     return (
       <Link
         href="/login"
-        onClick={closeMobileMenu}
+        onClick={
+          closeMobileMenu
+        }
         className={`flex min-h-[44px] items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
           pathname === "/login"
             ? "bg-blue-50 text-blue-700"
@@ -362,16 +414,24 @@ export default function Sidebar() {
   // ==========================================
   // RENDER
   // ==========================================
+
   return (
     <>
       {/* =====================================
           MOBILE MENU BUTTON
       ====================================== */}
+
       <button
         type="button"
         aria-label="Open navigation menu"
-        aria-expanded={mobileMenuOpen}
-        onClick={() => setMobileMenuOpen(true)}
+        aria-expanded={
+          mobileMenuOpen
+        }
+        onClick={() =>
+          setMobileMenuOpen(
+            true
+          )
+        }
         className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 md:hidden"
       >
         <Menu size={22} />
@@ -380,11 +440,14 @@ export default function Sidebar() {
       {/* =====================================
           MOBILE OVERLAY
       ====================================== */}
+
       {mobileMenuOpen && (
         <button
           type="button"
           aria-label="Close navigation menu"
-          onClick={closeMobileMenu}
+          onClick={
+            closeMobileMenu
+          }
           className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[1px] md:hidden"
         />
       )}
@@ -392,8 +455,11 @@ export default function Sidebar() {
       {/* =====================================
           DESKTOP SIDEBAR
       ====================================== */}
+
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+
         {/* Logo */}
+
         <div className="border-b border-slate-200 px-6 py-6">
           <Link
             href="/"
@@ -410,22 +476,27 @@ export default function Sidebar() {
         </div>
 
         {/* User Information */}
+
         {renderUserInformation()}
 
         {/* Navigation */}
+
         <div className="flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
 
         {/* Login / Logout */}
+
         <div className="border-t border-slate-200 px-3 py-3">
           {renderAuthButton()}
         </div>
+
       </aside>
 
       {/* =====================================
           MOBILE SIDEBAR
       ====================================== */}
+
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,320px)] flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
           mobileMenuOpen
@@ -433,11 +504,16 @@ export default function Sidebar() {
             : "-translate-x-full"
         }`}
       >
+
         {/* Mobile Header */}
+
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5">
+
           <Link
             href="/"
-            onClick={closeMobileMenu}
+            onClick={
+              closeMobileMenu
+            }
             className="min-w-0"
           >
             <h1 className="truncate text-base font-bold text-slate-900">
@@ -452,27 +528,35 @@ export default function Sidebar() {
           <button
             type="button"
             aria-label="Close navigation menu"
-            onClick={closeMobileMenu}
+            onClick={
+              closeMobileMenu
+            }
             className="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
           >
             <X size={22} />
           </button>
+
         </div>
 
         {/* User Information */}
+
         {renderUserInformation()}
 
         {/* Navigation */}
+
         <div className="flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
 
         {/* Login / Logout */}
+
         <div className="border-t border-slate-200 px-3 py-3">
           {renderAuthButton()}
         </div>
+
       </aside>
     </>
   );
 }
+
 // Reports navigation enabled
