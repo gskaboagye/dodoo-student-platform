@@ -1,7 +1,12 @@
 import { ObjectId } from "mongodb";
 import { cookies } from "next/headers";
+
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
+
+/* =========================================================
+   GET SESSION
+========================================================= */
 
 async function getSession() {
   const cookieStore = await cookies();
@@ -14,18 +19,130 @@ async function getSession() {
   return await verifySession(token);
 }
 
-/*
-|--------------------------------------------------------------------------
-| GET - View Projects
-|--------------------------------------------------------------------------
-| Facilitators:
-|   - Can see all projects.
-|
-| Students:
-|   - Can see ONLY their own projects.
-|
-| No public project listing.
-*/
+/* =========================================================
+   GET DATABASE
+========================================================= */
+
+async function getDatabase() {
+  const client = await clientPromise;
+
+  return client.db(
+    process.env.DB_NAME || "DCCPlatform"
+  );
+}
+
+/* =========================================================
+   GET USER
+========================================================= */
+
+async function getCurrentUser(db, session) {
+  if (!session?.userId) {
+    return null;
+  }
+
+  let user = null;
+
+  /*
+   * Normal case:
+   * users._id is a MongoDB ObjectId.
+   */
+
+  if (ObjectId.isValid(session.userId)) {
+    user = await db.collection("users").findOne({
+      _id: new ObjectId(session.userId),
+    });
+  }
+
+  /*
+   * Fallback for older accounts where _id may be stored
+   * differently.
+   */
+
+  if (!user) {
+    user = await db.collection("users").findOne({
+      _id: session.userId,
+    });
+  }
+
+  return user;
+}
+
+/* =========================================================
+   RESOLVE STUDENT PROFILE
+========================================================= */
+
+async function resolveStudent(db, session) {
+  if (!session || session.role !== "student") {
+    return null;
+  }
+
+  /*
+   * Find the actual logged-in user.
+   */
+
+  const user = await getCurrentUser(db, session);
+
+  if (!user) {
+    return null;
+  }
+
+  /*
+   * The users collection should contain the student's
+   * studentId, which points to students._id.
+   */
+
+  let studentId =
+    user.studentId ||
+    session.studentId ||
+    null;
+
+  if (!studentId) {
+    return null;
+  }
+
+  /*
+   * Convert the ID safely to ObjectId.
+   */
+
+  if (!ObjectId.isValid(studentId.toString())) {
+    return null;
+  }
+
+  const studentObjectId =
+    new ObjectId(studentId.toString());
+
+  /*
+   * Find the actual student profile.
+   */
+
+  const student = await db
+    .collection("students")
+    .findOne({
+      _id: studentObjectId,
+    });
+
+  if (!student) {
+    return null;
+  }
+
+  return {
+    user,
+    student,
+    studentId: studentObjectId,
+  };
+}
+
+/* =========================================================
+   GET - VIEW PROJECTS
+=========================================================
+
+Facilitators:
+  - Can see all projects.
+
+Students:
+  - Can see only their own projects.
+========================================================= */
+
 export async function GET() {
   try {
     const session = await getSession();
@@ -33,57 +150,57 @@ export async function GET() {
     if (!session) {
       return Response.json(
         {
-          message: "You must be logged in to view projects.",
+          message:
+            "You must be logged in to view projects.",
         },
         { status: 401 }
       );
     }
 
-    const client = await clientPromise;
-
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
+    const db = await getDatabase();
 
     let filter = {};
 
-    // Student can only see their own projects.
+    /* -----------------------------------------------------
+       STUDENT
+    ----------------------------------------------------- */
+
     if (session.role === "student") {
-      if (!session.studentId) {
+      const resolvedStudent =
+        await resolveStudent(db, session);
+
+      if (!resolvedStudent) {
         return Response.json(
           {
             message:
-              "Your account is not linked to a student profile.",
-          },
-          { status: 403 }
-        );
-      }
-
-      let studentObjectId;
-
-      try {
-        studentObjectId = new ObjectId(
-          session.studentId.toString()
-        );
-      } catch {
-        return Response.json(
-          {
-            message: "Invalid student account.",
+              "Your account is not linked to a valid student profile.",
           },
           { status: 403 }
         );
       }
 
       filter = {
-        studentId: studentObjectId,
+        studentId:
+          resolvedStudent.studentId,
       };
     }
 
-    // Only students and facilitators can access projects.
-    if (
-      session.role !== "student" &&
-      session.role !== "facilitator"
-    ) {
+    /* -----------------------------------------------------
+       FACILITATOR
+    ----------------------------------------------------- */
+
+    else if (session.role === "facilitator") {
+      /*
+       * Facilitators can see all projects.
+       */
+      filter = {};
+    }
+
+    /* -----------------------------------------------------
+       UNKNOWN ROLE
+    ----------------------------------------------------- */
+
+    else {
       return Response.json(
         {
           message: "Unauthorized.",
@@ -95,33 +212,40 @@ export async function GET() {
     const projects = await db
       .collection("projects")
       .find(filter)
-      .sort({ createdAt: -1 })
+      .sort({
+        createdAt: -1,
+      })
       .toArray();
 
     return Response.json(projects);
   } catch (error) {
-    console.error("Projects GET error:", error);
+    console.error(
+      "Projects GET error:",
+      error
+    );
 
     return Response.json(
       {
-        message: "Failed to load projects.",
+        message:
+          "Failed to load projects.",
       },
       { status: 500 }
     );
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| POST - Create Project
-|--------------------------------------------------------------------------
-| Students:
-|   - Can create unlimited projects.
-|   - Project automatically belongs to logged-in student.
-|
-| Facilitators:
-|   - Can create projects for any student.
-*/
+/* =========================================================
+   POST - CREATE PROJECT
+=========================================================
+
+Students:
+  - Can create unlimited projects.
+  - Project automatically belongs to themselves.
+
+Facilitators:
+  - Can create projects for any student.
+========================================================= */
+
 export async function POST(request) {
   try {
     const session = await getSession();
@@ -148,7 +272,15 @@ export async function POST(request) {
       githubUrl = "",
     } = body;
 
-    if (!title || !description || !technology) {
+    /* -----------------------------------------------------
+       REQUIRED FIELDS
+    ----------------------------------------------------- */
+
+    if (
+      !title ||
+      !description ||
+      !technology
+    ) {
       return Response.json(
         {
           message:
@@ -158,29 +290,63 @@ export async function POST(request) {
       );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Determine Project Owner
-    |--------------------------------------------------------------------------
-    */
+    /* -----------------------------------------------------
+       DATABASE
+    ----------------------------------------------------- */
+
+    const db = await getDatabase();
+
+    /* -----------------------------------------------------
+       DETERMINE PROJECT OWNER
+    ----------------------------------------------------- */
 
     let studentId;
+    let student;
+
+    /* =====================================================
+       STUDENT
+    ===================================================== */
 
     if (session.role === "student") {
-      // Students can ONLY create projects for themselves.
-      if (!session.studentId) {
+      /*
+       * IMPORTANT:
+       *
+       * Do NOT trust a studentId sent from the browser.
+       *
+       * Resolve the student from the authenticated
+       * user's database record.
+       */
+
+      const resolvedStudent =
+        await resolveStudent(db, session);
+
+      if (!resolvedStudent) {
         return Response.json(
           {
             message:
-              "Your account is not linked to a student profile.",
+              "Your account is not linked to a valid student profile.",
           },
           { status: 403 }
         );
       }
 
-      studentId = session.studentId;
-    } else if (session.role === "facilitator") {
-      // Facilitator must select the student.
+      studentId =
+        resolvedStudent.studentId;
+
+      student =
+        resolvedStudent.student;
+    }
+
+    /* =====================================================
+       FACILITATOR
+    ===================================================== */
+
+    else if (session.role === "facilitator") {
+      /*
+       * Facilitators must specify which student owns
+       * the project.
+       */
+
       if (!body.studentId) {
         return Response.json(
           {
@@ -191,17 +357,47 @@ export async function POST(request) {
         );
       }
 
-      if (!ObjectId.isValid(body.studentId)) {
+      if (
+        !ObjectId.isValid(
+          body.studentId.toString()
+        )
+      ) {
         return Response.json(
           {
-            message: "Invalid student ID.",
+            message:
+              "Invalid student ID.",
           },
           { status: 400 }
         );
       }
 
-      studentId = body.studentId;
-    } else {
+      studentId =
+        new ObjectId(
+          body.studentId.toString()
+        );
+
+      student = await db
+        .collection("students")
+        .findOne({
+          _id: studentId,
+        });
+
+      if (!student) {
+        return Response.json(
+          {
+            message:
+              "Student not found.",
+          },
+          { status: 404 }
+        );
+      }
+    }
+
+    /* =====================================================
+       UNKNOWN ROLE
+    ===================================================== */
+
+    else {
       return Response.json(
         {
           message: "Unauthorized.",
@@ -210,13 +406,12 @@ export async function POST(request) {
       );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Validate Progress
-    |--------------------------------------------------------------------------
-    */
+    /* -----------------------------------------------------
+       VALIDATE PROGRESS
+    ----------------------------------------------------- */
 
-    const numericProgress = Number(progress);
+    const numericProgress =
+      Number(progress);
 
     if (
       Number.isNaN(numericProgress) ||
@@ -232,114 +427,103 @@ export async function POST(request) {
       );
     }
 
-    const client = await clientPromise;
+    /* -----------------------------------------------------
+       CREATE PROJECT
+    ----------------------------------------------------- */
 
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Find Student
-    |--------------------------------------------------------------------------
-    */
-
-    if (!ObjectId.isValid(studentId)) {
-      return Response.json(
-        {
-          message: "Invalid student ID.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const student = await db
-      .collection("students")
-      .findOne({
-        _id: new ObjectId(studentId),
-      });
-
-    if (!student) {
-      return Response.json(
-        {
-          message: "Student not found.",
-        },
-        { status: 404 }
-      );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Create Project
-    |--------------------------------------------------------------------------
-    */
+    const studentName =
+      `${student.firstName || ""} ${
+        student.lastName || ""
+      }`.trim() ||
+      student.name ||
+      student.fullName ||
+      student.email ||
+      "Student";
 
     const project = {
       title: title.trim(),
 
-      description: description.trim(),
+      description:
+        description.trim(),
 
-      studentId: new ObjectId(studentId),
+      studentId,
 
-      studentName:
-        `${student.firstName || ""} ${student.lastName || ""}`.trim(),
+      studentName,
 
-      technology: technology.trim(),
+      technology:
+        technology.trim(),
 
-      status: String(status).trim(),
+      status:
+        String(status).trim(),
 
-      progress: Math.round(numericProgress),
+      progress:
+        Math.round(
+          numericProgress
+        ),
 
-      projectUrl: projectUrl.trim(),
+      projectUrl:
+        String(projectUrl).trim(),
 
-      githubUrl: githubUrl.trim(),
+      githubUrl:
+        String(githubUrl).trim(),
 
-      createdAt: new Date(),
+      createdAt:
+        new Date(),
 
-      updatedAt: new Date(),
+      updatedAt:
+        new Date(),
     };
 
-    const result = await db
-      .collection("projects")
-      .insertOne(project);
+    const result =
+      await db
+        .collection("projects")
+        .insertOne(project);
 
     return Response.json(
       {
-        message: "Project created successfully.",
+        message:
+          "Project created successfully.",
 
         project: {
           ...project,
-          _id: result.insertedId,
+          _id:
+            result.insertedId,
         },
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error("Projects POST error:", error);
+    console.error(
+      "Projects POST error:",
+      error
+    );
 
     return Response.json(
       {
-        message: "Failed to create project.",
+        message:
+          "Failed to create project.",
       },
       { status: 500 }
     );
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| PUT - Update Project
-|--------------------------------------------------------------------------
-| Facilitators:
-|   - Can edit any project.
-|
-| Students:
-|   - Can edit ONLY their own projects.
-|   - Cannot change project ownership.
-*/
+/* =========================================================
+   PUT - UPDATE PROJECT
+=========================================================
+
+Facilitators:
+  - Can edit any project.
+
+Students:
+  - Can edit only their own projects.
+  - Cannot change project ownership.
+========================================================= */
+
 export async function PUT(request) {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
       return Response.json(
@@ -351,7 +535,8 @@ export async function PUT(request) {
       );
     }
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const {
       id,
@@ -364,13 +549,14 @@ export async function PUT(request) {
       githubUrl = "",
     } = body;
 
-    /*
-    |--------------------------------------------------------------------------
-    | Validate Project ID
-    |--------------------------------------------------------------------------
-    */
+    /* -----------------------------------------------------
+       VALIDATE PROJECT ID
+    ----------------------------------------------------- */
 
-    if (!id || !ObjectId.isValid(id)) {
+    if (
+      !id ||
+      !ObjectId.isValid(id)
+    ) {
       return Response.json(
         {
           message:
@@ -380,11 +566,9 @@ export async function PUT(request) {
       );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Validate Required Fields
-    |--------------------------------------------------------------------------
-    */
+    /* -----------------------------------------------------
+       VALIDATE REQUIRED FIELDS
+    ----------------------------------------------------- */
 
     if (
       !title ||
@@ -401,13 +585,12 @@ export async function PUT(request) {
       );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Validate Progress
-    |--------------------------------------------------------------------------
-    */
+    /* -----------------------------------------------------
+       VALIDATE PROGRESS
+    ----------------------------------------------------- */
 
-    const numericProgress = Number(progress);
+    const numericProgress =
+      Number(progress);
 
     if (
       Number.isNaN(numericProgress) ||
@@ -423,57 +606,83 @@ export async function PUT(request) {
       );
     }
 
-    const client = await clientPromise;
+    const db =
+      await getDatabase();
 
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | Find Existing Project
-    |--------------------------------------------------------------------------
-    */
+    /* -----------------------------------------------------
+       FIND EXISTING PROJECT
+    ----------------------------------------------------- */
 
     const existingProject =
-      await db.collection("projects").findOne({
-        _id: new ObjectId(id),
-      });
+      await db
+        .collection("projects")
+        .findOne({
+          _id:
+            new ObjectId(id),
+        });
 
     if (!existingProject) {
       return Response.json(
         {
-          message: "Project not found.",
+          message:
+            "Project not found.",
         },
         { status: 404 }
       );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Ownership Check
-    |--------------------------------------------------------------------------
-    */
+    /* -----------------------------------------------------
+       DETERMINE STUDENT
+    ----------------------------------------------------- */
 
-    if (session.role === "student") {
-      if (!session.studentId) {
+    let studentId;
+    let student;
+
+    /* =====================================================
+       STUDENT EDIT
+    ===================================================== */
+
+    if (
+      session.role === "student"
+    ) {
+      /*
+       * Resolve the real logged-in student.
+       */
+
+      const resolvedStudent =
+        await resolveStudent(
+          db,
+          session
+        );
+
+      if (!resolvedStudent) {
         return Response.json(
           {
             message:
-              "Your account is not linked to a student profile.",
+              "Your account is not linked to a valid student profile.",
           },
           { status: 403 }
         );
       }
 
-      const sessionStudentId =
-        session.studentId.toString();
+      studentId =
+        resolvedStudent.studentId;
+
+      student =
+        resolvedStudent.student;
+
+      /*
+       * Make sure this project belongs to
+       * the logged-in student.
+       */
 
       const projectStudentId =
-        existingProject.studentId?.toString();
+        existingProject.studentId
+          ?.toString();
 
       if (
-        sessionStudentId !== projectStudentId
+        studentId.toString() !==
+        projectStudentId
       ) {
         return Response.json(
           {
@@ -483,112 +692,176 @@ export async function PUT(request) {
           { status: 403 }
         );
       }
-    } else if (session.role !== "facilitator") {
+    }
+
+    /* =====================================================
+       FACILITATOR EDIT
+    ===================================================== */
+
+    else if (
+      session.role ===
+      "facilitator"
+    ) {
+      /*
+       * Facilitators may change the student
+       * assigned to the project.
+       */
+
+      if (
+        body.studentId
+      ) {
+        if (
+          !ObjectId.isValid(
+            body.studentId.toString()
+          )
+        ) {
+          return Response.json(
+            {
+              message:
+                "Invalid student ID.",
+            },
+            { status: 400 }
+          );
+        }
+
+        studentId =
+          new ObjectId(
+            body.studentId.toString()
+          );
+      } else {
+        studentId =
+          existingProject.studentId;
+      }
+
+      if (
+        !studentId ||
+        !ObjectId.isValid(
+          studentId.toString()
+        )
+      ) {
+        return Response.json(
+          {
+            message:
+              "The project is not linked to a valid student.",
+          },
+          { status: 400 }
+        );
+      }
+
+      student =
+        await db
+          .collection("students")
+          .findOne({
+            _id:
+              new ObjectId(
+                studentId.toString()
+              ),
+          });
+
+      if (!student) {
+        return Response.json(
+          {
+            message:
+              "Student not found.",
+          },
+          { status: 404 }
+        );
+      }
+
+      studentId =
+        new ObjectId(
+          studentId.toString()
+        );
+    }
+
+    /* =====================================================
+       UNKNOWN ROLE
+    ===================================================== */
+
+    else {
       return Response.json(
         {
-          message: "Unauthorized.",
+          message:
+            "Unauthorized.",
         },
         { status: 403 }
       );
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Determine Student
-    |--------------------------------------------------------------------------
-    */
+    /* -----------------------------------------------------
+       STUDENT NAME
+    ----------------------------------------------------- */
 
-    let studentId;
+    const studentName =
+      `${student.firstName || ""} ${
+        student.lastName || ""
+      }`.trim() ||
+      student.name ||
+      student.fullName ||
+      student.email ||
+      "Student";
 
-    if (session.role === "student") {
-      // Students cannot change ownership.
-      studentId = existingProject.studentId;
-    } else {
-      // Facilitators can change the assigned student.
-      if (
-        body.studentId &&
-        ObjectId.isValid(body.studentId)
-      ) {
-        studentId = new ObjectId(
-          body.studentId
-        );
-      } else {
-        studentId =
-          existingProject.studentId;
-      }
-    }
+    /* -----------------------------------------------------
+       UPDATE PROJECT
+    ----------------------------------------------------- */
 
-    /*
-    |--------------------------------------------------------------------------
-    | Find Student
-    |--------------------------------------------------------------------------
-    */
-
-    const student = await db
-      .collection("students")
-      .findOne({
-        _id: new ObjectId(studentId),
-      });
-
-    if (!student) {
-      return Response.json(
-        {
-          message: "Student not found.",
-        },
-        { status: 404 }
-      );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Update Project
-    |--------------------------------------------------------------------------
-    */
-
-    const result = await db
-      .collection("projects")
-      .updateOne(
-        {
-          _id: new ObjectId(id),
-        },
-        {
-          $set: {
-            title: title.trim(),
-
-            description:
-              description.trim(),
-
-            studentId:
-              new ObjectId(studentId),
-
-            studentName:
-              `${student.firstName || ""} ${student.lastName || ""}`.trim(),
-
-            technology:
-              technology.trim(),
-
-            status:
-              String(status).trim(),
-
-            progress:
-              Math.round(numericProgress),
-
-            projectUrl:
-              projectUrl.trim(),
-
-            githubUrl:
-              githubUrl.trim(),
-
-            updatedAt:
-              new Date(),
+    const result =
+      await db
+        .collection("projects")
+        .updateOne(
+          {
+            _id:
+              new ObjectId(id),
           },
-        }
-      );
+          {
+            $set: {
+              title:
+                title.trim(),
 
-    if (result.matchedCount === 0) {
+              description:
+                description.trim(),
+
+              studentId:
+                new ObjectId(
+                  studentId.toString()
+                ),
+
+              studentName,
+
+              technology:
+                technology.trim(),
+
+              status:
+                String(status).trim(),
+
+              progress:
+                Math.round(
+                  numericProgress
+                ),
+
+              projectUrl:
+                String(
+                  projectUrl
+                ).trim(),
+
+              githubUrl:
+                String(
+                  githubUrl
+                ).trim(),
+
+              updatedAt:
+                new Date(),
+            },
+          }
+        );
+
+    if (
+      result.matchedCount === 0
+    ) {
       return Response.json(
         {
-          message: "Project not found.",
+          message:
+            "Project not found.",
         },
         { status: 404 }
       );
@@ -599,7 +872,10 @@ export async function PUT(request) {
         "Project updated successfully.",
     });
   } catch (error) {
-    console.error("Projects PUT error:", error);
+    console.error(
+      "Projects PUT error:",
+      error
+    );
 
     return Response.json(
       {
@@ -611,15 +887,19 @@ export async function PUT(request) {
   }
 }
 
-/*
-|--------------------------------------------------------------------------
-| DELETE - Delete Project
-|--------------------------------------------------------------------------
-| Facilitators only.
-*/
-export async function DELETE(request) {
+/* =========================================================
+   DELETE - DELETE PROJECT
+=========================================================
+
+Facilitators only.
+========================================================= */
+
+export async function DELETE(
+  request
+) {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
       return Response.json(
@@ -631,7 +911,10 @@ export async function DELETE(request) {
       );
     }
 
-    if (session.role !== "facilitator") {
+    if (
+      session.role !==
+      "facilitator"
+    ) {
       return Response.json(
         {
           message:
@@ -647,7 +930,10 @@ export async function DELETE(request) {
     const id =
       searchParams.get("id");
 
-    if (!id || !ObjectId.isValid(id)) {
+    if (
+      !id ||
+      !ObjectId.isValid(id)
+    ) {
       return Response.json(
         {
           message:
@@ -657,21 +943,24 @@ export async function DELETE(request) {
       );
     }
 
-    const client = await clientPromise;
-
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
+    const db =
+      await getDatabase();
 
     const result =
-      await db.collection("projects").deleteOne({
-        _id: new ObjectId(id),
-      });
+      await db
+        .collection("projects")
+        .deleteOne({
+          _id:
+            new ObjectId(id),
+        });
 
-    if (result.deletedCount === 0) {
+    if (
+      result.deletedCount === 0
+    ) {
       return Response.json(
         {
-          message: "Project not found.",
+          message:
+            "Project not found.",
         },
         { status: 404 }
       );
