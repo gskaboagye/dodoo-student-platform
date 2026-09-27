@@ -11,7 +11,10 @@ import { verifySession } from "@/lib/auth";
 
 async function getDatabase() {
   const client = await clientPromise;
-  return client.db();
+
+  return client.db(
+    process.env.DB_NAME || "DCCPlatform"
+  );
 }
 
 /* =========================================================
@@ -20,6 +23,7 @@ async function getDatabase() {
 
 async function getSession() {
   const cookieStore = await cookies();
+
   const token = cookieStore.get("dcc_session")?.value;
 
   if (!token) {
@@ -49,7 +53,9 @@ function isValidDateString(date) {
     return false;
   }
 
-  const [year, month, day] = date.split("-").map(Number);
+  const [year, month, day] = date
+    .split("-")
+    .map(Number);
 
   return (
     parsed.getUTCFullYear() === year &&
@@ -63,9 +69,17 @@ function isValidDateString(date) {
 ========================================================= */
 
 function formatAttendanceRecord(record) {
+  if (!record) {
+    return null;
+  }
+
   return {
     ...record,
-    _id: record._id?.toString(),
+
+    _id: record._id
+      ? record._id.toString()
+      : null,
+
     studentId:
       record.studentId instanceof ObjectId
         ? record.studentId.toString()
@@ -102,47 +116,54 @@ export async function GET(request) {
     if (!session) {
       return NextResponse.json(
         {
-          message: "Unauthorized. Please log in again.",
+          message:
+            "Unauthorized. Please log in again.",
         },
         { status: 401 }
       );
     }
 
-    const { searchParams } = new URL(request.url);
+    const { searchParams } =
+      new URL(request.url);
 
     const date = searchParams.get("date");
 
     const db = await getDatabase();
 
-    const attendanceCollection = db.collection("attendance");
+    const attendanceCollection =
+      db.collection("attendance");
 
     /* =====================================================
-       STUDENT
+       STUDENT VIEW
     ===================================================== */
 
     if (session.role === "student") {
       if (!session.studentId) {
         return NextResponse.json(
           {
-            message: "Student ID was not found in your session.",
+            message:
+              "Your student account is not linked to a student profile.",
           },
           { status: 400 }
         );
       }
 
       const query = {
-        studentId: buildStudentIdQuery(session.studentId),
+        studentId: buildStudentIdQuery(
+          session.studentId
+        ),
       };
 
       /*
-       * If the student selected a specific date,
+       * If a date was selected,
        * only return attendance for that date.
        */
       if (date) {
         if (!isValidDateString(date)) {
           return NextResponse.json(
             {
-              message: "Invalid date format. Use YYYY-MM-DD.",
+              message:
+                "Invalid date format. Use YYYY-MM-DD.",
             },
             { status: 400 }
           );
@@ -151,33 +172,39 @@ export async function GET(request) {
         query.date = date;
       }
 
-      const attendance = await attendanceCollection
-        .find(query)
-        .sort({
-          date: -1,
-        })
-        .toArray();
+      const attendance =
+        await attendanceCollection
+          .find(query)
+          .sort({
+            date: -1,
+          })
+          .toArray();
 
       return NextResponse.json({
-        attendance: attendance.map(formatAttendanceRecord),
+        attendance:
+          attendance.map(
+            formatAttendanceRecord
+          ),
       });
     }
 
     /* =====================================================
-       FACILITATOR
+       FACILITATOR VIEW
     ===================================================== */
 
     if (session.role === "facilitator") {
       const query = {};
 
       /*
-       * Facilitators can view attendance for a specific day.
+       * Facilitators can select any date and
+       * view attendance for that day.
        */
       if (date) {
         if (!isValidDateString(date)) {
           return NextResponse.json(
             {
-              message: "Invalid date format. Use YYYY-MM-DD.",
+              message:
+                "Invalid date format. Use YYYY-MM-DD.",
             },
             { status: 400 }
           );
@@ -186,27 +213,35 @@ export async function GET(request) {
         query.date = date;
       }
 
-      const attendance = await attendanceCollection
-        .find(query)
-        .sort({
-          date: -1,
-          studentName: 1,
-        })
-        .toArray();
+      const attendance =
+        await attendanceCollection
+          .find(query)
+          .sort({
+            date: -1,
+            studentName: 1,
+          })
+          .toArray();
 
       return NextResponse.json({
-        attendance: attendance.map(formatAttendanceRecord),
+        attendance:
+          attendance.map(
+            formatAttendanceRecord
+          ),
       });
     }
 
     return NextResponse.json(
       {
-        message: "You do not have permission to view attendance.",
+        message:
+          "You do not have permission to view attendance.",
       },
       { status: 403 }
     );
   } catch (error) {
-    console.error("GET ATTENDANCE ERROR:", error);
+    console.error(
+      "GET ATTENDANCE ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
@@ -220,7 +255,7 @@ export async function GET(request) {
 
 /* =========================================================
    POST ATTENDANCE
-   Facilitators only
+   FACILITATORS ONLY
 ========================================================= */
 
 export async function POST(request) {
@@ -230,7 +265,8 @@ export async function POST(request) {
     if (!session) {
       return NextResponse.json(
         {
-          message: "Unauthorized. Please log in again.",
+          message:
+            "Unauthorized. Please log in again.",
         },
         { status: 401 }
       );
@@ -239,7 +275,8 @@ export async function POST(request) {
     if (session.role !== "facilitator") {
       return NextResponse.json(
         {
-          message: "Only facilitators can record attendance.",
+          message:
+            "Only facilitators can record attendance.",
         },
         { status: 403 }
       );
@@ -267,10 +304,20 @@ export async function POST(request) {
       );
     }
 
+    if (!ObjectId.isValid(studentId)) {
+      return NextResponse.json(
+        {
+          message: "Invalid student ID.",
+        },
+        { status: 400 }
+      );
+    }
+
     if (!date) {
       return NextResponse.json(
         {
-          message: "Attendance date is required.",
+          message:
+            "Attendance date is required.",
         },
         { status: 400 }
       );
@@ -279,7 +326,8 @@ export async function POST(request) {
     if (!isValidDateString(date)) {
       return NextResponse.json(
         {
-          message: "Invalid date. Use YYYY-MM-DD.",
+          message:
+            "Invalid date. Use YYYY-MM-DD.",
         },
         { status: 400 }
       );
@@ -301,47 +349,69 @@ export async function POST(request) {
       );
     }
 
-    if (!ObjectId.isValid(studentId)) {
-      return NextResponse.json(
-        {
-          message: "Invalid student ID.",
-        },
-        { status: 400 }
-      );
-    }
+    /* =====================================================
+       DATABASE
+    ===================================================== */
 
     const db = await getDatabase();
 
     const attendanceCollection =
       db.collection("attendance");
 
-    const usersCollection = db.collection("users");
+    /*
+     * IMPORTANT:
+     *
+     * Student profiles are stored in the
+     * "students" collection.
+     *
+     * Do NOT use the "users" collection here.
+     */
+    const studentsCollection =
+      db.collection("students");
 
-    const studentObjectId = new ObjectId(studentId);
+    const studentObjectId =
+      new ObjectId(studentId);
 
     /* =====================================================
-       VERIFY STUDENT
+       FIND STUDENT PROFILE
     ===================================================== */
 
-    const student = await usersCollection.findOne({
-      _id: studentObjectId,
-      role: "student",
-    });
+    const student =
+      await studentsCollection.findOne({
+        _id: studentObjectId,
+      });
 
     if (!student) {
+      console.error(
+        "ATTENDANCE STUDENT NOT FOUND:",
+        {
+          studentId,
+          database:
+            process.env.DB_NAME ||
+            "DCCPlatform",
+        }
+      );
+
       return NextResponse.json(
         {
-          message: "Student account was not found.",
+          message:
+            "Student profile was not found.",
         },
         { status: 404 }
       );
     }
 
-    /*
-     * Always use the student's actual name from the
-     * database when possible.
-     */
+    /* =====================================================
+       STUDENT NAME
+    ===================================================== */
+
+    const databaseStudentName =
+      `${student.firstName || ""} ${
+        student.lastName || ""
+      }`.trim();
+
     const finalStudentName =
+      databaseStudentName ||
       student.name ||
       student.fullName ||
       studentName ||
@@ -352,11 +422,10 @@ export async function POST(request) {
     ===================================================== */
 
     /*
-     * We check both ObjectId and string formats.
+     * Check both ObjectId and string formats.
      *
-     * This is important because older attendance records
-     * may have studentId stored as a string while newer
-     * records use MongoDB ObjectId.
+     * This keeps older attendance records working
+     * if their studentId was saved as a string.
      */
 
     const existingRecord =
@@ -367,11 +436,12 @@ export async function POST(request) {
             studentObjectId.toString(),
           ],
         },
+
         date,
       });
 
     /* =====================================================
-       UPDATE EXISTING RECORD
+       UPDATE EXISTING ATTENDANCE
     ===================================================== */
 
     if (existingRecord) {
@@ -397,30 +467,40 @@ export async function POST(request) {
 
       return NextResponse.json(
         {
-          message: "Attendance updated successfully.",
-          attendance: formatAttendanceRecord(
-            updatedRecord
-          ),
+          message:
+            "Attendance updated successfully.",
+
+          attendance:
+            formatAttendanceRecord(
+              updatedRecord
+            ),
         },
         { status: 200 }
       );
     }
 
     /* =====================================================
-       CREATE NEW ATTENDANCE RECORD
+       CREATE NEW ATTENDANCE
     ===================================================== */
 
     const newRecord = {
       studentId: studentObjectId,
+
       studentName: finalStudentName,
+
       date,
+
       status,
+
       createdAt: new Date(),
+
       updatedAt: new Date(),
     };
 
     const result =
-      await attendanceCollection.insertOne(newRecord);
+      await attendanceCollection.insertOne(
+        newRecord
+      );
 
     const createdRecord =
       await attendanceCollection.findOne({
@@ -429,18 +509,24 @@ export async function POST(request) {
 
     return NextResponse.json(
       {
-        message: "Attendance recorded successfully.",
-        attendance: formatAttendanceRecord(
-          createdRecord
-        ),
+        message:
+          "Attendance recorded successfully.",
+
+        attendance:
+          formatAttendanceRecord(
+            createdRecord
+          ),
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error("POST ATTENDANCE ERROR:", error);
+    console.error(
+      "POST ATTENDANCE ERROR:",
+      error
+    );
 
     /*
-     * Handle duplicate attendance records gracefully.
+     * Handle duplicate records gracefully.
      */
     if (error?.code === 11000) {
       return NextResponse.json(
@@ -454,7 +540,8 @@ export async function POST(request) {
 
     return NextResponse.json(
       {
-        message: "Failed to save attendance.",
+        message:
+          "Failed to save attendance.",
         error: error.message,
       },
       { status: 500 }
@@ -464,7 +551,7 @@ export async function POST(request) {
 
 /* =========================================================
    PUT ATTENDANCE
-   Facilitators only
+   FACILITATORS ONLY
 ========================================================= */
 
 export async function PUT(request) {
@@ -474,7 +561,8 @@ export async function PUT(request) {
     if (!session) {
       return NextResponse.json(
         {
-          message: "Unauthorized. Please log in again.",
+          message:
+            "Unauthorized. Please log in again.",
         },
         { status: 401 }
       );
@@ -483,7 +571,8 @@ export async function PUT(request) {
     if (session.role !== "facilitator") {
       return NextResponse.json(
         {
-          message: "Only facilitators can update attendance.",
+          message:
+            "Only facilitators can update attendance.",
         },
         { status: 403 }
       );
@@ -499,7 +588,8 @@ export async function PUT(request) {
     if (!attendanceId) {
       return NextResponse.json(
         {
-          message: "Attendance ID is required.",
+          message:
+            "Attendance ID is required.",
         },
         { status: 400 }
       );
@@ -508,7 +598,8 @@ export async function PUT(request) {
     if (!ObjectId.isValid(attendanceId)) {
       return NextResponse.json(
         {
-          message: "Invalid attendance ID.",
+          message:
+            "Invalid attendance ID.",
         },
         { status: 400 }
       );
@@ -535,10 +626,13 @@ export async function PUT(request) {
     const attendanceCollection =
       db.collection("attendance");
 
+    const attendanceObjectId =
+      new ObjectId(attendanceId);
+
     const result =
       await attendanceCollection.updateOne(
         {
-          _id: new ObjectId(attendanceId),
+          _id: attendanceObjectId,
         },
         {
           $set: {
@@ -551,7 +645,8 @@ export async function PUT(request) {
     if (result.matchedCount === 0) {
       return NextResponse.json(
         {
-          message: "Attendance record not found.",
+          message:
+            "Attendance record not found.",
         },
         { status: 404 }
       );
@@ -559,21 +654,28 @@ export async function PUT(request) {
 
     const updatedRecord =
       await attendanceCollection.findOne({
-        _id: new ObjectId(attendanceId),
+        _id: attendanceObjectId,
       });
 
     return NextResponse.json({
-      message: "Attendance updated successfully.",
-      attendance: formatAttendanceRecord(
-        updatedRecord
-      ),
+      message:
+        "Attendance updated successfully.",
+
+      attendance:
+        formatAttendanceRecord(
+          updatedRecord
+        ),
     });
   } catch (error) {
-    console.error("PUT ATTENDANCE ERROR:", error);
+    console.error(
+      "PUT ATTENDANCE ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
-        message: "Failed to update attendance.",
+        message:
+          "Failed to update attendance.",
         error: error.message,
       },
       { status: 500 }
@@ -583,7 +685,7 @@ export async function PUT(request) {
 
 /* =========================================================
    DELETE ATTENDANCE
-   Facilitators only
+   FACILITATORS ONLY
 ========================================================= */
 
 export async function DELETE(request) {
@@ -593,7 +695,8 @@ export async function DELETE(request) {
     if (!session) {
       return NextResponse.json(
         {
-          message: "Unauthorized. Please log in again.",
+          message:
+            "Unauthorized. Please log in again.",
         },
         { status: 401 }
       );
@@ -602,7 +705,8 @@ export async function DELETE(request) {
     if (session.role !== "facilitator") {
       return NextResponse.json(
         {
-          message: "Only facilitators can delete attendance.",
+          message:
+            "Only facilitators can delete attendance.",
         },
         { status: 403 }
       );
@@ -617,7 +721,8 @@ export async function DELETE(request) {
     if (!attendanceId) {
       return NextResponse.json(
         {
-          message: "Attendance ID is required.",
+          message:
+            "Attendance ID is required.",
         },
         { status: 400 }
       );
@@ -626,7 +731,8 @@ export async function DELETE(request) {
     if (!ObjectId.isValid(attendanceId)) {
       return NextResponse.json(
         {
-          message: "Invalid attendance ID.",
+          message:
+            "Invalid attendance ID.",
         },
         { status: 400 }
       );
@@ -645,21 +751,27 @@ export async function DELETE(request) {
     if (result.deletedCount === 0) {
       return NextResponse.json(
         {
-          message: "Attendance record not found.",
+          message:
+            "Attendance record not found.",
         },
         { status: 404 }
       );
     }
 
     return NextResponse.json({
-      message: "Attendance deleted successfully.",
+      message:
+        "Attendance deleted successfully.",
     });
   } catch (error) {
-    console.error("DELETE ATTENDANCE ERROR:", error);
+    console.error(
+      "DELETE ATTENDANCE ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
-        message: "Failed to delete attendance.",
+        message:
+          "Failed to delete attendance.",
         error: error.message,
       },
       { status: 500 }

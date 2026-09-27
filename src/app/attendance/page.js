@@ -1,752 +1,450 @@
-﻿import { ObjectId } from "mongodb";
-import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+﻿"use client";
 
-import clientPromise from "@/lib/mongodb";
-import { verifySession } from "@/lib/auth";
+import { useEffect, useMemo, useState } from "react";
 
-/* =========================================================
-   DATABASE
-========================================================= */
+function getToday() {
+  const date = new Date();
+  const offset = date.getTimezoneOffset();
 
-async function getDatabase() {
-  const client = await clientPromise;
-  return client.db(process.env.DB_NAME || "DCCPlatform");
+  return new Date(date.getTime() - offset * 60000)
+    .toISOString()
+    .split("T")[0];
 }
 
-/* =========================================================
-   SESSION
-========================================================= */
+export default function AttendancePage() {
+  const [students, setStudents] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [date, setDate] = useState(getToday());
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-async function getSession() {
-  const cookieStore = await cookies();
+  async function loadStudents() {
+    try {
+      const response = await fetch("/api/students", {
+        cache: "no-store",
+      });
 
-  const token = cookieStore.get("dcc_session")?.value;
+      const data = await response.json();
 
-  if (!token) {
-    return null;
-  }
-
-  return await verifySession(token);
-}
-
-/* =========================================================
-   DATE VALIDATION
-========================================================= */
-
-function isValidDateString(date) {
-  if (!date || typeof date !== "string") {
-    return false;
-  }
-
-  // Must be YYYY-MM-DD
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return false;
-  }
-
-  const parsed = new Date(`${date}T00:00:00Z`);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return false;
-  }
-
-  const [year, month, day] = date.split("-").map(Number);
-
-  return (
-    parsed.getUTCFullYear() === year &&
-    parsed.getUTCMonth() + 1 === month &&
-    parsed.getUTCDate() === day
-  );
-}
-
-/* =========================================================
-   FORMAT ATTENDANCE RECORD
-========================================================= */
-
-function formatAttendanceRecord(record) {
-  if (!record) {
-    return null;
-  }
-
-  return {
-    ...record,
-
-    _id: record._id
-      ? record._id.toString()
-      : null,
-
-    studentId:
-      record.studentId instanceof ObjectId
-        ? record.studentId.toString()
-        : record.studentId,
-  };
-}
-
-/* =========================================================
-   STUDENT ID QUERY
-========================================================= */
-
-function buildStudentIdQuery(studentId) {
-  const idString = String(studentId);
-
-  const values = [idString];
-
-  if (ObjectId.isValid(idString)) {
-    values.push(new ObjectId(idString));
-  }
-
-  return {
-    $in: values,
-  };
-}
-
-/* =========================================================
-   GET ATTENDANCE
-========================================================= */
-
-export async function GET(request) {
-  try {
-    const session = await getSession();
-
-    if (!session) {
-      return NextResponse.json(
-        {
-          message: "Unauthorized. Please log in again.",
-        },
-        { status: 401 }
-      );
-    }
-
-    const { searchParams } = new URL(request.url);
-
-    const date = searchParams.get("date");
-
-    const db = await getDatabase();
-
-    const attendanceCollection =
-      db.collection("attendance");
-
-    /* =====================================================
-       STUDENT VIEW
-    ===================================================== */
-
-    if (session.role === "student") {
-      /*
-       * The user's account stores the MongoDB _id of the
-       * student's document in users.studentId.
-       */
-      if (!session.studentId) {
-        return NextResponse.json(
-          {
-            message:
-              "Your student account is not linked to a student profile.",
-          },
-          { status: 400 }
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            "Failed to load students."
         );
       }
 
-      const query = {
-        studentId: buildStudentIdQuery(
-          session.studentId
-        ),
-      };
+      setStudents(
+        Array.isArray(data)
+          ? data
+          : data.students || []
+      );
+    } catch (err) {
+      setError(err.message);
+    }
+  }
 
-      /*
-       * If a date was selected, only return attendance
-       * for that date.
-       */
-      if (date) {
-        if (!isValidDateString(date)) {
-          return NextResponse.json(
-            {
-              message:
-                "Invalid date format. Use YYYY-MM-DD.",
-            },
-            { status: 400 }
-          );
+  async function loadAttendance(selectedDate) {
+    try {
+      const response = await fetch(
+        `/api/attendance?date=${selectedDate}`,
+        {
+          cache: "no-store",
         }
+      );
 
-        query.date = date;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            "Failed to load attendance."
+        );
       }
 
-      const attendance =
-        await attendanceCollection
-          .find(query)
-          .sort({
-            date: -1,
-          })
-          .toArray();
-
-      return NextResponse.json({
-        attendance:
-          attendance.map(formatAttendanceRecord),
-      });
+      setAttendance(
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data.attendance)
+            ? data.attendance
+            : []
+      );
+    } catch (err) {
+      setAttendance([]);
+      setError(err.message);
     }
+  }
 
-    /* =====================================================
-       FACILITATOR VIEW
-    ===================================================== */
+  async function loadData() {
+    setLoading(true);
+    setError("");
 
-    if (session.role === "facilitator") {
-      const query = {};
-
-      if (date) {
-        if (!isValidDateString(date)) {
-          return NextResponse.json(
-            {
-              message:
-                "Invalid date format. Use YYYY-MM-DD.",
-            },
-            { status: 400 }
-          );
-        }
-
-        query.date = date;
-      }
-
-      const attendance =
-        await attendanceCollection
-          .find(query)
-          .sort({
-            date: -1,
-            studentName: 1,
-          })
-          .toArray();
-
-      return NextResponse.json({
-        attendance:
-          attendance.map(formatAttendanceRecord),
-      });
+    try {
+      await Promise.all([
+        loadStudents(),
+        loadAttendance(date),
+      ]);
+    } finally {
+      setLoading(false);
     }
+  }
 
-    return NextResponse.json(
-      {
-        message:
-          "You do not have permission to view attendance.",
-      },
-      { status: 403 }
-    );
-  } catch (error) {
-    console.error(
-      "GET ATTENDANCE ERROR:",
-      error
-    );
+  useEffect(() => {
+    loadData();
+  }, []);
 
-    return NextResponse.json(
-      {
-        message: "Failed to load attendance.",
-        error: error.message,
-      },
-      { status: 500 }
+  useEffect(() => {
+    loadAttendance(date);
+  }, [date]);
+
+  function getAttendance(studentId) {
+    return attendance.find(
+      (record) =>
+        record.studentId?.toString() ===
+        studentId?.toString()
     );
   }
-}
 
-/* =========================================================
-   POST ATTENDANCE
-   FACILITATORS ONLY
-========================================================= */
+  async function saveAttendance(student, status) {
+    setSavingId(student._id);
+    setMessage("");
+    setError("");
 
-export async function POST(request) {
-  try {
-    const session = await getSession();
-
-    if (!session) {
-      return NextResponse.json(
-        {
-          message:
-            "Unauthorized. Please log in again.",
+    try {
+      const response = await fetch("/api/attendance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        { status: 401 }
-      );
-    }
-
-    if (session.role !== "facilitator") {
-      return NextResponse.json(
-        {
-          message:
-            "Only facilitators can record attendance.",
-        },
-        { status: 403 }
-      );
-    }
-
-    const body = await request.json();
-
-    const {
-      studentId,
-      studentName,
-      date,
-      status,
-    } = body;
-
-    /* =====================================================
-       VALIDATION
-    ===================================================== */
-
-    if (!studentId) {
-      return NextResponse.json(
-        {
-          message: "Student ID is required.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!ObjectId.isValid(studentId)) {
-      return NextResponse.json(
-        {
-          message: "Invalid student ID.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!date) {
-      return NextResponse.json(
-        {
-          message:
-            "Attendance date is required.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!isValidDateString(date)) {
-      return NextResponse.json(
-        {
-          message:
-            "Invalid date. Use YYYY-MM-DD.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const allowedStatuses = [
-      "Present",
-      "Late",
-      "Absent",
-    ];
-
-    if (!allowedStatuses.includes(status)) {
-      return NextResponse.json(
-        {
-          message:
-            "Invalid attendance status. Use Present, Late, or Absent.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const db = await getDatabase();
-
-    const attendanceCollection =
-      db.collection("attendance");
-
-    const studentsCollection =
-      db.collection("students");
-
-    const studentObjectId =
-      new ObjectId(studentId);
-
-    /* =====================================================
-       FIND STUDENT IN STUDENTS COLLECTION
-    ===================================================== */
-
-    /*
-     * IMPORTANT:
-     *
-     * Students are stored in the "students" collection.
-     *
-     * The previous API incorrectly looked in "users".
-     * That caused:
-     *
-     * "Student account was not found."
-     */
-
-    const student =
-      await studentsCollection.findOne({
-        _id: studentObjectId,
+        body: JSON.stringify({
+          studentId: student._id,
+          studentName: `${student.firstName} ${student.lastName}`,
+          date,
+          status,
+        }),
       });
 
-    if (!student) {
-      return NextResponse.json(
-        {
-          message:
-            "Student profile was not found.",
-        },
-        { status: 404 }
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            data.message ||
+            "Failed to save attendance."
+        );
+      }
+
+      setMessage(
+        `${student.firstName} ${student.lastName}: ${status}`
       );
+
+      await loadAttendance(date);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  const filteredStudents = useMemo(() => {
+    const value = search.toLowerCase().trim();
+
+    if (!value) {
+      return students;
     }
 
-    /* =====================================================
-       STUDENT NAME
-    ===================================================== */
+    return students.filter((student) => {
+      const name =
+        `${student.firstName || ""} ${
+          student.lastName || ""
+        }`.toLowerCase();
 
-    const finalStudentName =
-      `${student.firstName || ""} ${
-        student.lastName || ""
-      }`.trim() ||
-      studentName ||
-      "Student";
-
-    /* =====================================================
-       FIND EXISTING ATTENDANCE
-    ===================================================== */
-
-    /*
-     * Check both ObjectId and string formats.
-     *
-     * This also allows older attendance records to continue
-     * working if their studentId was stored as a string.
-     */
-
-    const existingRecord =
-      await attendanceCollection.findOne({
-        studentId: {
-          $in: [
-            studentObjectId,
-            studentObjectId.toString(),
-          ],
-        },
-
-        date,
-      });
-
-    /* =====================================================
-       UPDATE EXISTING ATTENDANCE
-    ===================================================== */
-
-    if (existingRecord) {
-      await attendanceCollection.updateOne(
-        {
-          _id: existingRecord._id,
-        },
-
-        {
-          $set: {
-            studentId: studentObjectId,
-            studentName: finalStudentName,
-            date,
-            status,
-            updatedAt: new Date(),
-          },
-        }
+      return (
+        name.includes(value) ||
+        student.email
+          ?.toLowerCase()
+          .includes(value) ||
+        student.program
+          ?.toLowerCase()
+          .includes(value)
       );
+    });
+  }, [students, search]);
 
-      const updatedRecord =
-        await attendanceCollection.findOne({
-          _id: existingRecord._id,
-        });
+  const stats = useMemo(() => {
+    return {
+      present: attendance.filter(
+        (record) => record.status === "Present"
+      ).length,
 
-      return NextResponse.json(
-        {
-          message:
-            "Attendance updated successfully.",
+      late: attendance.filter(
+        (record) => record.status === "Late"
+      ).length,
 
-          attendance:
-            formatAttendanceRecord(
-              updatedRecord
-            ),
-        },
-        { status: 200 }
-      );
-    }
-
-    /* =====================================================
-       CREATE NEW ATTENDANCE
-    ===================================================== */
-
-    const newRecord = {
-      studentId: studentObjectId,
-
-      studentName: finalStudentName,
-
-      date,
-
-      status,
-
-      createdAt: new Date(),
-
-      updatedAt: new Date(),
+      absent: attendance.filter(
+        (record) => record.status === "Absent"
+      ).length,
     };
+  }, [attendance]);
 
-    const result =
-      await attendanceCollection.insertOne(
-        newRecord
-      );
+  return (
+    <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
+      <div className="mx-auto max-w-7xl">
 
-    const createdRecord =
-      await attendanceCollection.findOne({
-        _id: result.insertedId,
-      });
+        {/* HEADER */}
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold text-slate-900">
+            Attendance
+          </h1>
 
-    return NextResponse.json(
-      {
-        message:
-          "Attendance recorded successfully.",
+          <p className="mt-2 text-lg text-slate-600">
+            Record and monitor student attendance.
+          </p>
+        </div>
 
-        attendance:
-          formatAttendanceRecord(
-            createdRecord
-          ),
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    console.error(
-      "POST ATTENDANCE ERROR:",
-      error
-    );
+        {/* SUCCESS MESSAGE */}
+        {message && (
+          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-700">
+            {message}
+          </div>
+        )}
 
-    if (error?.code === 11000) {
-      return NextResponse.json(
-        {
-          message:
-            "Attendance already exists for this student and date.",
-        },
-        { status: 409 }
-      );
-    }
+        {/* ERROR MESSAGE */}
+        {error && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+            {error}
+          </div>
+        )}
 
-    return NextResponse.json(
-      {
-        message:
-          "Failed to save attendance.",
-        error: error.message,
-      },
-      { status: 500 }
-    );
-  }
-}
+        {/* CONTROLS */}
+        <div className="mb-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
 
-/* =========================================================
-   PUT ATTENDANCE
-   FACILITATORS ONLY
-========================================================= */
+            {/* DATE */}
+            <div>
+              <label className="mb-2 block font-semibold text-slate-700">
+                Attendance Date
+              </label>
 
-export async function PUT(request) {
-  try {
-    const session = await getSession();
+              <input
+                type="date"
+                value={date}
+                onChange={(event) =>
+                  setDate(event.target.value)
+                }
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
 
-    if (!session) {
-      return NextResponse.json(
-        {
-          message:
-            "Unauthorized. Please log in again.",
-        },
-        { status: 401 }
-      );
-    }
+            {/* SEARCH */}
+            <div>
+              <label className="mb-2 block font-semibold text-slate-700">
+                Search Students
+              </label>
 
-    if (session.role !== "facilitator") {
-      return NextResponse.json(
-        {
-          message:
-            "Only facilitators can update attendance.",
-        },
-        { status: 403 }
-      );
-    }
+              <input
+                type="search"
+                value={search}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
+                placeholder="Search by name, email or program..."
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-80"
+              />
+            </div>
 
-    const body = await request.json();
+          </div>
+        </div>
 
-    const {
-      attendanceId,
-      status,
-    } = body;
+        {/* STATISTICS */}
+        <div className="mb-8 grid gap-5 sm:grid-cols-3">
 
-    if (!attendanceId) {
-      return NextResponse.json(
-        {
-          message:
-            "Attendance ID is required.",
-        },
-        { status: 400 }
-      );
-    }
+          {/* PRESENT */}
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm font-medium text-slate-500">
+              Present
+            </p>
 
-    if (!ObjectId.isValid(attendanceId)) {
-      return NextResponse.json(
-        {
-          message:
-            "Invalid attendance ID.",
-        },
-        { status: 400 }
-      );
-    }
+            <p className="mt-2 text-3xl font-bold text-green-600">
+              {stats.present}
+            </p>
+          </div>
 
-    const allowedStatuses = [
-      "Present",
-      "Late",
-      "Absent",
-    ];
+          {/* LATE */}
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm font-medium text-slate-500">
+              Late
+            </p>
 
-    if (!allowedStatuses.includes(status)) {
-      return NextResponse.json(
-        {
-          message:
-            "Invalid attendance status. Use Present, Late, or Absent.",
-        },
-        { status: 400 }
-      );
-    }
+            <p className="mt-2 text-3xl font-bold text-yellow-600">
+              {stats.late}
+            </p>
+          </div>
 
-    const db = await getDatabase();
+          {/* ABSENT */}
+          <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <p className="text-sm font-medium text-slate-500">
+              Absent
+            </p>
 
-    const attendanceCollection =
-      db.collection("attendance");
+            <p className="mt-2 text-3xl font-bold text-red-600">
+              {stats.absent}
+            </p>
+          </div>
 
-    const attendanceObjectId =
-      new ObjectId(attendanceId);
+        </div>
 
-    const result =
-      await attendanceCollection.updateOne(
-        {
-          _id: attendanceObjectId,
-        },
+        {/* STUDENT ATTENDANCE */}
+        <section className="rounded-2xl bg-white p-7 shadow-sm ring-1 ring-slate-200">
 
-        {
-          $set: {
-            status,
-            updatedAt: new Date(),
-          },
-        }
-      );
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-slate-900">
+              Student Attendance
+            </h2>
 
-    if (result.matchedCount === 0) {
-      return NextResponse.json(
-        {
-          message:
-            "Attendance record not found.",
-        },
-        { status: 404 }
-      );
-    }
+            <p className="mt-1 text-slate-500">
+              Select the attendance status for each student.
+            </p>
+          </div>
 
-    const updatedRecord =
-      await attendanceCollection.findOne({
-        _id: attendanceObjectId,
-      });
+          {loading ? (
+            <div className="py-12 text-center text-slate-500">
+              Loading students...
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500">
+              No students found.
+            </div>
+          ) : (
+            <div className="space-y-4">
 
-    return NextResponse.json({
-      message:
-        "Attendance updated successfully.",
+              {filteredStudents.map((student) => {
+                const record = getAttendance(student._id);
 
-      attendance:
-        formatAttendanceRecord(
-          updatedRecord
-        ),
-    });
-  } catch (error) {
-    console.error(
-      "PUT ATTENDANCE ERROR:",
-      error
-    );
+                const currentStatus =
+                  record?.status;
 
-    return NextResponse.json(
-      {
-        message:
-          "Failed to update attendance.",
-        error: error.message,
-      },
-      { status: 500 }
-    );
-  }
-}
+                const isSaving =
+                  savingId === student._id;
 
-/* =========================================================
-   DELETE ATTENDANCE
-   FACILITATORS ONLY
-========================================================= */
+                return (
+                  <div
+                    key={student._id}
+                    className="rounded-2xl border border-slate-200 p-5 transition hover:shadow-sm"
+                  >
 
-export async function DELETE(request) {
-  try {
-    const session = await getSession();
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
 
-    if (!session) {
-      return NextResponse.json(
-        {
-          message:
-            "Unauthorized. Please log in again.",
-        },
-        { status: 401 }
-      );
-    }
+                      {/* STUDENT INFORMATION */}
+                      <div className="flex items-center gap-4">
 
-    if (session.role !== "facilitator") {
-      return NextResponse.json(
-        {
-          message:
-            "Only facilitators can delete attendance.",
-        },
-        { status: 403 }
-      );
-    }
+                        {student.profileImage ? (
+                          <img
+                            src={student.profileImage}
+                            alt={`${student.firstName} ${student.lastName}`}
+                            className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-100"
+                          />
+                        ) : (
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
+                            {student.firstName?.[0]}
+                            {student.lastName?.[0]}
+                          </div>
+                        )}
 
-    const { searchParams } =
-      new URL(request.url);
+                        <div>
+                          <h3 className="font-bold text-slate-900">
+                            {student.firstName}{" "}
+                            {student.lastName}
+                          </h3>
 
-    const attendanceId =
-      searchParams.get("id");
+                          <p className="text-sm text-slate-500">
+                            {student.program ||
+                              "Program not specified"}
+                          </p>
 
-    if (!attendanceId) {
-      return NextResponse.json(
-        {
-          message:
-            "Attendance ID is required.",
-        },
-        { status: 400 }
-      );
-    }
+                          <p className="text-sm text-slate-500">
+                            {student.email}
+                          </p>
+                        </div>
 
-    if (!ObjectId.isValid(attendanceId)) {
-      return NextResponse.json(
-        {
-          message:
-            "Invalid attendance ID.",
-        },
-        { status: 400 }
-      );
-    }
+                      </div>
 
-    const db = await getDatabase();
+                      {/* ATTENDANCE BUTTONS */}
+                      <div className="flex flex-wrap gap-2">
 
-    const attendanceCollection =
-      db.collection("attendance");
+                        {/* PRESENT */}
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() =>
+                            saveAttendance(
+                              student,
+                              "Present"
+                            )
+                          }
+                          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                            currentStatus === "Present"
+                              ? "bg-green-600 text-white"
+                              : "border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                          } disabled:opacity-50`}
+                        >
+                          Present
+                        </button>
 
-    const result =
-      await attendanceCollection.deleteOne({
-        _id: new ObjectId(attendanceId),
-      });
+                        {/* LATE */}
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() =>
+                            saveAttendance(
+                              student,
+                              "Late"
+                            )
+                          }
+                          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                            currentStatus === "Late"
+                              ? "bg-yellow-500 text-white"
+                              : "border border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
+                          } disabled:opacity-50`}
+                        >
+                          Late
+                        </button>
 
-    if (result.deletedCount === 0) {
-      return NextResponse.json(
-        {
-          message:
-            "Attendance record not found.",
-        },
-        { status: 404 }
-      );
-    }
+                        {/* ABSENT */}
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() =>
+                            saveAttendance(
+                              student,
+                              "Absent"
+                            )
+                          }
+                          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                            currentStatus === "Absent"
+                              ? "bg-red-600 text-white"
+                              : "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                          } disabled:opacity-50`}
+                        >
+                          Absent
+                        </button>
 
-    return NextResponse.json({
-      message:
-        "Attendance deleted successfully.",
-    });
-  } catch (error) {
-    console.error(
-      "DELETE ATTENDANCE ERROR:",
-      error
-    );
+                      </div>
 
-    return NextResponse.json(
-      {
-        message:
-          "Failed to delete attendance.",
-        error: error.message,
-      },
-      { status: 500 }
-    );
-  }
+                    </div>
+                  </div>
+                );
+              })}
+
+            </div>
+          )}
+
+        </section>
+      </div>
+    </main>
+  );
 }
