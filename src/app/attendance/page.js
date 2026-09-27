@@ -1,33 +1,149 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 function getToday() {
   const date = new Date();
   const offset = date.getTimezoneOffset();
 
-  return new Date(date.getTime() - offset * 60000)
+  return new Date(
+    date.getTime() - offset * 60000
+  )
     .toISOString()
     .split("T")[0];
 }
 
 export default function AttendancePage() {
+  const router = useRouter();
+
   const [students, setStudents] = useState([]);
   const [attendance, setAttendance] = useState([]);
-  const [date, setDate] = useState(getToday());
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [savingId, setSavingId] = useState(null);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+
+  const [date, setDate] =
+    useState(getToday());
+
+  const [search, setSearch] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [checkingAccess, setCheckingAccess] =
+    useState(true);
+
+  const [savingId, setSavingId] =
+    useState(null);
+
+  const [message, setMessage] =
+    useState("");
+
+  const [error, setError] =
+    useState("");
+
+  // =====================================================
+  // CHECK CURRENT USER
+  // =====================================================
+
+  async function checkAccess() {
+    try {
+      setCheckingAccess(true);
+      setError("");
+
+      const response = await fetch(
+        "/api/auth/me",
+        {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        router.replace("/login");
+        return false;
+      }
+
+      const data =
+        await response.json();
+
+      const currentUser =
+        data?.user || null;
+
+      if (!currentUser) {
+        router.replace("/login");
+        return false;
+      }
+
+      // =================================================
+      // STUDENT
+      // =================================================
+      // Students must use their own attendance page.
+      // =================================================
+
+      if (
+        currentUser.role ===
+        "student"
+      ) {
+        router.replace(
+          "/student/attendance"
+        );
+
+        return false;
+      }
+
+      // =================================================
+      // FACILITATOR
+      // =================================================
+
+      if (
+        currentUser.role !==
+        "facilitator"
+      ) {
+        router.replace("/");
+
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      console.error(
+        "ATTENDANCE ACCESS CHECK ERROR:",
+        err
+      );
+
+      router.replace("/login");
+
+      return false;
+    } finally {
+      setCheckingAccess(false);
+    }
+  }
+
+  // =====================================================
+  // LOAD STUDENTS
+  // =====================================================
 
   async function loadStudents() {
     try {
-      const response = await fetch("/api/students", {
-        cache: "no-store",
-      });
+      const response =
+        await fetch(
+          "/api/students",
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
 
-      const data = await response.json();
+      let data = {};
+
+      try {
+        data =
+          await response.json();
+      } catch {
+        data = {};
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -43,20 +159,44 @@ export default function AttendancePage() {
           : data.students || []
       );
     } catch (err) {
-      setError(err.message);
+      console.error(
+        "LOAD STUDENTS ERROR:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Failed to load students."
+      );
     }
   }
 
-  async function loadAttendance(selectedDate) {
-    try {
-      const response = await fetch(
-        `/api/attendance?date=${selectedDate}`,
-        {
-          cache: "no-store",
-        }
-      );
+  // =====================================================
+  // LOAD ATTENDANCE
+  // =====================================================
 
-      const data = await response.json();
+  async function loadAttendance(
+    selectedDate
+  ) {
+    try {
+      const response =
+        await fetch(
+          `/api/attendance?date=${selectedDate}`,
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
+
+      let data = {};
+
+      try {
+        data =
+          await response.json();
+      } catch {
+        data = {};
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -69,21 +209,43 @@ export default function AttendancePage() {
       setAttendance(
         Array.isArray(data)
           ? data
-          : Array.isArray(data.attendance)
+          : Array.isArray(
+              data.attendance
+            )
             ? data.attendance
             : []
       );
     } catch (err) {
+      console.error(
+        "LOAD ATTENDANCE ERROR:",
+        err
+      );
+
       setAttendance([]);
-      setError(err.message);
+
+      setError(
+        err.message ||
+          "Failed to load attendance."
+      );
     }
   }
+
+  // =====================================================
+  // LOAD DATA
+  // =====================================================
 
   async function loadData() {
     setLoading(true);
     setError("");
 
     try {
+      const allowed =
+        await checkAccess();
+
+      if (!allowed) {
+        return;
+      }
+
       await Promise.all([
         loadStudents(),
         loadAttendance(date),
@@ -93,15 +255,40 @@ export default function AttendancePage() {
     }
   }
 
+  // =====================================================
+  // INITIAL LOAD
+  // =====================================================
+
   useEffect(() => {
     loadData();
+
+    // We intentionally run this once on page load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    loadAttendance(date);
-  }, [date]);
+  // =====================================================
+  // DATE CHANGE
+  // =====================================================
 
-  function getAttendance(studentId) {
+  useEffect(() => {
+    // Don't request attendance until access
+    // has been checked.
+    if (checkingAccess) {
+      return;
+    }
+
+    loadAttendance(date);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, checkingAccess]);
+
+  // =====================================================
+  // GET ATTENDANCE FOR STUDENT
+  // =====================================================
+
+  function getAttendance(
+    studentId
+  ) {
     return attendance.find(
       (record) =>
         record.studentId?.toString() ===
@@ -109,26 +296,50 @@ export default function AttendancePage() {
     );
   }
 
-  async function saveAttendance(student, status) {
+  // =====================================================
+  // SAVE ATTENDANCE
+  // =====================================================
+
+  async function saveAttendance(
+    student,
+    status
+  ) {
     setSavingId(student._id);
     setMessage("");
     setError("");
 
     try {
-      const response = await fetch("/api/attendance", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          studentId: student._id,
-          studentName: `${student.firstName} ${student.lastName}`,
-          date,
-          status,
-        }),
-      });
+      const response =
+        await fetch(
+          "/api/attendance",
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              studentId:
+                student._id,
 
-      const data = await response.json();
+              studentName: `${student.firstName} ${student.lastName}`,
+
+              date,
+
+              status,
+            }),
+          }
+        );
+
+      let data = {};
+
+      try {
+        data =
+          await response.json();
+      } catch {
+        data = {};
+      }
 
       if (!response.ok) {
         throw new Error(
@@ -144,58 +355,115 @@ export default function AttendancePage() {
 
       await loadAttendance(date);
     } catch (err) {
-      setError(err.message);
+      console.error(
+        "SAVE ATTENDANCE ERROR:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Failed to save attendance."
+      );
     } finally {
       setSavingId(null);
     }
   }
 
-  const filteredStudents = useMemo(() => {
-    const value = search.toLowerCase().trim();
+  // =====================================================
+  // FILTER STUDENTS
+  // =====================================================
 
-    if (!value) {
-      return students;
-    }
+  const filteredStudents =
+    useMemo(() => {
+      const value =
+        search
+          .toLowerCase()
+          .trim();
 
-    return students.filter((student) => {
-      const name =
-        `${student.firstName || ""} ${
-          student.lastName || ""
-        }`.toLowerCase();
+      if (!value) {
+        return students;
+      }
 
-      return (
-        name.includes(value) ||
-        student.email
-          ?.toLowerCase()
-          .includes(value) ||
-        student.program
-          ?.toLowerCase()
-          .includes(value)
+      return students.filter(
+        (student) => {
+          const name =
+            `${student.firstName || ""} ${
+              student.lastName || ""
+            }`.toLowerCase();
+
+          return (
+            name.includes(value) ||
+            student.email
+              ?.toLowerCase()
+              .includes(value) ||
+            student.program
+              ?.toLowerCase()
+              .includes(value)
+          );
+        }
       );
-    });
-  }, [students, search]);
+    }, [students, search]);
 
-  const stats = useMemo(() => {
-    return {
-      present: attendance.filter(
-        (record) => record.status === "Present"
-      ).length,
+  // =====================================================
+  // STATISTICS
+  // =====================================================
 
-      late: attendance.filter(
-        (record) => record.status === "Late"
-      ).length,
+  const stats =
+    useMemo(() => {
+      return {
+        present:
+          attendance.filter(
+            (record) =>
+              record.status ===
+              "Present"
+          ).length,
 
-      absent: attendance.filter(
-        (record) => record.status === "Absent"
-      ).length,
-    };
-  }, [attendance]);
+        late:
+          attendance.filter(
+            (record) =>
+              record.status ===
+              "Late"
+          ).length,
+
+        absent:
+          attendance.filter(
+            (record) =>
+              record.status ===
+              "Absent"
+          ).length,
+      };
+    }, [attendance]);
+
+  // =====================================================
+  // ACCESS CHECK LOADING
+  // =====================================================
+
+  if (checkingAccess) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+
+          <p className="mt-4 text-sm font-medium text-slate-600">
+            Checking access...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // =====================================================
+  // PAGE
+  // =====================================================
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
       <div className="mx-auto max-w-7xl">
 
-        {/* HEADER */}
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-slate-900">
             Attendance
@@ -206,25 +474,35 @@ export default function AttendancePage() {
           </p>
         </div>
 
-        {/* SUCCESS MESSAGE */}
+        {/* =================================================
+            SUCCESS MESSAGE
+        ================================================= */}
+
         {message && (
           <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-700">
             {message}
           </div>
         )}
 
-        {/* ERROR MESSAGE */}
+        {/* =================================================
+            ERROR MESSAGE
+        ================================================= */}
+
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
             {error}
           </div>
         )}
 
-        {/* CONTROLS */}
+        {/* =================================================
+            CONTROLS
+        ================================================= */}
+
         <div className="mb-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
           <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
 
             {/* DATE */}
+
             <div>
               <label className="mb-2 block font-semibold text-slate-700">
                 Attendance Date
@@ -234,13 +512,16 @@ export default function AttendancePage() {
                 type="date"
                 value={date}
                 onChange={(event) =>
-                  setDate(event.target.value)
+                  setDate(
+                    event.target.value
+                  )
                 }
                 className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
             {/* SEARCH */}
+
             <div>
               <label className="mb-2 block font-semibold text-slate-700">
                 Search Students
@@ -250,7 +531,9 @@ export default function AttendancePage() {
                 type="search"
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value
+                  )
                 }
                 placeholder="Search by name, email or program..."
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-80"
@@ -260,10 +543,14 @@ export default function AttendancePage() {
           </div>
         </div>
 
-        {/* STATISTICS */}
+        {/* =================================================
+            STATISTICS
+        ================================================= */}
+
         <div className="mb-8 grid gap-5 sm:grid-cols-3">
 
           {/* PRESENT */}
+
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-medium text-slate-500">
               Present
@@ -275,6 +562,7 @@ export default function AttendancePage() {
           </div>
 
           {/* LATE */}
+
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-medium text-slate-500">
               Late
@@ -286,6 +574,7 @@ export default function AttendancePage() {
           </div>
 
           {/* ABSENT */}
+
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-medium text-slate-500">
               Absent
@@ -298,7 +587,10 @@ export default function AttendancePage() {
 
         </div>
 
-        {/* STUDENT ATTENDANCE */}
+        {/* =================================================
+            STUDENT ATTENDANCE
+        ================================================= */}
+
         <section className="rounded-2xl bg-white p-7 shadow-sm ring-1 ring-slate-200">
 
           <div className="mb-6">
@@ -315,130 +607,168 @@ export default function AttendancePage() {
             <div className="py-12 text-center text-slate-500">
               Loading students...
             </div>
-          ) : filteredStudents.length === 0 ? (
+          ) : filteredStudents.length ===
+            0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500">
               No students found.
             </div>
           ) : (
             <div className="space-y-4">
 
-              {filteredStudents.map((student) => {
-                const record = getAttendance(student._id);
+              {filteredStudents.map(
+                (student) => {
+                  const record =
+                    getAttendance(
+                      student._id
+                    );
 
-                const currentStatus =
-                  record?.status;
+                  const currentStatus =
+                    record?.status;
 
-                const isSaving =
-                  savingId === student._id;
+                  const isSaving =
+                    savingId ===
+                    student._id;
 
-                return (
-                  <div
-                    key={student._id}
-                    className="rounded-2xl border border-slate-200 p-5 transition hover:shadow-sm"
-                  >
+                  return (
+                    <div
+                      key={
+                        student._id
+                      }
+                      className="rounded-2xl border border-slate-200 p-5 transition hover:shadow-sm"
+                    >
 
-                    <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
 
-                      {/* STUDENT INFORMATION */}
-                      <div className="flex items-center gap-4">
+                        {/* STUDENT INFORMATION */}
 
-                        {student.profileImage ? (
-                          <img
-                            src={student.profileImage}
-                            alt={`${student.firstName} ${student.lastName}`}
-                            className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-100"
-                          />
-                        ) : (
-                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
-                            {student.firstName?.[0]}
-                            {student.lastName?.[0]}
+                        <div className="flex items-center gap-4">
+
+                          {student.profileImage ? (
+                            <img
+                              src={
+                                student.profileImage
+                              }
+                              alt={`${student.firstName} ${student.lastName}`}
+                              className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-100"
+                            />
+                          ) : (
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
+                              {
+                                student
+                                  .firstName?.[0]
+                              }
+                              {
+                                student
+                                  .lastName?.[0]
+                              }
+                            </div>
+                          )}
+
+                          <div>
+                            <h3 className="font-bold text-slate-900">
+                              {
+                                student.firstName
+                              }{" "}
+                              {
+                                student.lastName
+                              }
+                            </h3>
+
+                            <p className="text-sm text-slate-500">
+                              {student.program ||
+                                "Program not specified"}
+                            </p>
+
+                            <p className="text-sm text-slate-500">
+                              {
+                                student.email
+                              }
+                            </p>
                           </div>
-                        )}
 
-                        <div>
-                          <h3 className="font-bold text-slate-900">
-                            {student.firstName}{" "}
-                            {student.lastName}
-                          </h3>
+                        </div>
 
-                          <p className="text-sm text-slate-500">
-                            {student.program ||
-                              "Program not specified"}
-                          </p>
+                        {/* ATTENDANCE BUTTONS */}
 
-                          <p className="text-sm text-slate-500">
-                            {student.email}
-                          </p>
+                        <div className="flex flex-wrap gap-2">
+
+                          {/* PRESENT */}
+
+                          <button
+                            type="button"
+                            disabled={
+                              isSaving
+                            }
+                            onClick={() =>
+                              saveAttendance(
+                                student,
+                                "Present"
+                              )
+                            }
+                            className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                              currentStatus ===
+                              "Present"
+                                ? "bg-green-600 text-white"
+                                : "border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                            } disabled:opacity-50`}
+                          >
+                            Present
+                          </button>
+
+                          {/* LATE */}
+
+                          <button
+                            type="button"
+                            disabled={
+                              isSaving
+                            }
+                            onClick={() =>
+                              saveAttendance(
+                                student,
+                                "Late"
+                              )
+                            }
+                            className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                              currentStatus ===
+                              "Late"
+                                ? "bg-yellow-500 text-white"
+                                : "border border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
+                            } disabled:opacity-50`}
+                          >
+                            Late
+                          </button>
+
+                          {/* ABSENT */}
+
+                          <button
+                            type="button"
+                            disabled={
+                              isSaving
+                            }
+                            onClick={() =>
+                              saveAttendance(
+                                student,
+                                "Absent"
+                              )
+                            }
+                            className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                              currentStatus ===
+                              "Absent"
+                                ? "bg-red-600 text-white"
+                                : "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                            } disabled:opacity-50`}
+                          >
+                            Absent
+                          </button>
+
                         </div>
 
                       </div>
 
-                      {/* ATTENDANCE BUTTONS */}
-                      <div className="flex flex-wrap gap-2">
-
-                        {/* PRESENT */}
-                        <button
-                          type="button"
-                          disabled={isSaving}
-                          onClick={() =>
-                            saveAttendance(
-                              student,
-                              "Present"
-                            )
-                          }
-                          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-                            currentStatus === "Present"
-                              ? "bg-green-600 text-white"
-                              : "border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
-                          } disabled:opacity-50`}
-                        >
-                          Present
-                        </button>
-
-                        {/* LATE */}
-                        <button
-                          type="button"
-                          disabled={isSaving}
-                          onClick={() =>
-                            saveAttendance(
-                              student,
-                              "Late"
-                            )
-                          }
-                          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-                            currentStatus === "Late"
-                              ? "bg-yellow-500 text-white"
-                              : "border border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
-                          } disabled:opacity-50`}
-                        >
-                          Late
-                        </button>
-
-                        {/* ABSENT */}
-                        <button
-                          type="button"
-                          disabled={isSaving}
-                          onClick={() =>
-                            saveAttendance(
-                              student,
-                              "Absent"
-                            )
-                          }
-                          className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-                            currentStatus === "Absent"
-                              ? "bg-red-600 text-white"
-                              : "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                          } disabled:opacity-50`}
-                        >
-                          Absent
-                        </button>
-
-                      </div>
-
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                }
+              )}
 
             </div>
           )}
