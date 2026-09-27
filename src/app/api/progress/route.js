@@ -1,424 +1,740 @@
+import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
-import clientPromise from "@/lib/mongodb";
 import { cookies } from "next/headers";
+
+import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
-function addMonths(date, months) {
-  const result = new Date(date);
-  result.setMonth(result.getMonth() + months);
-  return result;
+// =====================================================
+// DATABASE
+// =====================================================
+
+async function getDatabase() {
+  const client =
+    await clientPromise;
+
+  return client.db(
+    process.env.DB_NAME ||
+      "DCCPlatform"
+  );
 }
 
-function clamp(value, min = 0, max = 100) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function getStudentIdValues(student) {
-  const values = [student._id.toString()];
-
-  if (student._id instanceof ObjectId) {
-    values.push(student._id);
-  }
-
-  return values;
-}
+// =====================================================
+// SESSION
+// =====================================================
 
 async function getSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("dcc_session")?.value;
+  const cookieStore =
+    await cookies();
+
+  const token =
+    cookieStore.get(
+      "dcc_session"
+    )?.value;
 
   if (!token) {
     return null;
   }
 
-  return await verifySession(token);
+  return await verifySession(
+    token
+  );
 }
 
-async function calculateStudentProgress(db, student) {
-  const enrollmentDate = student.enrollmentDate
-    ? new Date(student.enrollmentDate)
-    : new Date(student.createdAt || new Date());
+// =====================================================
+// GET CURRENT USER
+// =====================================================
 
-  const expectedCompletionDate = student.expectedCompletionDate
-    ? new Date(student.expectedCompletionDate)
-    : addMonths(enrollmentDate, 24);
-
-  const now = new Date();
-
-  const periodEnd =
-    now < expectedCompletionDate
-      ? now
-      : expectedCompletionDate;
-
-  /*
-   * ---------------------------------------------------------
-   * 1. PROGRAM TIMELINE — 20%
-   * ---------------------------------------------------------
-   */
-
-  const totalProgramTime =
-    expectedCompletionDate.getTime() -
-    enrollmentDate.getTime();
-
-  const elapsedProgramTime =
-    periodEnd.getTime() -
-    enrollmentDate.getTime();
-
-  let timelineProgress = 0;
-
-  if (totalProgramTime > 0) {
-    timelineProgress =
-      (elapsedProgramTime / totalProgramTime) * 100;
+async function getCurrentUser(
+  db,
+  session
+) {
+  if (!session?.userId) {
+    return null;
   }
 
-  timelineProgress = Math.round(
-    clamp(timelineProgress)
-  );
+  let user = null;
 
-  /*
-   * ---------------------------------------------------------
-   * 2. PROJECT PROGRESS — 50%
-   * ---------------------------------------------------------
-   */
-
-  const studentIdValues =
-    getStudentIdValues(student);
-
-  const projects = await db
-    .collection("projects")
-    .find({
-      studentId: {
-        $in: studentIdValues,
-      },
-    })
-    .toArray();
-
-  let projectProgress = 0;
-
-  if (projects.length > 0) {
-    const totalProjectProgress =
-      projects.reduce(
-        (total, project) =>
-          total + (Number(project.progress) || 0),
-        0
-      );
-
-    projectProgress =
-      totalProjectProgress / projects.length;
+  // Try MongoDB ObjectId.
+  if (
+    ObjectId.isValid(
+      session.userId
+    )
+  ) {
+    user =
+      await db
+        .collection("users")
+        .findOne({
+          _id: new ObjectId(
+            session.userId
+          ),
+        });
   }
 
-  projectProgress = Math.round(
-    clamp(projectProgress)
-  );
+  // Fallback for older string IDs.
+  if (!user) {
+    user =
+      await db
+        .collection("users")
+        .findOne({
+          _id: session.userId,
+        });
+  }
 
-  /*
-   * ---------------------------------------------------------
-   * 3. ATTENDANCE — 30%
-   * ---------------------------------------------------------
-   */
+  return user;
+}
 
-  const enrollmentDateString =
-    enrollmentDate.toISOString().split("T")[0];
+// =====================================================
+// RESOLVE STUDENT
+// =====================================================
+// This is the important part.
+//
+// Student login account:
+// users._id
+//
+// Student profile:
+// students._id
+//
+// Link:
+// users.studentId -> students._id
+// =====================================================
 
-  const periodEndString =
-    periodEnd.toISOString().split("T")[0];
+async function resolveStudent(
+  db,
+  session
+) {
+  if (
+    !session ||
+    session.role !==
+      "student"
+  ) {
+    return null;
+  }
 
-  const attendanceRecords = await db
-    .collection("attendance")
-    .find({
-      studentId: {
-        $in: studentIdValues,
-      },
-      date: {
-        $gte: enrollmentDateString,
-        $lte: periodEndString,
-      },
-    })
-    .toArray();
+  // ---------------------------------------------
+  // Get logged-in user
+  // ---------------------------------------------
 
-  let attendanceProgress = 0;
+  const user =
+    await getCurrentUser(
+      db,
+      session
+    );
 
-  if (attendanceRecords.length > 0) {
-    let attendancePoints = 0;
+  if (!user) {
+    return null;
+  }
 
-    attendanceRecords.forEach((record) => {
-      if (record.status === "Present") {
-        attendancePoints += 100;
-      } else if (record.status === "Late") {
-        attendancePoints += 50;
-      } else if (record.status === "Absent") {
-        attendancePoints += 0;
-      }
+  // ---------------------------------------------
+  // Get studentId
+  //
+  // Prefer the database user record.
+  // ---------------------------------------------
+
+  let studentId =
+    user.studentId ||
+    session.studentId ||
+    null;
+
+  if (!studentId) {
+    return null;
+  }
+
+  studentId =
+    studentId.toString();
+
+  // ---------------------------------------------
+  // Make possible ID formats.
+  // ---------------------------------------------
+
+  const studentQueries = [];
+
+  if (
+    ObjectId.isValid(
+      studentId
+    )
+  ) {
+    studentQueries.push({
+      _id: new ObjectId(
+        studentId
+      ),
     });
-
-    attendanceProgress =
-      attendancePoints /
-      attendanceRecords.length;
   }
 
-  attendanceProgress = Math.round(
-    clamp(attendanceProgress)
+  studentQueries.push({
+    _id: studentId,
+  });
+
+  // ---------------------------------------------
+  // Find student profile
+  // ---------------------------------------------
+
+  let student = null;
+
+  for (
+    const query of studentQueries
+  ) {
+    student =
+      await db
+        .collection("students")
+        .findOne(query);
+
+    if (student) {
+      break;
+    }
+  }
+
+  // ---------------------------------------------
+  // Fallback: match by email.
+  //
+  // This helps older student accounts where
+  // users.studentId was not saved correctly.
+  // ---------------------------------------------
+
+  if (!student && user.email) {
+    student =
+      await db
+        .collection("students")
+        .findOne({
+          email:
+            user.email
+              .trim()
+              .toLowerCase(),
+        });
+  }
+
+  return student;
+}
+
+// =====================================================
+// CALCULATE TIMELINE PROGRESS
+// =====================================================
+
+function calculateTimelineProgress(
+  student
+) {
+  if (
+    !student?.enrollmentDate
+  ) {
+    return 0;
+  }
+
+  const start =
+    new Date(
+      student.enrollmentDate
+    );
+
+  if (
+    Number.isNaN(
+      start.getTime()
+    )
+  ) {
+    return 0;
+  }
+
+  let end;
+
+  if (
+    student.expectedCompletionDate
+  ) {
+    end =
+      new Date(
+        student.expectedCompletionDate
+      );
+  } else {
+    end =
+      new Date(start);
+
+    end.setMonth(
+      end.getMonth() + 24
+    );
+  }
+
+  if (
+    Number.isNaN(
+      end.getTime()
+    )
+  ) {
+    return 0;
+  }
+
+  const now =
+    new Date();
+
+  if (now <= start) {
+    return 0;
+  }
+
+  if (now >= end) {
+    return 100;
+  }
+
+  const total =
+    end.getTime() -
+    start.getTime();
+
+  const elapsed =
+    now.getTime() -
+    start.getTime();
+
+  return Math.min(
+    Math.max(
+      Math.round(
+        (elapsed /
+          total) *
+          100
+      ),
+      0
+    ),
+    100
   );
+}
 
-  /*
-   * ---------------------------------------------------------
-   * 4. OVERALL PROGRESS
-   * ---------------------------------------------------------
-   */
+// =====================================================
+// CALCULATE ATTENDANCE PROGRESS
+// =====================================================
 
-  const overallProgress = Math.round(
-    timelineProgress * 0.2 +
-      attendanceProgress * 0.3 +
-      projectProgress * 0.5
+function calculateAttendanceProgress(
+  attendance
+) {
+  if (
+    !Array.isArray(
+      attendance
+    ) ||
+    attendance.length === 0
+  ) {
+    return 0;
+  }
+
+  let totalScore = 0;
+
+  for (
+    const record of attendance
+  ) {
+    if (
+      record.status ===
+      "Present"
+    ) {
+      totalScore += 100;
+    } else if (
+      record.status ===
+      "Late"
+    ) {
+      totalScore += 50;
+    } else if (
+      record.status ===
+      "Absent"
+    ) {
+      totalScore += 0;
+    }
+  }
+
+  return Math.round(
+    totalScore /
+      attendance.length
   );
+}
 
-  /*
-   * ---------------------------------------------------------
-   * 5. PROGRAM YEAR
-   * ---------------------------------------------------------
-   */
+// =====================================================
+// CALCULATE PROJECT PROGRESS
+// =====================================================
 
-  const monthsElapsed = Math.max(
-    0,
-    (periodEnd.getFullYear() -
-      enrollmentDate.getFullYear()) *
-      12 +
-      (periodEnd.getMonth() -
-        enrollmentDate.getMonth())
+function calculateProjectProgress(
+  projects
+) {
+  if (
+    !Array.isArray(
+      projects
+    ) ||
+    projects.length === 0
+  ) {
+    return 0;
+  }
+
+  const total =
+    projects.reduce(
+      (sum, project) =>
+        sum +
+        Number(
+          project.progress || 0
+        ),
+      0
+    );
+
+  return Math.round(
+    total /
+      projects.length
   );
+}
 
-  const programYear =
-    monthsElapsed < 12 ? 1 : 2;
+// =====================================================
+// CALCULATE OVERALL PROGRESS
+// =====================================================
+//
+// Timeline = 20%
+// Attendance = 30%
+// Projects = 50%
+//
+// =====================================================
 
-  const monthsCompleted = Math.min(
-    monthsElapsed,
-    24
+function calculateOverallProgress(
+  timelineProgress,
+  attendanceProgress,
+  projectProgress
+) {
+  return Math.round(
+    timelineProgress *
+      0.2 +
+      attendanceProgress *
+        0.3 +
+      projectProgress *
+        0.5
   );
+}
 
-  const monthsRemaining = Math.max(
-    0,
-    24 - monthsCompleted
-  );
+// =====================================================
+// FORMAT STUDENT
+// =====================================================
+
+function formatStudent(
+  student,
+  attendance,
+  projects
+) {
+  const timelineProgress =
+    calculateTimelineProgress(
+      student
+    );
+
+  const attendanceProgress =
+    calculateAttendanceProgress(
+      attendance
+    );
+
+  const projectProgress =
+    calculateProjectProgress(
+      projects
+    );
+
+  const overallProgress =
+    calculateOverallProgress(
+      timelineProgress,
+      attendanceProgress,
+      projectProgress
+    );
 
   return {
-    ...student,
+    _id:
+      student._id?.toString(),
 
-    _id: student._id.toString(),
+    firstName:
+      student.firstName ||
+      "",
 
-    progress: overallProgress,
+    lastName:
+      student.lastName ||
+      "",
 
-    progressDetails: {
-      overallProgress,
-      projectProgress,
-      attendanceProgress,
-      timelineProgress,
+    name:
+      `${student.firstName || ""} ${
+        student.lastName || ""
+      }`.trim(),
 
-      projectCount: projects.length,
-      attendanceRecords:
-        attendanceRecords.length,
+    email:
+      student.email ||
+      "",
 
-      programDurationMonths: 24,
-      monthsCompleted,
-      monthsRemaining,
-      programYear,
+    phone:
+      student.phone ||
+      "",
 
-      enrollmentDate,
-      expectedCompletionDate,
-    },
+    program:
+      student.program ||
+      "",
+
+    status:
+      student.status ||
+      "",
+
+    profileImage:
+      student.profileImage ||
+      "",
+
+    enrollmentDate:
+      student.enrollmentDate ||
+      null,
+
+    expectedCompletionDate:
+      student.expectedCompletionDate ||
+      null,
+
+    timelineProgress,
+
+    attendanceProgress,
+
+    projectProgress,
+
+    overallProgress,
+
+    attendanceCount:
+      attendance.length,
+
+    projectCount:
+      projects.length,
+
+    attendance,
+
+    projects,
   };
 }
 
+// =====================================================
+// GET PROGRESS
+// =====================================================
+
 export async function GET() {
   try {
-    /*
-     * ---------------------------------------------------------
-     * AUTHENTICATION
-     * ---------------------------------------------------------
-     */
+    // ---------------------------------------------
+    // SESSION
+    // ---------------------------------------------
 
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
-      return Response.json(
+      return NextResponse.json(
         {
-          message: "Authentication required",
+          message:
+            "Authentication required. Please log in again.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    const client = await clientPromise;
+    // ---------------------------------------------
+    // DATABASE
+    // ---------------------------------------------
 
-    const db = client.db(
-      process.env.DB_NAME || "DCCPlatform"
-    );
+    const db =
+      await getDatabase();
 
-    /*
-     * ---------------------------------------------------------
-     * FACILITATOR
-     * ---------------------------------------------------------
-     *
-     * Facilitators can see all student progress.
-     */
-
-    if (session.role === "facilitator") {
-      const students = await db
-        .collection("students")
-        .find({})
-        .sort({ createdAt: -1 })
-        .toArray();
-
-      const calculatedStudents =
-        await Promise.all(
-          students.map((student) =>
-            calculateStudentProgress(
-              db,
-              student
-            )
-          )
-        );
-
-      calculatedStudents.sort(
-        (a, b) =>
-          b.progress - a.progress
-      );
-
-      const totalStudents =
-        calculatedStudents.length;
-
-      const averageProgress =
-        totalStudents > 0
-          ? Math.round(
-              calculatedStudents.reduce(
-                (total, student) =>
-                  total + student.progress,
-                0
-              ) / totalStudents
-            )
-          : 0;
-
-      const completed =
-        calculatedStudents.filter(
-          (student) =>
-            student.progress >= 100
-        ).length;
-
-      const onTrack =
-        calculatedStudents.filter(
-          (student) =>
-            student.progress >= 70 &&
-            student.progress < 100
-        ).length;
-
-      const needsAttention =
-        calculatedStudents.filter(
-          (student) =>
-            student.progress < 70
-        ).length;
-
-      return Response.json({
-        totalStudents,
-        averageProgress,
-        completed,
-        onTrack,
-        needsAttention,
-        students: calculatedStudents,
-      });
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * STUDENT
-     * ---------------------------------------------------------
-     *
-     * Students can see ONLY their own progress.
-     */
+    // =================================================
+    // STUDENT
+    // =================================================
 
     if (
-      session.role === "student" &&
-      session.studentId
+      session.role ===
+      "student"
     ) {
-      if (
-        !ObjectId.isValid(
-          session.studentId.toString()
-        )
-      ) {
-        return Response.json(
+      const student =
+        await resolveStudent(
+          db,
+          session
+        );
+
+      if (!student) {
+        console.error(
+          "PROGRESS STUDENT RESOLUTION FAILED:",
+          {
+            userId:
+              session.userId,
+            sessionStudentId:
+              session.studentId,
+            email:
+              session.email,
+          }
+        );
+
+        return NextResponse.json(
           {
             message:
               "Invalid student account.",
           },
-          { status: 400 }
-        );
-      }
-
-      const student =
-        await db
-          .collection("students")
-          .findOne({
-            _id: new ObjectId(
-              session.studentId
-            ),
-          });
-
-      if (!student) {
-        return Response.json(
           {
-            message:
-              "Student record not found.",
-          },
-          { status: 404 }
+            status: 404,
+          }
         );
       }
 
-      const calculatedStudent =
-        await calculateStudentProgress(
-          db,
-          student
+      const studentId =
+        student._id;
+
+      // ---------------------------------------------
+      // Attendance
+      // ---------------------------------------------
+
+      const attendance =
+        await db
+          .collection(
+            "attendance"
+          )
+          .find({
+            studentId: {
+              $in: [
+                studentId,
+                studentId.toString(),
+              ],
+            },
+          })
+          .sort({
+            date: -1,
+          })
+          .toArray();
+
+      // ---------------------------------------------
+      // Projects
+      // ---------------------------------------------
+
+      const projects =
+        await db
+          .collection(
+            "projects"
+          )
+          .find({
+            studentId: {
+              $in: [
+                studentId,
+                studentId.toString(),
+              ],
+            },
+          })
+          .sort({
+            createdAt: -1,
+          })
+          .toArray();
+
+      const formatted =
+        formatStudent(
+          student,
+          attendance,
+          projects
         );
 
-      return Response.json({
-        totalStudents: 1,
-        averageProgress:
-          calculatedStudent.progress,
-        completed:
-          calculatedStudent.progress >= 100
-            ? 1
-            : 0,
-        onTrack:
-          calculatedStudent.progress >= 70 &&
-          calculatedStudent.progress < 100
-            ? 1
-            : 0,
-        needsAttention:
-          calculatedStudent.progress < 70
-            ? 1
-            : 0,
+      return NextResponse.json({
         students: [
-          calculatedStudent,
+          formatted,
         ],
+
+        student:
+          formatted,
+
+        totalStudents: 1,
       });
     }
 
-    return Response.json(
+    // =================================================
+    // FACILITATOR
+    // =================================================
+
+    if (
+      session.role ===
+      "facilitator"
+    ) {
+      const students =
+        await db
+          .collection(
+            "students"
+          )
+          .find({})
+          .sort({
+            createdAt: -1,
+          })
+          .toArray();
+
+      const formattedStudents =
+        [];
+
+      for (
+        const student of students
+      ) {
+        const studentId =
+          student._id;
+
+        const attendance =
+          await db
+            .collection(
+              "attendance"
+            )
+            .find({
+              studentId: {
+                $in: [
+                  studentId,
+                  studentId.toString(),
+                ],
+              },
+            })
+            .sort({
+              date: -1,
+            })
+            .toArray();
+
+        const projects =
+          await db
+            .collection(
+              "projects"
+            )
+            .find({
+              studentId: {
+                $in: [
+                  studentId,
+                  studentId.toString(),
+                ],
+              },
+            })
+            .sort({
+              createdAt: -1,
+            })
+            .toArray();
+
+        formattedStudents.push(
+          formatStudent(
+            student,
+            attendance,
+            projects
+          )
+        );
+      }
+
+      return NextResponse.json({
+        students:
+          formattedStudents,
+
+        totalStudents:
+          formattedStudents.length,
+      });
+    }
+
+    // =================================================
+    // UNKNOWN ROLE
+    // =================================================
+
+    return NextResponse.json(
       {
         message:
-          "You are not authorized to view progress.",
+          "Your account role is not recognized.",
       },
-      { status: 403 }
+      {
+        status: 403,
+      }
     );
   } catch (error) {
     console.error(
-      "Progress API Error:",
+      "PROGRESS GET ERROR:",
       error
     );
 
-    return Response.json(
+    return NextResponse.json(
       {
         message:
-          "Failed to calculate student progress",
+          "Failed to load student progress.",
+        error:
+          error.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
