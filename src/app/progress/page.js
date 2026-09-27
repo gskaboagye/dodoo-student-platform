@@ -11,6 +11,7 @@ import {
   FolderKanban,
   ClipboardCheck,
   UserRound,
+  ArrowLeft,
 } from "lucide-react";
 
 // =====================================================
@@ -92,7 +93,7 @@ export default function ProgressPage() {
       setError("");
 
       // -----------------------------------------------
-      // Get logged-in user
+      // GET LOGGED-IN USER
       // -----------------------------------------------
 
       const userResponse = await fetch("/api/auth/me", {
@@ -109,7 +110,7 @@ export default function ProgressPage() {
       setUser(userData.user);
 
       // -----------------------------------------------
-      // Get progress
+      // GET PROGRESS
       // -----------------------------------------------
 
       const response = await fetch("/api/progress", {
@@ -163,6 +164,7 @@ export default function ProgressPage() {
     return (
       <div className="p-6 md:p-8">
         <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+
           <p className="font-medium text-red-700">
             {error}
           </p>
@@ -174,6 +176,7 @@ export default function ProgressPage() {
           >
             Try Again
           </button>
+
         </div>
       </div>
     );
@@ -188,30 +191,34 @@ export default function ProgressPage() {
   }
 
   // ===================================================
-  // ROLE-BASED ACCESS
+  // ROLE
   // ===================================================
 
   const role = String(user.role || "")
     .trim()
     .toLowerCase();
 
-  const isFacilitator = role === "facilitator";
-  const isStudent = role === "student";
+  const isFacilitator =
+    role === "facilitator";
+
+  const isStudent =
+    role === "student";
 
   // ===================================================
-  // IMPORTANT
+  // ROLE-BASED DATA
   // ===================================================
-  //
-  // STUDENT:
-  // Only use data.student.
-  //
-  // FACILITATOR:
-  // Use the complete data.students array.
-  //
-  // The API MUST ALSO enforce this rule server-side.
-  // The frontend should never be the only security layer.
-  //
-  // ===================================================
+
+  /*
+    STUDENT:
+    Only data.student is used.
+
+    FACILITATOR:
+    data.students contains all students.
+
+    IMPORTANT:
+    The API should ALSO enforce this access rule.
+    Frontend filtering alone is not sufficient security.
+  */
 
   const allStudents = Array.isArray(data?.students)
     ? data.students
@@ -235,6 +242,7 @@ export default function ProgressPage() {
           {/* HEADER */}
 
           <div className="mb-8">
+
             <div className="flex items-center gap-3">
 
               <div className="rounded-xl bg-blue-100 p-3">
@@ -245,6 +253,7 @@ export default function ProgressPage() {
               </div>
 
               <div>
+
                 <p className="text-sm font-medium text-blue-600">
                   Facilitator
                 </p>
@@ -254,12 +263,14 @@ export default function ProgressPage() {
                 </h1>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  View and monitor the progress of all
-                  students in the program.
+                  View the progress of all students.
+                  Select a student to see their full progress details.
                 </p>
+
               </div>
 
             </div>
+
           </div>
 
           {/* STATISTICS */}
@@ -268,8 +279,14 @@ export default function ProgressPage() {
 
             <StatCard
               title="Total Students"
-              value={data?.totalStudents || 0}
-              icon={<Users size={20} />}
+              value={
+                data?.totalStudents ||
+                allStudents.length ||
+                0
+              }
+              icon={
+                <Users size={20} />
+              }
             />
 
             <StatCard
@@ -277,33 +294,40 @@ export default function ProgressPage() {
               value={`${safePercentage(
                 data?.averageProgress
               )}%`}
-              icon={<TrendingUp size={20} />}
+              icon={
+                <TrendingUp size={20} />
+              }
             />
 
             <StatCard
               title="Completed"
-              value={data?.completed || 0}
-              icon={<CheckCircle size={20} />}
+              value={
+                data?.completed || 0
+              }
+              icon={
+                <CheckCircle size={20} />
+              }
             />
 
             <StatCard
               title="Needs Attention"
-              value={data?.needsAttention || 0}
-              icon={<AlertCircle size={20} />}
+              value={
+                data?.needsAttention || 0
+              }
+              icon={
+                <AlertCircle size={20} />
+              }
             />
 
           </div>
 
-          {/* CALCULATION METHOD */}
-
-          <ProgressMethod />
-
-          {/* ALL STUDENTS */}
+          {/* STUDENT LIST */}
 
           <ProgressList
             students={students}
-            title="All Student Progress"
-            description="View the progress of every student in the program."
+            title="Students"
+            description="Select a student to view their complete progress."
+            facilitator
           />
 
         </div>
@@ -319,15 +343,17 @@ export default function ProgressPage() {
     const student = students[0];
 
     // -------------------------------------------------
-    // No student record
+    // NO STUDENT RECORD
     // -------------------------------------------------
 
     if (!student) {
       return (
         <div className="p-6 md:p-8">
+
           <div className="mx-auto max-w-4xl">
 
             <div className="mb-8">
+
               <div className="flex items-center gap-3">
 
                 <div className="rounded-xl bg-blue-100 p-3">
@@ -338,6 +364,7 @@ export default function ProgressPage() {
                 </div>
 
                 <div>
+
                   <p className="text-sm font-medium text-blue-600">
                     Student
                   </p>
@@ -345,9 +372,11 @@ export default function ProgressPage() {
                   <h1 className="text-2xl font-bold text-slate-900">
                     My Progress
                   </h1>
+
                 </div>
 
               </div>
+
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
@@ -369,6 +398,7 @@ export default function ProgressPage() {
             </div>
 
           </div>
+
         </div>
       );
     }
@@ -379,11 +409,13 @@ export default function ProgressPage() {
 
     return (
       <div className="p-6 md:p-8">
+
         <div className="mx-auto max-w-5xl">
 
           {/* HEADER */}
 
           <div className="mb-8">
+
             <div className="flex items-center gap-3">
 
               <div className="rounded-xl bg-blue-100 p-3">
@@ -394,6 +426,7 @@ export default function ProgressPage() {
               </div>
 
               <div>
+
                 <p className="text-sm font-medium text-blue-600">
                   Student Dashboard
                 </p>
@@ -403,101 +436,35 @@ export default function ProgressPage() {
                 </h1>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  View your personal progress, attendance,
-                  projects, and program timeline.
-                </p>
-              </div>
-
-            </div>
-          </div>
-
-          {/* OVERALL PROGRESS */}
-
-          <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-
-              <div className="flex items-center gap-4">
-
-                {student.profileImage ? (
-                  <img
-                    src={student.profileImage}
-                    alt={`${student.firstName || ""} ${student.lastName || ""}`}
-                    className="h-14 w-14 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
-                    {student.firstName?.charAt(0)}
-                    {student.lastName?.charAt(0)}
-                  </div>
-                )}
-
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900">
-                    {student.firstName}{" "}
-                    {student.lastName}
-                  </h2>
-
-                  <p className="text-sm text-slate-500">
-                    {student.program ||
-                      "Program not specified"}
-                  </p>
-                </div>
-
-              </div>
-
-              <div className="text-left sm:text-right">
-
-                <p className="text-4xl font-bold text-blue-700">
-                  {safePercentage(
-                    student.progress ??
-                      student.overallProgress
-                  )}
-                  %
-                </p>
-
-                <p className="text-xs text-slate-500">
-                  Overall Progress
+                  View your personal progress and development.
                 </p>
 
               </div>
 
-            </div>
-
-            <div className="mt-6">
-              <ProgressBar
-                value={
-                  student.progress ??
-                  student.overallProgress
-                }
-              />
             </div>
 
           </div>
-
-          {/* CALCULATION METHOD */}
-
-          <ProgressMethod />
 
           {/* PERSONAL PROGRESS */}
 
-          <ProgressList
-            students={[student]}
-            title="My Progress Details"
-            description="Only your own progress information is displayed here."
+          <StudentProgressCard
+            student={student}
+            detailed
           />
 
         </div>
+
       </div>
     );
   }
 
   // ===================================================
-  // UNKNOWN / UNSUPPORTED ROLE
+  // UNKNOWN ROLE
   // ===================================================
 
   return (
     <div className="p-6 md:p-8">
+
       <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
 
         <h1 className="text-lg font-semibold text-slate-900">
@@ -509,6 +476,7 @@ export default function ProgressPage() {
         </p>
 
       </div>
+
     </div>
   );
 }
@@ -546,113 +514,6 @@ function StatCard({
 }
 
 // =====================================================
-// PROGRESS METHOD
-// =====================================================
-
-function ProgressMethod() {
-  return (
-    <div className="mb-8 rounded-xl border border-blue-100 bg-blue-50 p-5">
-
-      <h2 className="mb-4 font-semibold text-slate-900">
-        How Progress Is Calculated
-      </h2>
-
-      <div className="grid gap-4 md:grid-cols-3">
-
-        {/* PROJECTS */}
-
-        <div className="rounded-lg bg-white p-4">
-
-          <div className="mb-2 flex items-center gap-2">
-
-            <FolderKanban
-              size={18}
-              className="text-blue-600"
-            />
-
-            <span className="font-semibold">
-              Projects - 50%
-            </span>
-
-          </div>
-
-          <p className="text-sm text-slate-500">
-            Based on the average progress of
-            the student's projects.
-          </p>
-
-        </div>
-
-        {/* ATTENDANCE */}
-
-        <div className="rounded-lg bg-white p-4">
-
-          <div className="mb-2 flex items-center gap-2">
-
-            <ClipboardCheck
-              size={18}
-              className="text-blue-600"
-            />
-
-            <span className="font-semibold">
-              Attendance - 30%
-            </span>
-
-          </div>
-
-          <p className="text-sm text-slate-500">
-            Present = 100%, Late = 50%,
-            Absent = 0%.
-          </p>
-
-        </div>
-
-        {/* TIMELINE */}
-
-        <div className="rounded-lg bg-white p-4">
-
-          <div className="mb-2 flex items-center gap-2">
-
-            <CalendarDays
-              size={18}
-              className="text-blue-600"
-            />
-
-            <span className="font-semibold">
-              Program Timeline - 20%
-            </span>
-
-          </div>
-
-          <p className="text-sm text-slate-500">
-            Measures the student's position
-            within the 24-month program.
-          </p>
-
-        </div>
-
-      </div>
-
-      {/* FORMULA */}
-
-      <div className="mt-5 rounded-lg border border-blue-100 bg-white p-4">
-
-        <p className="text-sm font-semibold text-slate-700">
-          Overall Progress Formula
-        </p>
-
-        <p className="mt-2 text-sm text-slate-600">
-          (Projects × 50%) + (Attendance × 30%)
-          + (Program Timeline × 20%)
-        </p>
-
-      </div>
-
-    </div>
-  );
-}
-
-// =====================================================
 // PROGRESS LIST
 // =====================================================
 
@@ -660,7 +521,50 @@ function ProgressList({
   students,
   title,
   description,
+  facilitator = false,
 }) {
+  const [selectedStudent, setSelectedStudent] =
+    useState(null);
+
+  // ===================================================
+  // SELECTED STUDENT
+  // ===================================================
+
+  if (selectedStudent) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+
+        {/* BACK HEADER */}
+
+        <div className="border-b border-slate-200 p-5">
+
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedStudent(null)
+            }
+            className="flex items-center gap-2 text-sm font-medium text-blue-600 transition hover:text-blue-800"
+          >
+
+            <ArrowLeft size={17} />
+
+            Back to Students
+
+          </button>
+
+        </div>
+
+        {/* FULL DETAILS */}
+
+        <StudentProgressCard
+          student={selectedStudent}
+          detailed
+        />
+
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
 
@@ -698,10 +602,17 @@ function ProgressList({
         <div className="divide-y divide-slate-100">
 
           {students.map((student) => (
+
             <StudentProgressCard
               key={String(student._id)}
               student={student}
+              detailed={false}
+              facilitator={facilitator}
+              onView={() =>
+                setSelectedStudent(student)
+              }
             />
+
           ))}
 
         </div>
@@ -718,9 +629,16 @@ function ProgressList({
 
 function StudentProgressCard({
   student,
+  detailed = false,
+  onView,
+  facilitator = false,
 }) {
   const details =
     student.progressDetails || {};
+
+  // ===================================================
+  // PROGRESS VALUES
+  // ===================================================
 
   const projectProgress =
     student.projectProgress ??
@@ -743,6 +661,10 @@ function StudentProgressCard({
     details.overallProgress ??
     0;
 
+  // ===================================================
+  // COUNTS
+  // ===================================================
+
   const projectCount =
     student.projectCount ??
     details.projectCount ??
@@ -758,6 +680,10 @@ function StudentProgressCard({
   const completedProjects =
     student.completedProjects ??
     0;
+
+  // ===================================================
+  // TIMELINE
+  // ===================================================
 
   const enrollmentDate =
     student.enrollmentDate ??
@@ -788,12 +714,104 @@ function StudentProgressCard({
       enrollmentDate
     );
 
+  // ===================================================
+  // SIMPLE LIST VIEW
+  // ===================================================
+
+  if (!detailed) {
+    return (
+      <div className="p-5">
+
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
+          {/* STUDENT */}
+
+          <div className="flex items-center gap-4">
+
+            {student.profileImage ? (
+              <img
+                src={student.profileImage}
+                alt={`${student.firstName || ""} ${student.lastName || ""}`}
+                className="h-12 w-12 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
+                {student.firstName?.charAt(0)}
+                {student.lastName?.charAt(0)}
+              </div>
+            )}
+
+            <div>
+
+              <h3 className="font-semibold text-slate-900">
+                {student.firstName}{" "}
+                {student.lastName}
+              </h3>
+
+              <p className="text-sm text-slate-500">
+                {student.program ||
+                  "Program not specified"}
+              </p>
+
+            </div>
+
+          </div>
+
+          {/* PROGRESS + BUTTON */}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+
+            <div className="w-full sm:w-44">
+
+              <div className="mb-1 flex justify-between text-xs">
+
+                <span className="text-slate-500">
+                  Progress
+                </span>
+
+                <span className="font-semibold text-blue-700">
+                  {safePercentage(
+                    overallProgress
+                  )}
+                  %
+                </span>
+
+              </div>
+
+              <ProgressBar
+                value={overallProgress}
+              />
+
+            </div>
+
+            {facilitator && (
+              <button
+                type="button"
+                onClick={onView}
+                className="whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+              >
+                View Progress
+              </button>
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+    );
+  }
+
+  // ===================================================
+  // DETAILED VIEW
+  // ===================================================
+
   return (
     <div className="p-6">
 
       {/* STUDENT HEADER */}
 
-      <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-center">
+      <div className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
 
         <div className="flex items-center gap-4">
 
@@ -801,10 +819,10 @@ function StudentProgressCard({
             <img
               src={student.profileImage}
               alt={`${student.firstName || ""} ${student.lastName || ""}`}
-              className="h-12 w-12 rounded-full object-cover"
+              className="h-16 w-16 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
               {student.firstName?.charAt(0)}
               {student.lastName?.charAt(0)}
             </div>
@@ -812,10 +830,10 @@ function StudentProgressCard({
 
           <div>
 
-            <h3 className="font-semibold text-slate-900">
+            <h2 className="text-xl font-bold text-slate-900">
               {student.firstName}{" "}
               {student.lastName}
-            </h3>
+            </h2>
 
             <p className="text-sm text-slate-500">
               {student.program ||
@@ -826,9 +844,11 @@ function StudentProgressCard({
 
         </div>
 
-        <div className="text-left md:text-right">
+        {/* OVERALL SCORE */}
 
-          <p className="text-3xl font-bold text-blue-700">
+        <div className="text-left sm:text-right">
+
+          <p className="text-4xl font-bold text-blue-700">
             {safePercentage(
               overallProgress
             )}
@@ -843,9 +863,9 @@ function StudentProgressCard({
 
       </div>
 
-      {/* OVERALL BAR */}
+      {/* OVERALL PROGRESS */}
 
-      <div className="mb-6">
+      <div className="mb-7">
 
         <div className="mb-2 flex justify-between text-sm">
 
@@ -868,7 +888,7 @@ function StudentProgressCard({
 
       </div>
 
-      {/* COMPONENT PROGRESS */}
+      {/* PROGRESS COMPONENTS */}
 
       <div className="grid gap-4 md:grid-cols-3">
 
@@ -901,13 +921,13 @@ function StudentProgressCard({
 
       </div>
 
-      {/* WEIGHTED CONTRIBUTIONS */}
+      {/* PROGRESS BREAKDOWN */}
 
-      <div className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
+      <div className="mt-6 rounded-xl border border-slate-200 p-5">
 
-        <h4 className="mb-3 text-sm font-semibold text-slate-800">
-          Contribution to Overall Progress
-        </h4>
+        <h3 className="mb-4 font-semibold text-slate-900">
+          Progress Breakdown
+        </h3>
 
         <div className="grid gap-3 sm:grid-cols-3">
 
@@ -935,40 +955,48 @@ function StudentProgressCard({
 
       {/* PROGRAM INFORMATION */}
 
-      <div className="mt-5 grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6">
 
-        <InfoItem
-          label="Enrollment Date"
-          value={formatDate(
-            enrollmentDate
-          )}
-        />
+        <h3 className="mb-3 font-semibold text-slate-900">
+          Program Information
+        </h3>
 
-        <InfoItem
-          label="Expected Completion"
-          value={formatDate(
-            expectedCompletionDate
-          )}
-        />
+        <div className="grid gap-3 rounded-xl bg-slate-50 p-5 sm:grid-cols-2 lg:grid-cols-4">
 
-        <InfoItem
-          label="Months Completed"
-          value={`${monthsCompleted} / 24`}
-        />
+          <InfoItem
+            label="Enrollment Date"
+            value={formatDate(
+              enrollmentDate
+            )}
+          />
 
-        <InfoItem
-          label="Months Remaining"
-          value={monthsRemaining}
-        />
+          <InfoItem
+            label="Expected Completion"
+            value={formatDate(
+              expectedCompletionDate
+            )}
+          />
+
+          <InfoItem
+            label="Months Completed"
+            value={`${monthsCompleted} / 24`}
+          />
+
+          <InfoItem
+            label="Months Remaining"
+            value={monthsRemaining}
+          />
+
+        </div>
 
       </div>
 
-      {/* EXTRA SUMMARY */}
+      {/* SUMMARY */}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
 
         <SmallSummary
-          label="Projects"
+          label="Total Projects"
           value={projectCount}
         />
 
@@ -1055,7 +1083,7 @@ function ContributionItem({
     );
 
   return (
-    <div className="rounded-lg bg-white p-3">
+    <div className="rounded-lg bg-slate-50 p-4">
 
       <div className="flex items-center justify-between">
 
@@ -1064,7 +1092,7 @@ function ContributionItem({
         </span>
 
         <span className="text-xs text-slate-400">
-          {weight}%
+          Weight: {weight}%
         </span>
 
       </div>
