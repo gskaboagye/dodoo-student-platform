@@ -25,8 +25,7 @@ async function getDatabase() {
 async function getSession() {
   const cookieStore = await cookies();
 
-  const token =
-    cookieStore.get("dcc_session")?.value;
+  const token = cookieStore.get("dcc_session")?.value;
 
   if (!token) {
     return null;
@@ -48,16 +47,13 @@ function isValidDateString(date) {
     return false;
   }
 
-  const parsed = new Date(
-    `${date}T00:00:00Z`
-  );
+  const parsed = new Date(`${date}T00:00:00Z`);
 
   if (Number.isNaN(parsed.getTime())) {
     return false;
   }
 
-  const [year, month, day] =
-    date.split("-").map(Number);
+  const [year, month, day] = date.split("-").map(Number);
 
   return (
     parsed.getUTCFullYear() === year &&
@@ -90,16 +86,44 @@ function formatAttendanceRecord(record) {
 }
 
 // =========================================================
+// STUDENT ID VALUES
+// =========================================================
+
+function getPossibleIdValues(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return [];
+  }
+
+  const stringValue = String(value).trim();
+
+  if (!stringValue) {
+    return [];
+  }
+
+  const values = [stringValue];
+
+  if (ObjectId.isValid(stringValue)) {
+    values.push(new ObjectId(stringValue));
+  }
+
+  return values;
+}
+
+// =========================================================
 // STUDENT ID QUERY
 // =========================================================
 
 function buildStudentIdQuery(studentId) {
-  const idString = String(studentId);
+  const values = getPossibleIdValues(studentId);
 
-  const values = [idString];
-
-  if (ObjectId.isValid(idString)) {
-    values.push(new ObjectId(idString));
+  if (values.length === 0) {
+    return {
+      studentId: null,
+    };
   }
 
   return {
@@ -110,80 +134,206 @@ function buildStudentIdQuery(studentId) {
 }
 
 // =========================================================
-// RESOLVE STUDENT PROFILE
+// ESCAPE REGEX
 // =========================================================
 
-async function resolveStudentProfile(
-  db,
-  session
-) {
-  const usersCollection =
-    db.collection("users");
+function escapeRegex(value) {
+  return String(value).replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&"
+  );
+}
 
-  const studentsCollection =
-    db.collection("students");
+// =========================================================
+// EMAIL QUERY
+// =========================================================
 
-  let studentId =
-    session?.studentId || null;
+function buildEmailQuery(email) {
+  if (!email) {
+    return null;
+  }
+
+  const normalizedEmail = String(email)
+    .trim()
+    .toLowerCase();
+
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  return {
+    email: {
+      $regex: `^${escapeRegex(normalizedEmail)}$`,
+      $options: "i",
+    },
+  };
+}
+
+// =========================================================
+// RESOLVE STUDENT PROFILE
+//
+// IMPORTANT:
+// We resolve the profile using the CURRENT USER first.
+// We verify that a studentId actually belongs to the
+// student's account before trusting it.
+//
+// If the stored studentId is stale or mismatched,
+// we fall back to the student's email.
+// =========================================================
+
+async function resolveStudentProfile(db, session) {
+  const usersCollection = db.collection("users");
+  const studentsCollection = db.collection("students");
+
+  let user = null;
 
   // -------------------------------------------------------
-  // Try to resolve from current user account
+  // 1. Find current user by session userId
   // -------------------------------------------------------
 
   if (
     session?.userId &&
-    ObjectId.isValid(
-      String(session.userId)
-    )
+    ObjectId.isValid(String(session.userId))
   ) {
-    const user =
-      await usersCollection.findOne({
-        _id: new ObjectId(
-          String(session.userId)
-        ),
-      });
+    user = await usersCollection.findOne({
+      _id: new ObjectId(String(session.userId)),
+    });
+  }
 
-    if (user?.studentId) {
-      studentId = user.studentId;
+  // -------------------------------------------------------
+  // 2. Fallback to session email
+  // -------------------------------------------------------
+
+  if (!user && session?.email) {
+    const emailQuery = buildEmailQuery(session.email);
+
+    if (emailQuery) {
+      user = await usersCollection.findOne(
+        emailQuery
+      );
     }
   }
 
   // -------------------------------------------------------
-  // Find student using studentId
+  // 3. Determine the user's student ID
   // -------------------------------------------------------
 
-  if (
-    studentId &&
-    ObjectId.isValid(
-      String(studentId)
-    )
-  ) {
-    const student =
-      await studentsCollection.findOne({
-        _id: new ObjectId(
-          String(studentId)
-        ),
-      });
+  const possibleStudentIds = [];
 
-    if (student) {
+  if (user?.studentId) {
+    possibleStudentIds.push(
+      ...getPossibleIdValues(user.studentId)
+    );
+  }
+
+  if (session?.studentId) {
+    possibleStudentIds.push(
+      ...getPossibleIdValues(session.studentId)
+    );
+  }
+
+  // Remove duplicate IDs.
+  const uniqueStudentIds = [];
+
+  for (const value of possibleStudentIds) {
+    const key =
+      value instanceof ObjectId
+        ? value.toString()
+        : String(value);
+
+    if (
+      !uniqueStudentIds.some(
+        (existing) => existing.key === key
+      )
+    ) {
+      uniqueStudentIds.push({
+        key,
+        value,
+      });
+    }
+  }
+
+  // -------------------------------------------------------
+  // 4. Try to find the student profile by ID
+  //
+  // If the user has an email, make sure the profile's
+  // email also matches when possible. This prevents a
+  // stale studentId from pointing to another student.
+  // -------------------------------------------------------
+
+  if (uniqueStudentIds.length > 0) {
+    for (const idEntry of uniqueStudentIds) {
+      let student = null;
+
+      if (idEntry.value instanceof ObjectId) {
+        student =
+          await studentsCollection.findOne({
+            _id: idEntry.value,
+          });
+      } else if (
+        ObjectId.isValid(String(idEntry.value))
+      ) {
+        student =
+          await studentsCollection.findOne({
+            _id: new ObjectId(
+              String(idEntry.value)
+            ),
+          });
+      }
+
+      if (!student) {
+        continue;
+      }
+
+      // If both user and student have emails,
+      // verify they belong together.
+      if (
+        user?.email &&
+        student?.email
+      ) {
+        const userEmail = String(user.email)
+          .trim()
+          .toLowerCase();
+
+        const studentEmail = String(
+          student.email
+        )
+          .trim()
+          .toLowerCase();
+
+        if (
+          userEmail !== studentEmail
+        ) {
+          continue;
+        }
+      }
+
       return student;
     }
   }
 
   // -------------------------------------------------------
-  // Fallback: find student by email
+  // 5. Fallback: find student by user/session email
   // -------------------------------------------------------
 
-  if (session?.email) {
-    const student =
-      await studentsCollection.findOne({
-        email: String(
-          session.email
-        ).toLowerCase(),
-      });
+  const email =
+    user?.email ||
+    session?.email ||
+    null;
 
-    if (student) {
-      return student;
+  if (email) {
+    const emailQuery =
+      buildEmailQuery(email);
+
+    if (emailQuery) {
+      const student =
+        await studentsCollection.findOne(
+          emailQuery
+        );
+
+      if (student) {
+        return student;
+      }
     }
   }
 
@@ -194,58 +344,51 @@ async function resolveStudentProfile(
 // FIND USER ACCOUNT FOR STUDENT
 // =========================================================
 
-async function findStudentUser(
-  db,
-  student
-) {
-  if (!student) {
+async function findStudentUser(db, student) {
+  if (!student?._id) {
     return null;
   }
 
   const usersCollection =
     db.collection("users");
 
+  const possibleStudentIds =
+    getPossibleIdValues(student._id);
+
   // -------------------------------------------------------
-  // Try studentId as ObjectId
+  // 1. Try studentId in both ObjectId and string formats
   // -------------------------------------------------------
 
-  const userByStudentId =
-    await usersCollection.findOne({
-      studentId: student._id,
-    });
+  if (possibleStudentIds.length > 0) {
+    const userByStudentId =
+      await usersCollection.findOne({
+        studentId: {
+          $in: possibleStudentIds,
+        },
+      });
 
-  if (userByStudentId) {
-    return userByStudentId;
+    if (userByStudentId) {
+      return userByStudentId;
+    }
   }
 
   // -------------------------------------------------------
-  // Try studentId as string
-  // -------------------------------------------------------
-
-  const userByStudentIdString =
-    await usersCollection.findOne({
-      studentId:
-        student._id.toString(),
-    });
-
-  if (userByStudentIdString) {
-    return userByStudentIdString;
-  }
-
-  // -------------------------------------------------------
-  // Fallback to email
+  // 2. Fallback to email
   // -------------------------------------------------------
 
   if (student.email) {
-    const userByEmail =
-      await usersCollection.findOne({
-        email: String(
-          student.email
-        ).toLowerCase(),
-      });
+    const emailQuery =
+      buildEmailQuery(student.email);
 
-    if (userByEmail) {
-      return userByEmail;
+    if (emailQuery) {
+      const userByEmail =
+        await usersCollection.findOne(
+          emailQuery
+        );
+
+      if (userByEmail) {
+        return userByEmail;
+      }
     }
   }
 
@@ -314,8 +457,8 @@ async function notifyAttendanceChange({
       link: "/student/attendance",
     });
   } catch (error) {
-    // Notification errors should never
-    // prevent attendance from succeeding.
+    // Notification errors must never prevent
+    // attendance from succeeding.
     console.error(
       "ATTENDANCE NOTIFICATION ERROR:",
       error
@@ -381,12 +524,10 @@ function calculateTimelineProgress(student) {
   const now =
     new Date();
 
-  // Program has not started
   if (now <= start) {
     return 0;
   }
 
-  // Program has finished
   if (now >= end) {
     return 100;
   }
@@ -425,9 +566,7 @@ function calculateAttendanceProgress(
 
   let totalScore = 0;
 
-  for (
-    const record of attendance
-  ) {
+  for (const record of attendance) {
     const status =
       String(
         record?.status || ""
@@ -435,17 +574,11 @@ function calculateAttendanceProgress(
         .trim()
         .toLowerCase();
 
-    if (
-      status === "present"
-    ) {
+    if (status === "present") {
       totalScore += 100;
-    } else if (
-      status === "late"
-    ) {
+    } else if (status === "late") {
       totalScore += 50;
-    } else if (
-      status === "absent"
-    ) {
+    } else if (status === "absent") {
       totalScore += 0;
     }
   }
@@ -472,9 +605,7 @@ function calculateProjectProgress(
 
   let total = 0;
 
-  for (
-    const project of projects
-  ) {
+  for (const project of projects) {
     total +=
       normalizeProgress(
         project?.progress ?? 0
@@ -598,11 +729,7 @@ async function notifyProgressChange({
         currentProgress
       );
 
-    // Do not notify if the percentage
-    // did not actually change.
-    if (
-      previous === current
-    ) {
+    if (previous === current) {
       return;
     }
 
@@ -635,11 +762,9 @@ async function notifyProgressChange({
 
       message,
 
-      type:
-        "progress",
+      type: "progress",
 
-      link:
-        "/progress",
+      link: "/progress",
     });
 
     console.log(
@@ -656,8 +781,6 @@ async function notifyProgressChange({
       }
     );
   } catch (error) {
-    // A notification error must never
-    // prevent attendance from succeeding.
     console.error(
       "PROGRESS NOTIFICATION ERROR:",
       error
@@ -715,6 +838,20 @@ export async function GET(request) {
         );
 
       if (!student) {
+        console.error(
+          "STUDENT ATTENDANCE: Could not resolve student profile.",
+          {
+            userId:
+              session?.userId || null,
+
+            sessionStudentId:
+              session?.studentId || null,
+
+            email:
+              session?.email || null,
+          }
+        );
+
         return NextResponse.json(
           {
             message:
@@ -726,11 +863,23 @@ export async function GET(request) {
         );
       }
 
+      // ---------------------------------------------------
+      // IMPORTANT:
+      // Query using BOTH ObjectId and string forms.
+      // This allows older attendance records to continue
+      // working even if their studentId was stored as a
+      // string instead of an ObjectId.
+      // ---------------------------------------------------
+
+      const studentIdValues =
+        getPossibleIdValues(
+          student._id
+        );
+
       const query = {
-        studentId:
-          buildStudentIdQuery(
-            student._id
-          ),
+        studentId: {
+          $in: studentIdValues,
+        },
       };
 
       if (date) {
@@ -750,8 +899,7 @@ export async function GET(request) {
           );
         }
 
-        query.date =
-          date;
+        query.date = date;
       }
 
       const attendance =
@@ -761,6 +909,24 @@ export async function GET(request) {
             date: -1,
           })
           .toArray();
+
+      console.log(
+        "STUDENT ATTENDANCE LOADED:",
+        {
+          userId:
+            session?.userId || null,
+
+          studentId:
+            student?._id?.toString() ||
+            null,
+
+          date:
+            date || "all",
+
+          records:
+            attendance.length,
+        }
+      );
 
       return NextResponse.json({
         attendance:
@@ -797,8 +963,7 @@ export async function GET(request) {
           );
         }
 
-        query.date =
-          date;
+        query.date = date;
       }
 
       const attendance =
@@ -884,8 +1049,22 @@ export async function POST(request) {
       );
     }
 
-    const body =
-      await request.json();
+    let body;
+
+    try {
+      body =
+        await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          message:
+            "Invalid request body.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     const {
       studentId,
@@ -912,7 +1091,7 @@ export async function POST(request) {
 
     if (
       !ObjectId.isValid(
-        studentId
+        String(studentId)
       )
     ) {
       return NextResponse.json(
@@ -995,7 +1174,7 @@ export async function POST(request) {
 
     const studentObjectId =
       new ObjectId(
-        studentId
+        String(studentId)
       );
 
     // =====================================================
@@ -1012,7 +1191,8 @@ export async function POST(request) {
       console.error(
         "ATTENDANCE STUDENT NOT FOUND:",
         {
-          studentId,
+          studentId:
+            String(studentId),
 
           database:
             process.env.DB_NAME ||
@@ -1068,7 +1248,6 @@ export async function POST(request) {
     // =====================================================
 
     if (existingRecord) {
-      // Get progress BEFORE changing attendance.
       const previousProgress =
         await getStudentOverallProgress(
           db,
@@ -1082,6 +1261,7 @@ export async function POST(request) {
         },
         {
           $set: {
+            // ALWAYS normalize the ID to ObjectId.
             studentId:
               studentObjectId,
 
@@ -1104,7 +1284,6 @@ export async function POST(request) {
             existingRecord._id,
         });
 
-      // Attendance notification
       await notifyAttendanceChange({
         db,
         student,
@@ -1114,7 +1293,6 @@ export async function POST(request) {
           "updated",
       });
 
-      // Progress notification
       await notifyProgressChange({
         db,
         student,
@@ -1141,7 +1319,6 @@ export async function POST(request) {
     // CREATE NEW ATTENDANCE
     // =====================================================
 
-    // Get progress BEFORE creating attendance.
     const previousProgress =
       await getStudentOverallProgress(
         db,
@@ -1149,6 +1326,7 @@ export async function POST(request) {
       );
 
     const newRecord = {
+      // ALWAYS store studentId as ObjectId.
       studentId:
         studentObjectId,
 
@@ -1190,7 +1368,10 @@ export async function POST(request) {
         "created",
     });
 
-    // Progress notification
+    // =====================================================
+    // NOTIFY PROGRESS CHANGE
+    // =====================================================
+
     await notifyProgressChange({
       db,
       student,
@@ -1283,8 +1464,22 @@ export async function PUT(request) {
       );
     }
 
-    const body =
-      await request.json();
+    let body;
+
+    try {
+      body =
+        await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          message:
+            "Invalid request body.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
 
     const {
       attendanceId,
@@ -1305,7 +1500,7 @@ export async function PUT(request) {
 
     if (
       !ObjectId.isValid(
-        attendanceId
+        String(attendanceId)
       )
     ) {
       return NextResponse.json(
@@ -1356,7 +1551,7 @@ export async function PUT(request) {
 
     const attendanceObjectId =
       new ObjectId(
-        attendanceId
+        String(attendanceId)
       );
 
     // =====================================================
@@ -1385,8 +1580,7 @@ export async function PUT(request) {
     // FIND STUDENT
     // =====================================================
 
-    let student =
-      null;
+    let student = null;
 
     if (
       existingRecord.studentId
@@ -1562,9 +1756,7 @@ export async function DELETE(
       new URL(request.url);
 
     const attendanceId =
-      searchParams.get(
-        "id"
-      );
+      searchParams.get("id");
 
     if (!attendanceId) {
       return NextResponse.json(
@@ -1580,7 +1772,7 @@ export async function DELETE(
 
     if (
       !ObjectId.isValid(
-        attendanceId
+        String(attendanceId)
       )
     ) {
       return NextResponse.json(
@@ -1609,7 +1801,7 @@ export async function DELETE(
 
     const attendanceObjectId =
       new ObjectId(
-        attendanceId
+        String(attendanceId)
       );
 
     // =====================================================
@@ -1638,8 +1830,7 @@ export async function DELETE(
     // FIND STUDENT
     // =====================================================
 
-    let student =
-      null;
+    let student = null;
 
     if (
       existingRecord.studentId
