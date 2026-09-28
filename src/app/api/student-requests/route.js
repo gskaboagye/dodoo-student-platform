@@ -1175,30 +1175,30 @@ export async function POST(request) {
       }
 
       // -------------------------------------------------------
-      // PERMANENTLY DELETE OLD STUDENT PROFILE
+      // PERMANENTLY DELETE ALL OLD STUDENT PROFILES
       // -------------------------------------------------------
       //
       // A previous version of the rejection process could
       // leave a student profile behind in the students
       // collection.
       //
-      // Delete any profile belonging to this email so that
+      // Delete ALL profiles belonging to this email so that
       // the student can register again with the same email.
       //
 
-      const deletedStudentProfile =
+      const deletedStudentProfiles =
         await db
           .collection("students")
-          .deleteOne({
+          .deleteMany({
             email: studentEmail,
           });
 
       console.log(
-        "OLD STUDENT PROFILE DELETED:",
+        "OLD STUDENT PROFILE(S) DELETED:",
         {
           email: studentEmail,
           deletedCount:
-            deletedStudentProfile.deletedCount,
+            deletedStudentProfiles.deletedCount,
         }
       );
 
@@ -1264,7 +1264,13 @@ export async function POST(request) {
         accountDeleted: true,
 
         studentProfileDeleted:
-          deletedStudentProfile.deletedCount > 0,
+          deletedStudentProfiles.deletedCount > 0,
+
+        deletedUserCount:
+          deleteResult.deletedCount,
+
+        deletedStudentCount:
+          deletedStudentProfiles.deletedCount,
 
         emailSent,
 
