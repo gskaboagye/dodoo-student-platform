@@ -63,7 +63,8 @@ export async function POST(request) {
     if (!isValidEmail(email)) {
       return NextResponse.json(
         {
-          error: "Please enter a valid email address.",
+          error:
+            "Please enter a valid email address.",
         },
         { status: 400 }
       );
@@ -95,16 +96,21 @@ export async function POST(request) {
     if (role === "student" && !program) {
       return NextResponse.json(
         {
-          error: "Please select your program.",
+          error:
+            "Please select your program.",
         },
         { status: 400 }
       );
     }
 
-    if (role === "student" && program.length > 150) {
+    if (
+      role === "student" &&
+      program.length > 150
+    ) {
       return NextResponse.json(
         {
-          error: "Program name is too long.",
+          error:
+            "Program name is too long.",
         },
         { status: 400 }
       );
@@ -127,7 +133,8 @@ export async function POST(request) {
 
       if (
         !process.env.FACILITATOR_CODE ||
-        facilitatorCode !== process.env.FACILITATOR_CODE
+        facilitatorCode !==
+          process.env.FACILITATOR_CODE
       ) {
         return NextResponse.json(
           {
@@ -174,9 +181,9 @@ export async function POST(request) {
 
     const db = client.db(dbName);
 
-    // ---------------------------------------------------------
+    // =========================================================
     // CHECK EXISTING USER ACCOUNT
-    // ---------------------------------------------------------
+    // =========================================================
 
     const existingUser =
       await db.collection("users").findOne({
@@ -184,48 +191,160 @@ export async function POST(request) {
       });
 
     if (existingUser) {
-      return NextResponse.json(
-        {
-          error:
-            "An account with this email already exists.",
-        },
-        { status: 409 }
-      );
+      const existingRole =
+        String(
+          existingUser.role || ""
+        ).toLowerCase();
+
+      const existingStatus =
+        String(
+          existingUser.status || ""
+        ).toLowerCase();
+
+      // -------------------------------------------------------
+      // PREVIOUSLY REJECTED STUDENT
+      // -------------------------------------------------------
+      //
+      // A rejected student should be able to register again
+      // using the same email address.
+      //
+      // We remove the old user and any old student profile
+      // before continuing with the new registration.
+      //
+
+      if (
+        role === "student" &&
+        existingRole === "student" &&
+        (
+          existingStatus === "rejected" ||
+          existingStatus === "inactive"
+        )
+      ) {
+        console.log(
+          "OLD REJECTED/INACTIVE STUDENT FOUND:",
+          {
+            userId:
+              existingUser._id.toString(),
+            email,
+            status: existingStatus,
+          }
+        );
+
+        // -----------------------------------------------------
+        // Delete old student profile
+        // -----------------------------------------------------
+
+        const oldStudentProfile =
+          await db
+            .collection("students")
+            .findOne({
+              email,
+            });
+
+        if (oldStudentProfile) {
+          await db
+            .collection("students")
+            .deleteOne({
+              _id:
+                oldStudentProfile._id,
+            });
+
+          console.log(
+            "OLD STUDENT PROFILE DELETED:",
+            email
+          );
+        }
+
+        // -----------------------------------------------------
+        // Delete old user account
+        // -----------------------------------------------------
+
+        const deletedOldUser =
+          await db
+            .collection("users")
+            .deleteOne({
+              _id:
+                existingUser._id,
+              role: "student",
+            });
+
+        if (
+          deletedOldUser.deletedCount !== 1
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "The previous rejected student account could not be removed. Please contact the administrator.",
+            },
+            { status: 500 }
+          );
+        }
+
+        console.log(
+          "OLD REJECTED STUDENT ACCOUNT DELETED:",
+          email
+        );
+      } else {
+        // -----------------------------------------------------
+        // ACTIVE / PENDING / OTHER ACCOUNT
+        // -----------------------------------------------------
+
+        return NextResponse.json(
+          {
+            error:
+              "An account with this email already exists.",
+          },
+          { status: 409 }
+        );
+      }
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // CHECK OLD STUDENT PROFILE
-    // ---------------------------------------------------------
+    // =========================================================
     //
-    // A rejected student account is deleted from the users
-    // collection. However, an old student profile could still
-    // remain in the students collection.
+    // This is a second layer of protection.
     //
-    // Remove only old inactive/rejected/pending profiles so
-    // the student can start a completely new registration.
+    // A previous rejection could have deleted the user but
+    // accidentally left a student profile behind.
     //
-    // Do NOT delete an active student profile.
-    // ---------------------------------------------------------
+    // Only rejected/inactive/pending profiles are removed.
+    // Active student profiles are NEVER deleted here.
+    // =========================================================
 
     if (role === "student") {
       const existingStudent =
-        await db.collection("students").findOne({
-          email,
-        });
+        await db
+          .collection("students")
+          .findOne({
+            email,
+          });
 
       if (existingStudent) {
-        const existingStatus = String(
-          existingStudent.status || ""
-        ).toLowerCase();
+        const existingStatus =
+          String(
+            existingStudent.status || ""
+          ).toLowerCase();
 
         if (
           existingStatus === "rejected" ||
           existingStatus === "inactive" ||
           existingStatus === "pending"
         ) {
-          await db.collection("students").deleteOne({
-            _id: existingStudent._id,
-          });
+          await db
+            .collection("students")
+            .deleteOne({
+              _id:
+                existingStudent._id,
+            });
+
+          console.log(
+            "OLD INACTIVE STUDENT PROFILE REMOVED:",
+            {
+              email,
+              status: existingStatus,
+            }
+          );
         } else {
           return NextResponse.json(
             {
@@ -238,37 +357,42 @@ export async function POST(request) {
       }
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // PASSWORD
-    // ---------------------------------------------------------
+    // =========================================================
 
     const passwordHash =
       await bcrypt.hash(password, 12);
 
-    // ---------------------------------------------------------
+    // =========================================================
     // EMAIL VERIFICATION
-    // ---------------------------------------------------------
+    // =========================================================
 
     const verificationCode =
       generateVerificationCode();
 
-    const verificationExpiresAt = new Date(
-      Date.now() + 10 * 60 * 1000
-    );
+    const verificationExpiresAt =
+      new Date(
+        Date.now() + 10 * 60 * 1000
+      );
 
-    // ---------------------------------------------------------
+    // =========================================================
     // CREATE USER
-    // ---------------------------------------------------------
+    // =========================================================
 
     const user = {
       name,
+
       email,
+
       passwordHash,
 
       role,
 
       program:
-        role === "student" ? program : "",
+        role === "student"
+          ? program
+          : "",
 
       // Students require facilitator approval.
       // Facilitators become active after registration.
@@ -288,21 +412,24 @@ export async function POST(request) {
         verificationExpiresAt,
 
       createdAt: new Date(),
+
       updatedAt: new Date(),
     };
 
-    const result = await db
-      .collection("users")
-      .insertOne(user);
+    const result =
+      await db
+        .collection("users")
+        .insertOne(user);
 
-    // ---------------------------------------------------------
+    // =========================================================
     // SEND VERIFICATION EMAIL
-    // ---------------------------------------------------------
+    // =========================================================
 
     try {
-      const resend = new Resend(
-        process.env.RESEND_API_KEY
-      );
+      const resend =
+        new Resend(
+          process.env.RESEND_API_KEY
+        );
 
       const accountType =
         role === "facilitator"
@@ -311,9 +438,14 @@ export async function POST(request) {
 
       const emailResult =
         await resend.emails.send({
-          from: process.env.EMAIL_FROM,
+          from:
+            process.env.EMAIL_FROM,
+
           to: [email],
-          subject: `Dodoo Coding Club - Verify Your ${accountType} Account`,
+
+          subject:
+            `Dodoo Coding Club - Verify Your ${accountType} Account`,
+
           html: `
             <div style="
               font-family: Arial, Helvetica, sans-serif;
@@ -360,8 +492,8 @@ export async function POST(request) {
                 </p>
 
                 <p>
-                  Please enter the verification code below
-                  to verify your email address:
+                  Please enter the verification code
+                  below to verify your email address:
                 </p>
 
                 <div style="
@@ -393,23 +525,25 @@ export async function POST(request) {
                   role === "student"
                     ? `
                       <p>
-                        After verifying your email, your student
-                        account will remain pending until a
-                        facilitator reviews and approves your
+                        After verifying your email,
+                        your student account will remain
+                        pending until a facilitator
+                        reviews and approves your
                         registration.
                       </p>
                     `
                     : `
                       <p>
-                        After verifying your email, you can log
-                        in to your facilitator account.
+                        After verifying your email,
+                        you can log in to your
+                        facilitator account.
                       </p>
                     `
                 }
 
                 <p>
-                  If you did not create this account, you can
-                  safely ignore this email.
+                  If you did not create this account,
+                  you can safely ignore this email.
                 </p>
 
                 <p style="
@@ -483,9 +617,9 @@ export async function POST(request) {
       );
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // NOTIFY FACILITATORS OF NEW STUDENT APPLICATION
-    // ---------------------------------------------------------
+    // =========================================================
 
     if (role === "student") {
       try {
@@ -515,9 +649,11 @@ export async function POST(request) {
                 message:
                   `${name} has submitted an application to join the Dodoo Coding Club Student Platform. Please review the application.`,
 
-                type: "student-request",
+                type:
+                  "student-request",
 
-                link: "/student-requests",
+                link:
+                  "/student-requests",
               })
             );
 
@@ -544,15 +680,17 @@ export async function POST(request) {
       }
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // SUCCESS
-    // ---------------------------------------------------------
+    // =========================================================
 
     return NextResponse.json(
       {
         message:
           "Registration successful. A verification code has been sent to your email.",
+
         email,
+
         role,
       },
       { status: 201 }
