@@ -143,12 +143,14 @@ export default function RegisterPage() {
       }
 
       setSuccess(
-        "Registration successful. Redirecting you to email verification..."
+        role === "student"
+          ? "Registration submitted successfully. Please check your email to verify your account. After verification, your application will remain pending until a facilitator approves it. You will receive an email when your application is approved."
+          : "Registration successful. Redirecting you to email verification..."
       );
 
       setTimeout(() => {
         router.push(`/verify-email?email=${encodeURIComponent(email)}`);
-      }, 1000);
+      }, 1500);
     } catch (error) {
       console.error(error);
       setError("Unable to connect to the server. Please try again.");
@@ -183,6 +185,7 @@ export default function RegisterPage() {
             </label>
 
             <div className="grid grid-cols-2 gap-3">
+              {/* Student */}
               <button
                 type="button"
                 onClick={() => handleRoleChange("student")}
@@ -207,6 +210,7 @@ export default function RegisterPage() {
                 </div>
               </button>
 
+              {/* Facilitator */}
               <button
                 type="button"
                 onClick={() => handleRoleChange("facilitator")}
@@ -248,16 +252,21 @@ export default function RegisterPage() {
             <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
               <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
 
-              <p className="text-sm text-green-700">{success}</p>
+              <p className="text-sm leading-6 text-green-700">
+                {success}
+              </p>
             </div>
           )}
 
           {/* Student Notice */}
           {role === "student" && (
             <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm text-blue-700">
-                After registration, you must verify your email. Your account
-                will then remain pending until a facilitator approves it.
+              <p className="text-sm leading-6 text-blue-700">
+                After registration, please verify your email address. Your
+                account will remain pending until a facilitator reviews and
+                approves your application. Once your application is approved,
+                you will receive an email confirming your approval and letting
+                you know that you can log in to the student platform.
               </p>
             </div>
           )}
@@ -265,9 +274,9 @@ export default function RegisterPage() {
           {/* Facilitator Notice */}
           {role === "facilitator" && (
             <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
-              <p className="text-sm text-amber-700">
-                Facilitator registration requires a valid invitation code.
-                Your email must also be verified before you can log in.
+              <p className="text-sm leading-6 text-amber-700">
+                Facilitator registration requires a valid invitation code. Your
+                email must also be verified before you can log in.
               </p>
             </div>
           )}
@@ -402,6 +411,9 @@ export default function RegisterPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  aria-label={
+                    showPassword ? "Hide password" : "Show password"
+                  }
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -446,6 +458,11 @@ export default function RegisterPage() {
                     setShowConfirmPassword(!showConfirmPassword)
                   }
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  aria-label={
+                    showConfirmPassword
+                      ? "Hide confirmation password"
+                      : "Show confirmation password"
+                  }
                 >
                   {showConfirmPassword ? (
                     <EyeOff className="h-5 w-5" />
