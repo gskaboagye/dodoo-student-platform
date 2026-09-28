@@ -1,25 +1,85 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+
 import clientPromise from "@/lib/mongodb";
 import { createSession } from "@/lib/auth";
 
+// =========================================================
+// HELPERS
+// =========================================================
+
+function normalizeEmail(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase()
+    : "";
+}
+
+function normalizeRole(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase()
+    : "";
+}
+
+function getDisplayName(user) {
+  const fullName = [
+    user.firstName,
+    user.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  return (
+    fullName ||
+    user.name ||
+    user.email ||
+    "User"
+  );
+}
+
+// =========================================================
+// LOGIN
+// =========================================================
+
 export async function POST(request) {
   try {
-    const body = await request.json();
+    // -------------------------------------------------------
+    // READ REQUEST
+    // -------------------------------------------------------
 
-    const email =
-      body.email?.trim().toLowerCase();
+    let body;
 
-    const password = body.password;
-    const role = body.role;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const email = normalizeEmail(body.email);
+
+    const password =
+      typeof body.password === "string"
+        ? body.password
+        : "";
+
+    const role = normalizeRole(body.role);
 
     const facilitatorCode =
-      body.facilitatorCode?.trim();
+      typeof body.facilitatorCode === "string"
+        ? body.facilitatorCode.trim()
+        : "";
 
-    // =======================================================
+    // -------------------------------------------------------
     // VALIDATE INPUT
-    // =======================================================
+    // -------------------------------------------------------
 
     if (!email || !password || !role) {
       return NextResponse.json(
@@ -34,14 +94,11 @@ export async function POST(request) {
     }
 
     if (
-      !["student", "facilitator"].includes(
-        role
-      )
+      !["student", "facilitator"].includes(role)
     ) {
       return NextResponse.json(
         {
-          error:
-            "Invalid account type.",
+          error: "Invalid account type.",
         },
         {
           status: 400,
@@ -49,9 +106,9 @@ export async function POST(request) {
       );
     }
 
-    // =======================================================
-    // FACILITATOR CODE
-    // =======================================================
+    // -------------------------------------------------------
+    // FACILITATOR CODE REQUIRED
+    // -------------------------------------------------------
 
     if (
       role === "facilitator" &&
@@ -68,9 +125,9 @@ export async function POST(request) {
       );
     }
 
-    // =======================================================
+    // -------------------------------------------------------
     // DATABASE
-    // =======================================================
+    // -------------------------------------------------------
 
     const client =
       await clientPromise;
@@ -82,9 +139,9 @@ export async function POST(request) {
     const db =
       client.db(dbName);
 
-    // =======================================================
+    // -------------------------------------------------------
     // FIND USER
-    // =======================================================
+    // -------------------------------------------------------
 
     const user =
       await db
@@ -105,9 +162,30 @@ export async function POST(request) {
       );
     }
 
-    // =======================================================
-    // CHECK PASSWORD
-    // =======================================================
+    // -------------------------------------------------------
+    // PASSWORD
+    // -------------------------------------------------------
+
+    if (!user.passwordHash) {
+      console.error(
+        "LOGIN ERROR: User has no password hash.",
+        {
+          userId:
+            user._id?.toString(),
+          email: user.email,
+        }
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "This account cannot be logged in at the moment. Please contact the administrator.",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
 
     const passwordMatch =
       await bcrypt.compare(
@@ -127,9 +205,9 @@ export async function POST(request) {
       );
     }
 
-    // =======================================================
-    // CHECK ROLE
-    // =======================================================
+    // -------------------------------------------------------
+    // ROLE CHECK
+    // -------------------------------------------------------
 
     if (user.role !== role) {
       return NextResponse.json(
@@ -143,9 +221,9 @@ export async function POST(request) {
       );
     }
 
-    // =======================================================
+    // -------------------------------------------------------
     // FACILITATOR INVITATION CODE
-    // =======================================================
+    // -------------------------------------------------------
 
     if (role === "facilitator") {
       const expectedCode =
@@ -167,11 +245,11 @@ export async function POST(request) {
       }
     }
 
-    // =======================================================
+    // -------------------------------------------------------
     // EMAIL VERIFICATION
-    // =======================================================
+    // -------------------------------------------------------
 
-    if (!user.emailVerified) {
+    if (user.emailVerified !== true) {
       return NextResponse.json(
         {
           error:
@@ -184,41 +262,47 @@ export async function POST(request) {
     }
 
     // =======================================================
-    // STUDENT STATUS
+    // STUDENT ACCOUNT STATUS
     // =======================================================
 
-    if (
-      user.role === "student" &&
-      user.status === "pending"
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Your account is waiting for facilitator approval.",
-        },
-        {
-          status: 403,
-        }
-      );
-    }
+    if (user.role === "student") {
+      // -----------------------------------------------------
+      // Pending
+      // -----------------------------------------------------
 
-    if (
-      user.role === "student" &&
-      user.status === "rejected"
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Your student account was not approved.",
-        },
-        {
-          status: 403,
-        }
-      );
+      if (user.status === "pending") {
+        return NextResponse.json(
+          {
+            error:
+              "Your account is waiting for facilitator approval.",
+            status: "pending",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
+
+      // -----------------------------------------------------
+      // Rejected
+      // -----------------------------------------------------
+
+      if (user.status === "rejected") {
+        return NextResponse.json(
+          {
+            error:
+              "Your student account was not approved.",
+            status: "rejected",
+          },
+          {
+            status: 403,
+          }
+        );
+      }
     }
 
     // =======================================================
-    // ACCOUNT STATUS
+    // GENERAL ACCOUNT STATUS
     // =======================================================
 
     if (user.status !== "active") {
@@ -226,6 +310,36 @@ export async function POST(request) {
         {
           error:
             "Your account is not active.",
+          status:
+            user.status || "unknown",
+        },
+        {
+          status: 403,
+        }
+      );
+    }
+
+    // =======================================================
+    // STUDENT SAFETY CHECK
+    // =======================================================
+
+    if (
+      user.role === "student" &&
+      !user.studentId
+    ) {
+      console.error(
+        "LOGIN ERROR: Active student has no studentId.",
+        {
+          userId:
+            user._id?.toString(),
+          email: user.email,
+        }
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Your student account is not fully configured yet. Please contact the administrator.",
         },
         {
           status: 403,
@@ -237,25 +351,25 @@ export async function POST(request) {
     // CREATE SESSION
     // =======================================================
 
+    const displayName =
+      getDisplayName(user);
+
     const token =
       await createSession({
-        id: user._id.toString(),
+        id:
+          user._id.toString(),
 
-        role: user.role,
+        userId:
+          user._id.toString(),
+
+        role:
+          user.role,
 
         studentId:
           user.studentId || null,
 
         name:
-          [
-            user.firstName,
-            user.lastName,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .trim() ||
-          user.name ||
-          user.email,
+          displayName,
 
         email:
           user.email,
@@ -272,18 +386,17 @@ export async function POST(request) {
       await cookies();
 
     /*
-     * IMPORTANT:
+     * Session cookie:
      *
-     * There is intentionally NO:
+     * - httpOnly prevents JavaScript access
+     * - secure is enabled in production
+     * - sameSite=lax helps protect against CSRF
+     * - path=/ makes it available throughout the platform
      *
-     * maxAge
-     * expires
-     *
-     * Therefore this is a browser session cookie.
-     *
-     * Students and facilitators use exactly
-     * the same cookie behavior.
+     * No maxAge or expires is specified, so the cookie
+     * behaves as a browser session cookie.
      */
+
     cookieStore.set(
       "dcc_session",
       token,
@@ -301,10 +414,12 @@ export async function POST(request) {
     );
 
     // =======================================================
-    // SUCCESS
+    // SUCCESS RESPONSE
     // =======================================================
 
     return NextResponse.json({
+      success: true,
+
       message:
         "Login successful.",
 
@@ -313,15 +428,7 @@ export async function POST(request) {
           user._id.toString(),
 
         name:
-          [
-            user.firstName,
-            user.lastName,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .trim() ||
-          user.name ||
-          user.email,
+          displayName,
 
         email:
           user.email,

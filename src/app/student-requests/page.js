@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckCircle,
-  XCircle,
+  Clock3,
+  Mail,
   RefreshCw,
+  UserCheck,
   Users,
+  XCircle,
 } from "lucide-react";
 
 export default function StudentRequestsPage() {
@@ -15,67 +18,107 @@ export default function StudentRequestsPage() {
   const [user, setUser] = useState(null);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  async function loadRequests() {
-    try {
-      setLoading(true);
-      setError("");
+  // ---------------------------------------------------------
+  // Load student applications
+  // ---------------------------------------------------------
+  const loadRequests = useCallback(
+    async (showFullLoader = true) => {
+      try {
+        if (showFullLoader) {
+          setLoading(true);
+        } else {
+          setRefreshing(true);
+        }
 
-      const meResponse = await fetch("/api/auth/me", {
-        cache: "no-store",
-      });
+        setError("");
 
-      if (!meResponse.ok) {
-        router.replace("/login");
-        return;
-      }
+        // Check logged-in user
+        const meResponse = await fetch("/api/auth/me", {
+          cache: "no-store",
+        });
 
-      const meData = await meResponse.json();
+        if (!meResponse.ok) {
+          router.replace("/login");
+          return;
+        }
 
-      if (meData.user?.role !== "facilitator") {
-        router.replace("/");
-        return;
-      }
+        const meData = await meResponse.json();
 
-      setUser(meData.user);
+        if (meData.user?.role !== "facilitator") {
+          router.replace("/");
+          return;
+        }
 
-      const response = await fetch("/api/student-requests", {
-        cache: "no-store",
-      });
+        setUser(meData.user);
 
-      const data = await response.json();
+        // Load pending applications
+        const response = await fetch("/api/student-requests", {
+          cache: "no-store",
+        });
 
-      if (!response.ok) {
-        throw new Error(
-          data.error || "Unable to load student requests."
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              data.message ||
+              "Unable to load student applications."
+          );
+        }
+
+        const applications =
+          data.requests ||
+          data.students ||
+          data.applications ||
+          [];
+
+        setRequests(Array.isArray(applications) ? applications : []);
+      } catch (err) {
+        console.error("Student Requests Error:", err);
+
+        setError(
+          err.message || "Unable to load student applications."
         );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
+    },
+    [router]
+  );
 
-      setRequests(data.requests || []);
-    } catch (err) {
-      console.error("Student Requests Error:", err);
-
-      setError(
-        err.message || "Unable to load student requests."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  // ---------------------------------------------------------
+  // Initial load
+  // ---------------------------------------------------------
   useEffect(() => {
-    loadRequests();
-  }, []);
+    loadRequests(true);
+  }, [loadRequests]);
 
+  // ---------------------------------------------------------
+  // Automatically check for new applications
+  // ---------------------------------------------------------
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadRequests(false);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [loadRequests]);
+
+  // ---------------------------------------------------------
+  // Accept / reject application
+  // ---------------------------------------------------------
   async function handleAction(request, action) {
     const userId = request.id || request._id;
 
     if (!userId) {
       setError(
-        "This student request does not have a valid user ID. Please refresh the page and try again."
+        "This student application does not have a valid user ID. Please refresh the page and try again."
       );
       return;
     }
@@ -98,19 +141,16 @@ export default function StudentRequestsPage() {
       setError("");
       setMessage("");
 
-      const response = await fetch(
-        "/api/student-requests",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: userId,
-            action: action,
-          }),
-        }
-      );
+      const response = await fetch("/api/student-requests", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          action,
+        }),
+      });
 
       const data = await response.json();
 
@@ -118,31 +158,42 @@ export default function StudentRequestsPage() {
         throw new Error(
           data.error ||
             data.message ||
-            "Unable to process request."
+            "Unable to process this application."
         );
       }
 
       setMessage(
         data.message ||
-          "Request processed successfully."
+          (action === "accept"
+            ? "Student application approved successfully."
+            : "Student application rejected successfully.")
       );
 
-      await loadRequests();
+      // Reload applications after action
+      await loadRequests(false);
     } catch (err) {
-      console.error(
-        "Student Request Action Error:",
-        err
-      );
+      console.error("Student Request Action Error:", err);
 
       setError(
         err.message ||
-          "Unable to process request."
+          "Unable to process this student application."
       );
     } finally {
       setProcessingId(null);
     }
   }
 
+  // ---------------------------------------------------------
+  // Manual refresh
+  // ---------------------------------------------------------
+  async function handleRefresh() {
+    setMessage("");
+    await loadRequests(false);
+  }
+
+  // ---------------------------------------------------------
+  // Loading screen
+  // ---------------------------------------------------------
   if (!user || loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-4">
@@ -153,7 +204,7 @@ export default function StudentRequestsPage() {
           />
 
           <p className="text-slate-600">
-            Loading student requests...
+            Loading student applications...
           </p>
         </div>
       </div>
@@ -163,8 +214,9 @@ export default function StudentRequestsPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-6 md:p-8">
       <div className="mx-auto max-w-6xl">
-
-        {/* Header */}
+        {/* -------------------------------------------------
+            Header
+        ------------------------------------------------- */}
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="mb-2 flex items-center gap-3">
@@ -174,11 +226,11 @@ export default function StudentRequestsPage() {
 
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">
-                  Student Requests
+                  Student Applications
                 </h1>
 
                 <p className="text-sm text-slate-500">
-                  Review and approve student registrations.
+                  Review and manage student registrations.
                 </p>
               </div>
             </div>
@@ -186,118 +238,252 @@ export default function StudentRequestsPage() {
 
           <button
             type="button"
-            onClick={loadRequests}
-            disabled={loading}
+            onClick={handleRefresh}
+            disabled={refreshing}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw
               size={17}
-              className={
-                loading ? "animate-spin" : ""
-              }
+              className={refreshing ? "animate-spin" : ""}
             />
 
-            Refresh
+            {refreshing ? "Refreshing..." : "Refresh"}
           </button>
         </div>
 
-        {/* Success Message */}
+        {/* -------------------------------------------------
+            Statistics
+        ------------------------------------------------- */}
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  Pending Applications
+                </p>
+
+                <p className="mt-1 text-2xl font-bold text-slate-900">
+                  {requests.length}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-amber-50 p-3 text-amber-600">
+                <Clock3 size={22} />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  Action Required
+                </p>
+
+                <p className="mt-1 text-2xl font-bold text-slate-900">
+                  {requests.length}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-blue-50 p-3 text-blue-600">
+                <UserCheck size={22} />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  Application Status
+                </p>
+
+                <p className="mt-1 text-sm font-semibold text-green-600">
+                  Awaiting Review
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-green-50 p-3 text-green-600">
+                <CheckCircle size={22} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* -------------------------------------------------
+            Success Message
+        ------------------------------------------------- */}
         {message && (
-          <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            {message}
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && requests.length === 0 && (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm sm:p-12">
-            <Users
-              size={48}
-              className="mx-auto mb-4 text-slate-300"
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+            <CheckCircle
+              size={18}
+              className="mt-0.5 shrink-0"
             />
 
-            <h2 className="text-xl font-semibold text-slate-800">
-              No Pending Requests
-            </h2>
-
-            <p className="mt-2 text-sm text-slate-500">
-              There are currently no student registrations
-              waiting for approval.
-            </p>
+            <span>{message}</span>
           </div>
         )}
 
-        {/* Requests */}
+        {/* -------------------------------------------------
+            Error Message
+        ------------------------------------------------- */}
+        {error && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <XCircle
+              size={18}
+              className="mt-0.5 shrink-0"
+            />
+
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* -------------------------------------------------
+            Empty State
+        ------------------------------------------------- */}
+        {requests.length === 0 && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm sm:p-12">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+              <Users
+                size={32}
+                className="text-slate-400"
+              />
+            </div>
+
+            <h2 className="text-xl font-semibold text-slate-800">
+              No Pending Applications
+            </h2>
+
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+              There are currently no student registrations
+              waiting for facilitator approval.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw
+                size={17}
+                className={refreshing ? "animate-spin" : ""}
+              />
+
+              Check Again
+            </button>
+          </div>
+        )}
+
+        {/* -------------------------------------------------
+            Pending Applications
+        ------------------------------------------------- */}
         {requests.length > 0 && (
           <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-
+            {/* Table Header */}
             <div className="border-b border-slate-200 px-4 py-4 sm:px-6">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="font-semibold text-slate-900">
-                  Pending Registrations
-                </h2>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="font-semibold text-slate-900">
+                    Pending Registrations
+                  </h2>
 
-                <span className="shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                  <p className="mt-1 text-xs text-slate-500">
+                    Review each application and decide whether
+                    the student should be admitted.
+                  </p>
+                </div>
+
+                <span className="w-fit shrink-0 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
                   {requests.length}{" "}
                   {requests.length === 1
-                    ? "Request"
-                    : "Requests"}
+                    ? "Application"
+                    : "Applications"}
                 </span>
               </div>
             </div>
 
+            {/* Application List */}
             <div className="divide-y divide-slate-200">
-
               {requests.map((request) => {
                 const requestId =
                   request.id || request._id;
 
+                const isProcessing =
+                  processingId === requestId;
+
                 return (
                   <div
                     key={requestId}
-                    className="p-4 sm:p-6"
+                    className="p-4 transition hover:bg-slate-50 sm:p-6"
                   >
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-
                       {/* Student Information */}
-                      <div className="min-w-0">
-                        <h3 className="break-words text-lg font-semibold text-slate-900">
-                          {request.name || "Unnamed Student"}
-                        </h3>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start gap-4">
+                          <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600 sm:flex">
+                            <Users size={20} />
+                          </div>
 
-                        <p className="mt-1 break-all text-sm text-slate-600">
-                          {request.email}
-                        </p>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="break-words text-lg font-semibold text-slate-900">
+                                {request.name ||
+                                  "Unnamed Student"}
+                              </h3>
 
-                        {request.program && (
-                          <p className="mt-1 text-sm text-slate-500">
-                            Program:{" "}
-                            <span className="font-medium text-slate-700">
-                              {request.program}
-                            </span>
-                          </p>
-                        )}
+                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                                <Clock3 size={12} />
+                                Pending
+                              </span>
+                            </div>
 
-                        {request.createdAt && (
-                          <p className="mt-2 text-xs text-slate-400">
-                            Registered:{" "}
-                            {new Date(
-                              request.createdAt
-                            ).toLocaleDateString()}
-                          </p>
-                        )}
+                            {/* Email */}
+                            {request.email && (
+                              <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                                <Mail
+                                  size={15}
+                                  className="shrink-0 text-slate-400"
+                                />
+
+                                <span className="break-all">
+                                  {request.email}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Program */}
+                            {request.program && (
+                              <p className="mt-2 text-sm text-slate-500">
+                                Program:{" "}
+                                <span className="font-medium text-slate-700">
+                                  {request.program}
+                                </span>
+                              </p>
+                            )}
+
+                            {/* Registration Date */}
+                            {request.createdAt && (
+                              <p className="mt-2 text-xs text-slate-400">
+                                Application submitted:{" "}
+                                {new Date(
+                                  request.createdAt
+                                ).toLocaleDateString(
+                                  undefined,
+                                  {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  }
+                                )}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-
+                      <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
                         {/* Accept */}
                         <button
                           type="button"
@@ -308,14 +494,20 @@ export default function StudentRequestsPage() {
                             )
                           }
                           disabled={
-                            !requestId ||
-                            processingId === requestId
+                            !requestId || isProcessing
                           }
                           className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         >
-                          <CheckCircle size={17} />
+                          {isProcessing ? (
+                            <RefreshCw
+                              size={17}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <CheckCircle size={17} />
+                          )}
 
-                          {processingId === requestId
+                          {isProcessing
                             ? "Processing..."
                             : "Accept"}
                         </button>
@@ -330,14 +522,20 @@ export default function StudentRequestsPage() {
                             )
                           }
                           disabled={
-                            !requestId ||
-                            processingId === requestId
+                            !requestId || isProcessing
                           }
                           className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                         >
-                          <XCircle size={17} />
+                          {isProcessing ? (
+                            <RefreshCw
+                              size={17}
+                              className="animate-spin"
+                            />
+                          ) : (
+                            <XCircle size={17} />
+                          )}
 
-                          {processingId === requestId
+                          {isProcessing
                             ? "Processing..."
                             : "Reject"}
                         </button>
@@ -346,10 +544,21 @@ export default function StudentRequestsPage() {
                   </div>
                 );
               })}
-
             </div>
           </div>
         )}
+
+        {/* -------------------------------------------------
+            Auto-refresh information
+        ------------------------------------------------- */}
+        <div className="mt-5 flex items-center justify-center gap-2 text-xs text-slate-400">
+          <RefreshCw size={13} />
+
+          <span>
+            Applications are automatically checked for
+            updates every 30 seconds.
+          </span>
+        </div>
       </div>
     </div>
   );

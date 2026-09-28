@@ -13,14 +13,18 @@ import { createNotification } from "@/lib/notifications";
 async function getSession() {
   const cookieStore = await cookies();
 
-  const token =
-    cookieStore.get("dcc_session")?.value;
+  const token = cookieStore.get("dcc_session")?.value;
 
   if (!token) {
     return null;
   }
 
-  return await verifySession(token);
+  try {
+    return await verifySession(token);
+  } catch (error) {
+    console.error("SESSION VERIFICATION ERROR:", error);
+    return null;
+  }
 }
 
 // =========================================================
@@ -28,36 +32,27 @@ async function getSession() {
 // =========================================================
 
 async function requireFacilitator() {
-  const session =
-    await getSession();
+  const session = await getSession();
 
   if (!session) {
     return {
       error: NextResponse.json(
         {
-          error:
-            "You must be logged in.",
+          error: "You must be logged in.",
         },
-        {
-          status: 401,
-        }
+        { status: 401 }
       ),
     };
   }
 
-  if (
-    session.role !==
-    "facilitator"
-  ) {
+  if (session.role !== "facilitator") {
     return {
       error: NextResponse.json(
         {
           error:
             "Only facilitators can perform this action.",
         },
-        {
-          status: 403,
-        }
+        { status: 403 }
       ),
     };
   }
@@ -68,35 +63,55 @@ async function requireFacilitator() {
 }
 
 // =========================================================
-// HTML ESCAPE
+// DATABASE
 // =========================================================
 
-function escapeHtml(value = "") {
-  return String(value)
-    .replace(
-      /&/g,
-      "&amp;"
-    )
-    .replace(
-      /</g,
-      "&lt;"
-    )
-    .replace(
-      />/g,
-      "&gt;"
-    )
-    .replace(
-      /"/g,
-      "&quot;"
-    )
-    .replace(
-      /'/g,
-      "&#039;"
-    );
+async function getDatabase() {
+  const client = await clientPromise;
+
+  const dbName =
+    process.env.DB_NAME || "DCCPlatform";
+
+  return client.db(dbName);
 }
 
 // =========================================================
-// SEND STUDENT APPROVAL EMAIL
+// HELPERS
+// =========================================================
+
+function isValidObjectId(value) {
+  return (
+    typeof value === "string" &&
+    ObjectId.isValid(value)
+  );
+}
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function getStudentNames(name = "") {
+  const parts = String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const firstName = parts.shift() || "";
+  const lastName = parts.join(" ") || "";
+
+  return {
+    firstName,
+    lastName,
+  };
+}
+
+// =========================================================
+// SEND APPROVAL EMAIL
 // =========================================================
 
 async function sendApprovalEmail({
@@ -109,10 +124,6 @@ async function sendApprovalEmail({
   const fromEmail =
     process.env.EMAIL_FROM ||
     "Dodoo Coding Club <hello@dccstudentplatform.com>";
-
-  // -------------------------------------------------------
-  // Check Resend configuration
-  // -------------------------------------------------------
 
   if (!apiKey) {
     throw new Error(
@@ -132,20 +143,11 @@ async function sendApprovalEmail({
     );
   }
 
-  // -------------------------------------------------------
-  // Student name
-  // -------------------------------------------------------
-
   const studentName =
-    name?.trim() ||
-    "Student";
+    String(name || "Student").trim();
 
   const safeStudentName =
     escapeHtml(studentName);
-
-  // -------------------------------------------------------
-  // Email HTML
-  // -------------------------------------------------------
 
   const html = `
 <!DOCTYPE html>
@@ -388,10 +390,6 @@ async function sendApprovalEmail({
 </html>
 `;
 
-  // -------------------------------------------------------
-  // Plain-text email
-  // -------------------------------------------------------
-
   const text = `Hello ${studentName},
 
 Your request to join the Dodoo Coding Club Student Platform has been approved.
@@ -410,10 +408,6 @@ Best regards,
 Dodoo Coding Club
 Student Success & Impact Platform`;
 
-  // -------------------------------------------------------
-  // Send through Resend
-  // -------------------------------------------------------
-
   console.log(
     "SENDING STUDENT APPROVAL EMAIL:",
     {
@@ -422,44 +416,31 @@ Student Success & Impact Platform`;
     }
   );
 
-  const response =
-    await fetch(
-      "https://api.resend.com/emails",
-      {
-        method: "POST",
+  const response = await fetch(
+    "https://api.resend.com/emails",
+    {
+      method: "POST",
 
-        headers: {
-          Authorization:
-            `Bearer ${apiKey}`,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
 
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
-          from: fromEmail,
-
-          to: [email],
-
-          subject:
-            "Your Dodoo Coding Club Application Has Been Approved",
-
-          text,
-
-          html,
-        }),
-      }
-    );
-
-  // -------------------------------------------------------
-  // Read Resend response
-  // -------------------------------------------------------
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [email],
+        subject:
+          "Your Dodoo Coding Club Application Has Been Approved",
+        text,
+        html,
+      }),
+    }
+  );
 
   let data = {};
 
   try {
-    data =
-      await response.json();
+    data = await response.json();
   } catch (jsonError) {
     console.error(
       "RESEND RESPONSE JSON ERROR:",
@@ -470,31 +451,19 @@ Student Success & Impact Platform`;
   console.log(
     "RESEND APPROVAL EMAIL RESPONSE:",
     {
-      status:
-        response.status,
-
-      ok:
-        response.ok,
-
+      status: response.status,
+      ok: response.ok,
       data,
     }
   );
-
-  // -------------------------------------------------------
-  // Handle Resend failure
-  // -------------------------------------------------------
 
   if (!response.ok) {
     console.error(
       "RESEND APPROVAL EMAIL ERROR:",
       {
-        status:
-          response.status,
-
+        status: response.status,
         data,
-
-        recipient:
-          email,
+        recipient: email,
       }
     );
 
@@ -505,27 +474,11 @@ Student Success & Impact Platform`;
     );
   }
 
-  // -------------------------------------------------------
-  // Successful email
-  // -------------------------------------------------------
-
-  console.log(
-    "RESEND APPROVAL EMAIL SUCCESS:",
-    {
-      id:
-        data?.id ||
-        null,
-
-      recipient:
-        email,
-    }
-  );
-
   return data;
 }
 
 // =========================================================
-// CREATE NOTIFICATION FOR STUDENT REQUEST
+// STUDENT NOTIFICATION
 // =========================================================
 
 async function notifyStudentRequest({
@@ -536,48 +489,41 @@ async function notifyStudentRequest({
     return;
   }
 
+  let title =
+    "Student Request Updated";
+
+  let message =
+    "Your student platform request has been updated.";
+
+  let link = "/login";
+
+  if (action === "accept") {
+    title = "Application Approved";
+
+    message =
+      "Your request to join the Dodoo Coding Club Student Platform has been approved. Your student account is now active.";
+
+    link = "/dashboard";
+  }
+
+  if (action === "reject") {
+    title = "Application Not Approved";
+
+    message =
+      "Your request to join the Dodoo Coding Club Student Platform was not approved.";
+
+    link = "/login";
+  }
+
   try {
-    let title =
-      "Student Request Updated";
-
-    let message =
-      "Your student platform request has been updated.";
-
-    if (action === "accept") {
-      title =
-        "Application Approved";
-
-      message =
-        "Your request to join the Dodoo Coding Club Student Platform has been approved. Your student account is now active.";
-    }
-
-    if (action === "reject") {
-      title =
-        "Application Not Approved";
-
-      message =
-        "Your request to join the Dodoo Coding Club Student Platform was not approved.";
-    }
-
     await createNotification({
-      userId:
-        user._id.toString(),
-
+      userId: user._id.toString(),
       title,
-
       message,
-
-      type:
-        "student-request",
-
-      link:
-        action === "accept"
-          ? "/dashboard"
-          : "/login",
+      type: "student-request",
+      link,
     });
   } catch (notificationError) {
-    // A notification failure must never
-    // undo the request decision.
     console.error(
       "STUDENT REQUEST NOTIFICATION ERROR:",
       notificationError
@@ -598,60 +544,43 @@ export async function GET() {
       return auth.error;
     }
 
-    const client =
-      await clientPromise;
+    const db = await getDatabase();
 
-    const dbName =
-      process.env.DB_NAME ||
-      "DCCPlatform";
-
-    const db =
-      client.db(dbName);
-
-    const requests =
-      await db
-        .collection("users")
-        .find({
-          role: "student",
-          status: "pending",
-          emailVerified: true,
-        })
-        .sort({
-          createdAt: -1,
-        })
-        .toArray();
+    const requests = await db
+      .collection("users")
+      .find({
+        role: "student",
+        status: "pending",
+        emailVerified: true,
+      })
+      .sort({
+        createdAt: -1,
+      })
+      .toArray();
 
     const formattedRequests =
-      requests.map(
-        (user) => ({
-          id:
-            user._id.toString(),
+      requests.map((user) => ({
+        id: user._id.toString(),
 
-          name:
-            user.name || "",
+        name: user.name || "",
 
-          email:
-            user.email || "",
+        email: user.email || "",
 
-          program:
-            user.program || "",
+        program: user.program || "",
 
-          status:
-            user.status,
+        status: user.status,
 
-          emailVerified:
-            user.emailVerified ===
-            true,
+        emailVerified:
+          user.emailVerified === true,
 
-          createdAt:
-            user.createdAt ||
-            null,
-        })
-      );
+        createdAt:
+          user.createdAt || null,
+      }));
 
     return NextResponse.json({
-      requests:
-        formattedRequests,
+      success: true,
+      requests: formattedRequests,
+      total: formattedRequests.length,
     });
   } catch (error) {
     console.error(
@@ -661,6 +590,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
+        success: false,
         error:
           "Failed to load student requests.",
       },
@@ -675,10 +605,12 @@ export async function GET() {
 // ACCEPT / REJECT STUDENT REQUEST
 // =========================================================
 
-export async function POST(
-  request
-) {
+export async function POST(request) {
   try {
+    // -------------------------------------------------------
+    // Authorization
+    // -------------------------------------------------------
+
     const auth =
       await requireFacilitator();
 
@@ -686,23 +618,33 @@ export async function POST(
       return auth.error;
     }
 
-    const body =
-      await request.json();
+    // -------------------------------------------------------
+    // Read request body
+    // -------------------------------------------------------
 
-    const userId =
-      body.userId;
+    let body;
 
-    const action =
-      body.action;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const userId = body.userId;
+    const action = body.action;
 
     // -------------------------------------------------------
     // Validate request
     // -------------------------------------------------------
 
-    if (
-      !userId ||
-      !action
-    ) {
+    if (!userId || !action) {
       return NextResponse.json(
         {
           error:
@@ -715,15 +657,12 @@ export async function POST(
     }
 
     if (
-      ![
-        "accept",
-        "reject",
-      ].includes(action)
+      !["accept", "reject"].includes(action)
     ) {
       return NextResponse.json(
         {
           error:
-            "Invalid action.",
+            "Invalid action. Use accept or reject.",
         },
         {
           status: 400,
@@ -731,15 +670,10 @@ export async function POST(
       );
     }
 
-    if (
-      !ObjectId.isValid(
-        userId
-      )
-    ) {
+    if (!isValidObjectId(userId)) {
       return NextResponse.json(
         {
-          error:
-            "Invalid user ID.",
+          error: "Invalid user ID.",
         },
         {
           status: 400,
@@ -751,38 +685,23 @@ export async function POST(
     // Database
     // -------------------------------------------------------
 
-    const client =
-      await clientPromise;
+    const db = await getDatabase();
 
-    const dbName =
-      process.env.DB_NAME ||
-      "DCCPlatform";
-
-    const db =
-      client.db(dbName);
+    const userObjectId =
+      new ObjectId(userId);
 
     // -------------------------------------------------------
-    // Find pending student
+    // Find pending, verified student
     // -------------------------------------------------------
 
-    const user =
-      await db
-        .collection("users")
-        .findOne({
-          _id:
-            new ObjectId(
-              userId
-            ),
-
-          role:
-            "student",
-
-          status:
-            "pending",
-
-          emailVerified:
-            true,
-        });
+    const user = await db
+      .collection("users")
+      .findOne({
+        _id: userObjectId,
+        role: "student",
+        status: "pending",
+        emailVerified: true,
+      });
 
     if (!user) {
       return NextResponse.json(
@@ -800,38 +719,43 @@ export async function POST(
     // REJECT
     // =======================================================
 
-    if (
-      action === "reject"
-    ) {
-      await db
+    if (action === "reject") {
+      const updateResult = await db
         .collection("users")
         .updateOne(
           {
-            _id:
-              user._id,
+            _id: user._id,
+            role: "student",
+            status: "pending",
           },
           {
             $set: {
-              status:
-                "rejected",
-
-              updatedAt:
-                new Date(),
+              status: "rejected",
+              updatedAt: new Date(),
             },
           }
         );
 
-      // -----------------------------------------------------
-      // CREATE NOTIFICATION
-      // -----------------------------------------------------
+      if (updateResult.modifiedCount === 0) {
+        return NextResponse.json(
+          {
+            error:
+              "The student request could not be rejected because it may have already been processed.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
 
+      // Notify student
       await notifyStudentRequest({
         user,
-        action:
-          "reject",
+        action: "reject",
       });
 
       return NextResponse.json({
+        success: true,
         message:
           "Student request rejected.",
       });
@@ -841,40 +765,37 @@ export async function POST(
     // ACCEPT
     // =======================================================
 
+    // -------------------------------------------------------
+    // Check whether a student record already exists
+    // -------------------------------------------------------
+
     const existingStudent =
       await db
         .collection("students")
         .findOne({
-          email:
-            user.email,
+          email: user.email,
         });
 
     let studentId;
+    let studentWasCreated = false;
 
     // -------------------------------------------------------
     // Existing student
     // -------------------------------------------------------
 
-    if (
-      existingStudent
-    ) {
-      studentId =
-        existingStudent._id;
+    if (existingStudent) {
+      studentId = existingStudent._id;
 
       await db
         .collection("students")
         .updateOne(
           {
-            _id:
-              existingStudent._id,
+            _id: existingStudent._id,
           },
           {
             $set: {
-              status:
-                "Active",
-
-              updatedAt:
-                new Date(),
+              status: "Active",
+              updatedAt: new Date(),
             },
           }
         );
@@ -885,29 +806,16 @@ export async function POST(
     // -------------------------------------------------------
 
     else {
-      const nameParts =
-        (
-          user.name ||
-          ""
-        )
-          .trim()
-          .split(/\s+/);
-
-      const firstName =
-        nameParts.shift() ||
-        "";
-
-      const lastName =
-        nameParts.join(" ") ||
-        "";
+      const {
+        firstName,
+        lastName,
+      } = getStudentNames(user.name);
 
       const enrollmentDate =
         new Date();
 
       const expectedCompletionDate =
-        new Date(
-          enrollmentDate
-        );
+        new Date(enrollmentDate);
 
       expectedCompletionDate.setMonth(
         expectedCompletionDate.getMonth() +
@@ -916,97 +824,107 @@ export async function POST(
 
       const student = {
         firstName,
-
         lastName,
 
-        email:
-          user.email,
+        email: user.email,
 
-        phone:
-          "",
+        phone: "",
 
-        dateOfBirth:
-          "",
+        dateOfBirth: "",
 
-        gender:
-          "",
+        gender: "",
 
         program:
           user.program ||
           "Software Development",
 
-        educationLevel:
-          "",
+        educationLevel: "",
 
-        school:
-          "",
+        school: "",
 
-        address:
-          "",
+        address: "",
 
-        emergencyContactName:
-          "",
+        emergencyContactName: "",
 
-        emergencyContactPhone:
-          "",
+        emergencyContactPhone: "",
 
         enrollmentDate,
 
         expectedCompletionDate,
 
-        programDurationMonths:
-          24,
+        programDurationMonths: 24,
 
-        status:
-          "Active",
+        status: "Active",
 
-        progress:
-          0,
+        progress: 0,
 
-        profileImage:
-          "",
+        profileImage: "",
 
-        createdAt:
-          new Date(),
+        createdAt: new Date(),
 
-        updatedAt:
-          new Date(),
+        updatedAt: new Date(),
       };
 
-      const result =
-        await db
-          .collection("students")
-          .insertOne(
-            student
-          );
+      const result = await db
+        .collection("students")
+        .insertOne(student);
 
-      studentId =
-        result.insertedId;
+      studentId = result.insertedId;
+      studentWasCreated = true;
     }
 
     // =======================================================
     // ACTIVATE USER ACCOUNT
     // =======================================================
 
-    await db
-      .collection("users")
-      .updateOne(
+    const userUpdateResult =
+      await db
+        .collection("users")
+        .updateOne(
+          {
+            _id: user._id,
+            role: "student",
+            status: "pending",
+          },
+          {
+            $set: {
+              status: "active",
+
+              studentId,
+
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+    // -------------------------------------------------------
+    // Safety check
+    // -------------------------------------------------------
+
+    if (
+      userUpdateResult.modifiedCount === 0
+    ) {
+      // If we created a brand-new student record but
+      // could not activate the user, remove the student
+      // record so we do not leave an orphaned student.
+      if (studentWasCreated && studentId) {
+        await db
+          .collection("students")
+          .deleteOne({
+            _id: studentId,
+          });
+      }
+
+      return NextResponse.json(
         {
-          _id:
-            user._id,
+          error:
+            "The student account could not be activated. Please try again.",
         },
         {
-          $set: {
-            status:
-              "active",
-
-            studentId,
-
-            updatedAt:
-              new Date(),
-          },
+          status: 409,
         }
       );
+    }
 
     // =======================================================
     // CREATE APPROVAL NOTIFICATION
@@ -1014,22 +932,16 @@ export async function POST(
 
     await notifyStudentRequest({
       user,
-      action:
-        "accept",
+      action: "accept",
     });
 
     // =======================================================
     // SEND APPROVAL EMAIL
     // =======================================================
 
-    let emailSent =
-      false;
-
-    let emailResponseId =
-      null;
-
-    let emailErrorMessage =
-      "";
+    let emailSent = false;
+    let emailResponseId = null;
+    let emailErrorMessage = "";
 
     try {
       const emailResult =
@@ -1040,34 +952,27 @@ export async function POST(
               user.lastName || ""
             }`.trim(),
 
-          email:
-            user.email,
+          email: user.email,
         });
 
-      emailSent =
-        true;
+      emailSent = true;
 
       emailResponseId =
-        emailResult?.id ||
-        null;
+        emailResult?.id || null;
 
       console.log(
         "STUDENT APPROVAL EMAIL SENT:",
         {
-          studentEmail:
-            user.email,
-
-          resendId:
-            emailResponseId,
+          studentEmail: user.email,
+          resendId: emailResponseId,
         }
       );
     } catch (emailError) {
       /*
-       * IMPORTANT:
-       *
        * The student has already been approved.
-       * We do not undo the approval if Resend
-       * fails.
+       *
+       * We do NOT undo the approval if the
+       * approval email fails.
        */
 
       emailErrorMessage =
@@ -1094,10 +999,11 @@ export async function POST(
     // =======================================================
 
     return NextResponse.json({
-      message:
-        emailSent
-          ? "Student accepted successfully. An approval email has been sent to the student."
-          : "Student accepted successfully, but the approval email could not be sent.",
+      success: true,
+
+      message: emailSent
+        ? "Student accepted successfully. An approval email has been sent to the student."
+        : "Student accepted successfully, but the approval email could not be sent.",
 
       studentId:
         studentId.toString(),
@@ -1106,10 +1012,9 @@ export async function POST(
 
       emailResponseId,
 
-      emailError:
-        emailSent
-          ? null
-          : emailErrorMessage,
+      emailError: emailSent
+        ? null
+        : emailErrorMessage,
     });
   } catch (error) {
     console.error(
@@ -1119,7 +1024,9 @@ export async function POST(
 
     return NextResponse.json(
       {
+        success: false,
         error:
+          error?.message ||
           "Failed to process student request.",
       },
       {

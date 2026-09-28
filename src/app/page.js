@@ -20,6 +20,9 @@ import {
   Code2,
   Terminal,
   GitBranch,
+  FileCheck2,
+  UserPlus,
+  RefreshCw,
 } from "lucide-react";
 
 import Announcements from "@/components/Announcements";
@@ -28,8 +31,14 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [data, setData] = useState(null);
   const [studentData, setStudentData] = useState(null);
+
+  const [pendingApplications, setPendingApplications] =
+    useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refreshingApplications, setRefreshingApplications] =
+    useState(false);
 
   useEffect(() => {
     loadDashboard();
@@ -82,6 +91,58 @@ export default function Dashboard() {
         const dashboardData = await response.json();
 
         setData(dashboardData);
+
+        // ---------------------------------------------------
+        // LOAD PENDING STUDENT APPLICATIONS
+        // ---------------------------------------------------
+        //
+        // This uses the existing student-requests endpoint.
+        // The response is normalized so the dashboard can
+        // handle common response property names safely.
+        //
+
+        try {
+          const applicationsResponse = await fetch(
+            "/api/student-requests",
+            {
+              cache: "no-store",
+            }
+          );
+
+          if (applicationsResponse.ok) {
+            const applicationsData =
+              await applicationsResponse.json();
+
+            const applications =
+              Array.isArray(applicationsData)
+                ? applicationsData
+                : Array.isArray(
+                    applicationsData?.students
+                  )
+                ? applicationsData.students
+                : Array.isArray(
+                    applicationsData?.requests
+                  )
+                ? applicationsData.requests
+                : Array.isArray(
+                    applicationsData?.applications
+                  )
+                ? applicationsData.applications
+                : [];
+
+            setPendingApplications(applications);
+          } else {
+            setPendingApplications([]);
+          }
+        } catch (applicationError) {
+          console.error(
+            "Pending applications error:",
+            applicationError
+          );
+
+          // Do not prevent the main dashboard from loading.
+          setPendingApplications([]);
+        }
 
         return;
       }
@@ -170,8 +231,8 @@ export default function Dashboard() {
         const attendance = Array.isArray(attendanceData)
           ? attendanceData
           : Array.isArray(attendanceData?.attendance)
-            ? attendanceData.attendance
-            : [];
+          ? attendanceData.attendance
+          : [];
 
         // =====================================================
         // NORMALIZE PROJECT DATA
@@ -180,8 +241,8 @@ export default function Dashboard() {
         const projects = Array.isArray(projectsData)
           ? projectsData
           : Array.isArray(projectsData?.projects)
-            ? projectsData.projects
-            : [];
+          ? projectsData.projects
+          : [];
 
         // =====================================================
         // ONLY SHOW THIS STUDENT'S PROJECTS
@@ -234,7 +295,8 @@ export default function Dashboard() {
             ? Math.round(
                 myProjects.reduce(
                   (sum, project) =>
-                    sum + Number(project.progress || 0),
+                    sum +
+                    Number(project.progress || 0),
                   0
                 ) / myProjects.length
               )
@@ -244,13 +306,14 @@ export default function Dashboard() {
         // OFFICIAL OVERALL PROGRESS
         // =====================================================
 
-        const overallProgress = normalizeProgressValue(
-          progressData?.progress?.overall ??
-            progressData?.overallProgress ??
-            progressData?.progress?.percentage ??
-            progressData?.percentage ??
-            0
-        );
+        const overallProgress =
+          normalizeProgressValue(
+            progressData?.progress?.overall ??
+              progressData?.overallProgress ??
+              progressData?.progress?.percentage ??
+              progressData?.percentage ??
+              0
+          );
 
         // =====================================================
         // SAVE STUDENT DATA
@@ -289,15 +352,73 @@ export default function Dashboard() {
       // UNKNOWN ROLE
       // =====================================================
 
-      setError("Your account role is not recognized.");
+      setError(
+        "Your account role is not recognized."
+      );
     } catch (err) {
-      console.error("Dashboard error:", err);
+      console.error(
+        "Dashboard error:",
+        err
+      );
 
       setError(
-        err.message || "Unable to load dashboard."
+        err.message ||
+          "Unable to load dashboard."
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  // =========================================================
+  // REFRESH PENDING APPLICATIONS
+  // =========================================================
+
+  async function refreshPendingApplications() {
+    try {
+      setRefreshingApplications(true);
+
+      const response = await fetch(
+        "/api/student-requests",
+        {
+          cache: "no-store",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Unable to refresh applications."
+        );
+      }
+
+      const responseData =
+        await response.json();
+
+      const applications =
+        Array.isArray(responseData)
+          ? responseData
+          : Array.isArray(
+              responseData?.students
+            )
+          ? responseData.students
+          : Array.isArray(
+              responseData?.requests
+            )
+          ? responseData.requests
+          : Array.isArray(
+              responseData?.applications
+            )
+          ? responseData.applications
+          : [];
+
+      setPendingApplications(applications);
+    } catch (err) {
+      console.error(
+        "Refresh applications error:",
+        err
+      );
+    } finally {
+      setRefreshingApplications(false);
     }
   }
 
@@ -309,7 +430,9 @@ export default function Dashboard() {
     return (
       <div className="p-4 sm:p-6">
         <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-          <p className="text-sm text-slate-500">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-600" />
+
+          <p className="mt-4 text-sm text-slate-500">
             Loading dashboard...
           </p>
         </div>
@@ -350,6 +473,9 @@ export default function Dashboard() {
   // =========================================================
 
   if (user?.role === "facilitator") {
+    const pendingCount =
+      pendingApplications.length;
+
     return (
       <div className="p-4 sm:p-6">
 
@@ -383,11 +509,12 @@ export default function Dashboard() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
-              Guide. Teach. Build. Inspire. Empower the next
-              generation of developers by creating a practical
-              learning environment where students can turn ideas
-              into code, build real projects, and develop skills
-              for the future.
+              Guide. Teach. Build. Inspire. Empower
+              the next generation of developers by
+              creating a practical learning
+              environment where students can turn
+              ideas into code, build real projects,
+              and develop skills for the future.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3 text-xs font-medium">
@@ -404,11 +531,10 @@ export default function Dashboard() {
             </div>
 
           </div>
-
         </section>
 
         {/* =================================================
-            STATISTICS
+            MAIN STATISTICS
         ================================================= */}
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -418,6 +544,14 @@ export default function Dashboard() {
             value={data?.totalStudents ?? 0}
             icon={<Users size={22} />}
             href="/students"
+          />
+
+          <StatCard
+            title="Pending Applications"
+            value={pendingCount}
+            icon={<FileCheck2 size={22} />}
+            href="/student-requests"
+            highlight={pendingCount > 0}
           />
 
           <StatCard
@@ -434,14 +568,180 @@ export default function Dashboard() {
             href="/projects"
           />
 
-          <StatCard
-            title="Resources"
-            value={data?.resources ?? 0}
-            icon={<BookOpen size={22} />}
-            href="/resources"
-          />
-
         </div>
+
+        {/* =================================================
+            PENDING APPLICATIONS
+        ================================================= */}
+
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+            <div className="flex items-start gap-3">
+
+              <div className="rounded-xl bg-blue-50 p-2.5 text-blue-600">
+                <UserPlus size={21} />
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-semibold text-slate-900">
+                    Pending Student Applications
+                  </h2>
+
+                  {pendingCount > 0 && (
+                    <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">
+                      {pendingCount}
+                    </span>
+                  )}
+                </div>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Review students waiting for
+                  facilitator approval.
+                </p>
+              </div>
+
+            </div>
+
+            <div className="flex items-center gap-3">
+
+              <button
+                type="button"
+                onClick={refreshPendingApplications}
+                disabled={refreshingApplications}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw
+                  className={
+                    refreshingApplications
+                      ? "h-4 w-4 animate-spin"
+                      : "h-4 w-4"
+                  }
+                />
+
+                Refresh
+              </button>
+
+              <Link
+                href="/student-requests"
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                Review Applications
+                <ArrowRight size={15} />
+              </Link>
+
+            </div>
+          </div>
+
+          {pendingApplications.length > 0 ? (
+            <div className="mt-5 space-y-3">
+
+              {pendingApplications
+                .slice(0, 5)
+                .map((application) => {
+
+                  const applicationName =
+                    application.name ||
+                    `${application.firstName || ""} ${
+                      application.lastName || ""
+                    }`.trim() ||
+                    "Unnamed Student";
+
+                  const applicationEmail =
+                    application.email ||
+                    "No email provided";
+
+                  const applicationProgram =
+                    application.program ||
+                    "Program not specified";
+
+                  return (
+                    <div
+                      key={
+                        String(
+                          application._id ||
+                            application.id ||
+                            application.email ||
+                            applicationName
+                        )
+                      }
+                      className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+
+                      <div className="flex min-w-0 items-center gap-3">
+
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                          <UserRound size={20} />
+                        </div>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {applicationName}
+                          </p>
+
+                          <p className="truncate text-xs text-slate-500">
+                            {applicationEmail}
+                          </p>
+
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-slate-500">
+                              {applicationProgram}
+                            </span>
+
+                            <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-yellow-700">
+                              Pending
+                            </span>
+                          </div>
+                        </div>
+
+                      </div>
+
+                      <Link
+                        href="/student-requests"
+                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+                      >
+                        Review
+                        <ArrowRight size={14} />
+                      </Link>
+
+                    </div>
+                  );
+                })}
+
+              {pendingApplications.length > 5 && (
+                <div className="pt-2 text-center">
+                  <Link
+                    href="/student-requests"
+                    className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    View all {pendingApplications.length} applications
+                  </Link>
+                </div>
+              )}
+
+            </div>
+          ) : (
+            <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600">
+                <CheckCircle2 size={24} />
+              </div>
+
+              <h3 className="mt-3 text-sm font-semibold text-slate-900">
+                No Pending Applications
+              </h3>
+
+              <p className="mt-1 text-sm text-slate-500">
+                There are currently no student
+                applications waiting for review.
+              </p>
+
+            </div>
+          )}
+
+        </section>
 
         {/* =================================================
             FACILITATOR CARDS
@@ -500,8 +800,14 @@ export default function Dashboard() {
             <div className="grid gap-3">
 
               <QuickAction
+                href="/student-requests"
+                icon={<FileCheck2 size={18} />}
+                text="Review Applications"
+              />
+
+              <QuickAction
                 href="/students"
-                icon={<Plus size={18} />}
+                icon={<Users size={18} />}
                 text="Manage Students"
               />
 
@@ -538,31 +844,31 @@ export default function Dashboard() {
             {data?.recentStudents?.length > 0 ? (
               <div className="space-y-3">
 
-                {data.recentStudents.map((student) => (
-                  <div
-                    key={String(student._id)}
-                    className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"
-                  >
+                {data.recentStudents.map(
+                  (student) => (
+                    <div
+                      key={String(student._id)}
+                      className="flex items-center gap-3 rounded-xl bg-slate-50 p-3"
+                    >
 
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                      <UserRound size={18} />
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                        <UserRound size={18} />
+                      </div>
+
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-800">
+                          {student.firstName}{" "}
+                          {student.lastName}
+                        </p>
+
+                        <p className="truncate text-xs text-slate-500">
+                          {student.email}
+                        </p>
+                      </div>
+
                     </div>
-
-                    <div className="min-w-0">
-
-                      <p className="truncate text-sm font-semibold text-slate-800">
-                        {student.firstName}{" "}
-                        {student.lastName}
-                      </p>
-
-                      <p className="truncate text-xs text-slate-500">
-                        {student.email}
-                      </p>
-
-                    </div>
-
-                  </div>
-                ))}
+                  )
+                )}
 
               </div>
             ) : (
@@ -584,10 +890,87 @@ export default function Dashboard() {
         </div>
 
         {/* =================================================
+            ADDITIONAL FACILITATOR OVERVIEW
+        ================================================= */}
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+
+          <DashboardCard
+            title="Program Overview"
+            description="Current platform activity"
+            icon={<ChartNoAxesCombined size={20} />}
+          >
+
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+
+              <MiniStat
+                label="Students"
+                value={data?.totalStudents ?? 0}
+                icon={<Users size={17} />}
+              />
+
+              <MiniStat
+                label="Projects"
+                value={data?.activeProjects ?? 0}
+                icon={<FolderKanban size={17} />}
+              />
+
+              <MiniStat
+                label="Resources"
+                value={data?.resources ?? 0}
+                icon={<BookOpen size={17} />}
+              />
+
+            </div>
+
+          </DashboardCard>
+
+          <DashboardCard
+            title="Application Status"
+            description="Student registration workflow"
+            icon={<FileCheck2 size={20} />}
+          >
+
+            <div className="rounded-xl bg-slate-50 p-4">
+
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    Applications awaiting review
+                  </p>
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Review applications and approve
+                    eligible students.
+                  </p>
+                </div>
+
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
+                  {pendingCount}
+                </div>
+              </div>
+
+              <Link
+                href="/student-requests"
+                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-700"
+              >
+                Open application management
+                <ArrowRight size={15} />
+              </Link>
+
+            </div>
+
+          </DashboardCard>
+
+        </div>
+
+        {/* =================================================
             ANNOUNCEMENTS
         ================================================= */}
 
-        <Announcements role={user?.role} />
+        <div className="mt-6">
+          <Announcements role={user?.role} />
+        </div>
 
       </div>
     );
@@ -597,7 +980,10 @@ export default function Dashboard() {
   // PENDING STUDENT
   // =========================================================
 
-  if (user?.role === "student" && studentData?.pending) {
+  if (
+    user?.role === "student" &&
+    studentData?.pending
+  ) {
     return (
       <div className="p-4 sm:p-6">
         <div className="flex min-h-[70vh] items-center justify-center">
@@ -615,8 +1001,10 @@ export default function Dashboard() {
               </h1>
 
               <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-                Your application has been submitted successfully
-                and is currently being reviewed by a facilitator.
+                Your application has been
+                submitted successfully and is
+                currently being reviewed by a
+                facilitator.
               </p>
 
             </div>
@@ -626,7 +1014,7 @@ export default function Dashboard() {
               <div className="flex items-start gap-3">
 
                 <div className="mt-0.5 shrink-0">
-                  <span className="text-xl">📧</span>
+                  <BookOpen className="h-5 w-5 text-blue-600" />
                 </div>
 
                 <div>
@@ -636,15 +1024,18 @@ export default function Dashboard() {
                   </h2>
 
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Please check the email address you used to
-                    register for an approval notification from
+                    Please check the email address
+                    you used to register for an
+                    approval notification from
                     Dodoo Coding Club.
                   </p>
 
                   <p className="mt-3 text-sm leading-6 text-slate-600">
-                    If you do not see the message in your Inbox,
-                    please check your{" "}
-                    <strong>Spam/Junk</strong> folder.
+                    If you do not see the message
+                    in your Inbox, please check
+                    your{" "}
+                    <strong>Spam/Junk</strong>{" "}
+                    folder.
                   </p>
 
                   {studentData.email && (
@@ -676,8 +1067,9 @@ export default function Dashboard() {
               </p>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                You will receive an email once a facilitator
-                reviews your application.
+                You will receive an email once a
+                facilitator reviews your
+                application.
               </p>
 
             </div>
@@ -710,8 +1102,6 @@ export default function Dashboard() {
 
       <section className="relative mb-8 overflow-hidden rounded-2xl bg-slate-950 p-6 text-white shadow-lg sm:p-8">
 
-        {/* Background Code Icon */}
-
         <div className="absolute -right-8 -top-8 opacity-10">
           <Code2 className="h-56 w-56" />
         </div>
@@ -739,8 +1129,6 @@ export default function Dashboard() {
                 )}
 
               </div>
-
-              {/* ONLINE INDICATOR */}
 
               <div className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-slate-950 bg-green-500">
                 <span className="h-2.5 w-2.5 rounded-full bg-white" />
@@ -780,29 +1168,23 @@ export default function Dashboard() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Where ideas become code and code becomes impact.
-                Build projects, sharpen your programming skills,
-                track your progress, and turn your ideas into
-                real-world solutions.
+                Where ideas become code and code
+                becomes impact. Build projects,
+                sharpen your programming skills,
+                track your progress, and turn your
+                ideas into real-world solutions.
               </p>
-
-              {/* PROGRAM */}
 
               {profile?.program && (
                 <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-300">
-
                   <GraduationCap className="h-4 w-4" />
-
                   {profile.program}
-
                 </div>
               )}
 
             </div>
 
           </div>
-
-          {/* CODING TAGS */}
 
           <div className="mt-6 flex flex-wrap gap-3">
 
@@ -825,7 +1207,6 @@ export default function Dashboard() {
           </div>
 
         </div>
-
       </section>
 
       {/* =================================================
@@ -1006,7 +1387,10 @@ export default function Dashboard() {
                 style={{
                   width: `${Math.min(
                     100,
-                    Math.max(0, projectProgress)
+                    Math.max(
+                      0,
+                      projectProgress
+                    )
                   )}%`,
                 }}
               />
@@ -1152,7 +1536,9 @@ export default function Dashboard() {
                             100,
                             Math.max(
                               0,
-                              Number(project.progress) || 0
+                              Number(
+                                project.progress
+                              ) || 0
                             )
                           )}%`,
                         }}
@@ -1293,11 +1679,16 @@ function StatCard({
   value,
   icon,
   href,
+  highlight = false,
 }) {
   return (
     <Link
       href={href}
-      className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className={`group rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        highlight
+          ? "border-blue-300 ring-1 ring-blue-100"
+          : "border-slate-200"
+      }`}
     >
 
       <div className="flex items-start justify-between">
@@ -1308,13 +1699,25 @@ function StatCard({
             {title}
           </p>
 
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p
+            className={`mt-2 text-2xl font-bold ${
+              highlight && Number(value) > 0
+                ? "text-blue-600"
+                : "text-slate-900"
+            }`}
+          >
             {value}
           </p>
 
         </div>
 
-        <div className="rounded-xl bg-blue-50 p-3 text-blue-600">
+        <div
+          className={`rounded-xl p-3 ${
+            highlight && Number(value) > 0
+              ? "bg-blue-100 text-blue-600"
+              : "bg-blue-50 text-blue-600"
+          }`}
+        >
           {icon}
         </div>
 
@@ -1404,7 +1807,8 @@ function ProgressItem({
   label,
   value,
 }) {
-  const normalizedValue = normalizeProgressValue(value);
+  const normalizedValue =
+    normalizeProgressValue(value);
 
   return (
     <div>

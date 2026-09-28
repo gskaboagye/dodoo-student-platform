@@ -5,26 +5,32 @@ import { ObjectId } from "mongodb";
 import { verifySession } from "@/lib/auth";
 import clientPromise from "@/lib/mongodb";
 
+const SESSION_COOKIE = "dcc_session";
+
+function clearSessionCookie(cookieStore) {
+  cookieStore.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    expires: new Date(0),
+    path: "/",
+  });
+}
+
 export async function GET() {
   try {
-    const cookieStore =
-      await cookies();
-
-    const token =
-      cookieStore.get(
-        "dcc_session"
-      )?.value;
-
     // =======================================================
-    // NO SESSION
+    // GET SESSION COOKIE
     // =======================================================
+
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE)?.value;
 
     if (!token) {
       return NextResponse.json(
         {
           authenticated: false,
-          message:
-            "No active session.",
+          message: "No active session.",
         },
         {
           status: 401,
@@ -33,44 +39,36 @@ export async function GET() {
     }
 
     // =======================================================
-    // VERIFY SESSION
+    // VERIFY JWT SESSION
     // =======================================================
 
-    const session =
-      await verifySession(token);
-
-    // =======================================================
-    // EXPIRED / INVALID SESSION
-    // =======================================================
+    const session = await verifySession(token);
 
     if (!session) {
-      /*
-       * Remove the invalid cookie.
-       */
-      cookieStore.set(
-        "dcc_session",
-        "",
-        {
-          httpOnly: true,
-
-          secure:
-            process.env.NODE_ENV ===
-            "production",
-
-          sameSite: "lax",
-
-          expires:
-            new Date(0),
-
-          path: "/",
-        }
-      );
+      clearSessionCookie(cookieStore);
 
       return NextResponse.json(
         {
           authenticated: false,
-          message:
-            "Invalid or expired session.",
+          message: "Invalid or expired session.",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
+    // =======================================================
+    // VALIDATE SESSION USER ID
+    // =======================================================
+
+    if (!session.userId) {
+      clearSessionCookie(cookieStore);
+
+      return NextResponse.json(
+        {
+          authenticated: false,
+          message: "Invalid session.",
         },
         {
           status: 401,
@@ -82,15 +80,10 @@ export async function GET() {
     // DATABASE
     // =======================================================
 
-    const client =
-      await clientPromise;
+    const client = await clientPromise;
 
-    const dbName =
-      process.env.DB_NAME ||
-      "DCCPlatform";
-
-    const db =
-      client.db(dbName);
+    const dbName = process.env.DB_NAME || "DCCPlatform";
+    const db = client.db(dbName);
 
     // =======================================================
     // FIND USER
@@ -98,32 +91,19 @@ export async function GET() {
 
     let user = null;
 
-    if (session.userId) {
-      if (
-        ObjectId.isValid(
-          session.userId
-        )
-      ) {
-        user =
-          await db
-            .collection("users")
-            .findOne({
-              _id:
-                new ObjectId(
-                  session.userId
-                ),
-            });
-      }
+    const userId = String(session.userId);
 
-      if (!user) {
-        user =
-          await db
-            .collection("users")
-            .findOne({
-              _id:
-                session.userId,
-            });
-      }
+    if (ObjectId.isValid(userId)) {
+      user = await db.collection("users").findOne({
+        _id: new ObjectId(userId),
+      });
+    }
+
+    // Fallback for legacy records where _id may be stored as a string
+    if (!user) {
+      user = await db.collection("users").findOne({
+        _id: userId,
+      });
     }
 
     // =======================================================
@@ -131,30 +111,56 @@ export async function GET() {
     // =======================================================
 
     if (!user) {
-      cookieStore.set(
-        "dcc_session",
-        "",
-        {
-          httpOnly: true,
-
-          secure:
-            process.env.NODE_ENV ===
-            "production",
-
-          sameSite: "lax",
-
-          expires:
-            new Date(0),
-
-          path: "/",
-        }
-      );
+      clearSessionCookie(cookieStore);
 
       return NextResponse.json(
         {
           authenticated: false,
-          message:
-            "User account not found.",
+          message: "User account not found.",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
+    // =======================================================
+    // ACCOUNT STATUS
+    // =======================================================
+
+    const accountStatus = String(
+      user.status || session.status || "active"
+    ).toLowerCase();
+
+    if (accountStatus !== "active") {
+      clearSessionCookie(cookieStore);
+
+      return NextResponse.json(
+        {
+          authenticated: false,
+          message: "Your account is not active.",
+        },
+        {
+          status: 401,
+        }
+      );
+    }
+
+    // =======================================================
+    // ROLE
+    // =======================================================
+
+    const role = String(
+      user.role || session.role || ""
+    ).toLowerCase();
+
+    if (!["student", "facilitator"].includes(role)) {
+      clearSessionCookie(cookieStore);
+
+      return NextResponse.json(
+        {
+          authenticated: false,
+          message: "Invalid account role.",
         },
         {
           status: 401,
@@ -179,38 +185,31 @@ export async function GET() {
       "User";
 
     // =======================================================
-    // CHECK ACCOUNT STATUS
+    // STUDENT ID
     // =======================================================
 
-    if (
-      user.status &&
-      user.status !== "active"
-    ) {
-      cookieStore.set(
-        "dcc_session",
-        "",
-        {
-          httpOnly: true,
+    const studentId =
+      user.studentId ||
+      session.studentId ||
+      null;
 
-          secure:
-            process.env.NODE_ENV ===
-            "production",
+    // =======================================================
+    // STUDENT SAFETY CHECK
+    // =======================================================
 
-          sameSite: "lax",
-
-          expires:
-            new Date(0),
-
-          path: "/",
-        }
+    if (role === "student" && !studentId) {
+      console.error(
+        "ACTIVE STUDENT HAS NO STUDENT ID:",
+        user._id?.toString()
       );
+
+      clearSessionCookie(cookieStore);
 
       return NextResponse.json(
         {
           authenticated: false,
-
           message:
-            "Your account is not active.",
+            "Your student account is not properly linked. Please contact a facilitator.",
         },
         {
           status: 401,
@@ -229,7 +228,7 @@ export async function GET() {
         user: {
           id:
             user._id?.toString() ||
-            session.userId,
+            userId,
 
           firstName:
             user.firstName || "",
@@ -241,21 +240,18 @@ export async function GET() {
             fullName,
 
           email:
-            user.email || "",
+            user.email ||
+            session.email ||
+            "",
 
           role:
-            user.role ||
-            session.role,
+            role,
 
           studentId:
-            user.studentId ||
-            session.studentId ||
-            null,
+            studentId,
 
           status:
-            user.status ||
-            session.status ||
-            "active",
+            accountStatus,
         },
       },
       {
@@ -264,14 +260,23 @@ export async function GET() {
     );
   } catch (error) {
     console.error(
-      "SESSION ERROR:",
+      "AUTH ME SESSION ERROR:",
       error
     );
+
+    try {
+      const cookieStore = await cookies();
+      clearSessionCookie(cookieStore);
+    } catch (cookieError) {
+      console.error(
+        "SESSION COOKIE CLEAR ERROR:",
+        cookieError
+      );
+    }
 
     return NextResponse.json(
       {
         authenticated: false,
-
         message:
           "Unable to retrieve session.",
       },

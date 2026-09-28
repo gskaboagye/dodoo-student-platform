@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
+
 import clientPromise from "@/lib/mongodb";
+import { createNotifications } from "@/lib/notifications";
 
 function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -31,16 +33,28 @@ export async function POST(request) {
     const password = body.password;
     const role = body.role?.trim().toLowerCase();
     const program = body.program?.trim() || "";
-    const facilitatorCode = body.facilitatorCode?.trim() || "";
+    const facilitatorCode =
+      body.facilitatorCode?.trim() || "";
 
-    // ---------------------------------------
+    // ---------------------------------------------------------
     // BASIC VALIDATION
-    // ---------------------------------------
+    // ---------------------------------------------------------
 
     if (!name || !email || !password || !role) {
       return NextResponse.json(
         {
-          error: "Name, email, password, and role are required.",
+          error:
+            "Name, email, password, and role are required.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (name.length < 2 || name.length > 100) {
+      return NextResponse.json(
+        {
+          error:
+            "Name must be between 2 and 100 characters.",
         },
         { status: 400 }
       );
@@ -74,9 +88,9 @@ export async function POST(request) {
       );
     }
 
-    // ---------------------------------------
+    // ---------------------------------------------------------
     // STUDENT VALIDATION
-    // ---------------------------------------
+    // ---------------------------------------------------------
 
     if (role === "student" && !program) {
       return NextResponse.json(
@@ -87,15 +101,25 @@ export async function POST(request) {
       );
     }
 
-    // ---------------------------------------
+    if (role === "student" && program.length > 150) {
+      return NextResponse.json(
+        {
+          error: "Program name is too long.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ---------------------------------------------------------
     // FACILITATOR VALIDATION
-    // ---------------------------------------
+    // ---------------------------------------------------------
 
     if (role === "facilitator") {
       if (!facilitatorCode) {
         return NextResponse.json(
           {
-            error: "Facilitator invitation code is required.",
+            error:
+              "Facilitator invitation code is required.",
           },
           { status: 400 }
         );
@@ -107,16 +131,17 @@ export async function POST(request) {
       ) {
         return NextResponse.json(
           {
-            error: "Invalid facilitator invitation code.",
+            error:
+              "Invalid facilitator invitation code.",
           },
           { status: 403 }
         );
       }
     }
 
-    // ---------------------------------------
+    // ---------------------------------------------------------
     // EMAIL CONFIGURATION
-    // ---------------------------------------
+    // ---------------------------------------------------------
 
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json(
@@ -138,13 +163,18 @@ export async function POST(request) {
       );
     }
 
-    // ---------------------------------------
+    // ---------------------------------------------------------
     // DATABASE
-    // ---------------------------------------
+    // ---------------------------------------------------------
 
     const client = await clientPromise;
+
     const dbName = process.env.DB_NAME || "DCCPlatform";
     const db = client.db(dbName);
+
+    // ---------------------------------------------------------
+    // CHECK EXISTING ACCOUNT
+    // ---------------------------------------------------------
 
     const existingUser = await db.collection("users").findOne({
       email,
@@ -153,31 +183,33 @@ export async function POST(request) {
     if (existingUser) {
       return NextResponse.json(
         {
-          error: "An account with this email already exists.",
+          error:
+            "An account with this email already exists.",
         },
         { status: 409 }
       );
     }
 
-    // ---------------------------------------
+    // ---------------------------------------------------------
     // PASSWORD
-    // ---------------------------------------
+    // ---------------------------------------------------------
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // ---------------------------------------
-    // VERIFICATION CODE
-    // ---------------------------------------
+    // ---------------------------------------------------------
+    // EMAIL VERIFICATION
+    // ---------------------------------------------------------
 
-    const verificationCode = generateVerificationCode();
+    const verificationCode =
+      generateVerificationCode();
 
     const verificationExpiresAt = new Date(
       Date.now() + 10 * 60 * 1000
     );
 
-    // ---------------------------------------
-    // USER ACCOUNT
-    // ---------------------------------------
+    // ---------------------------------------------------------
+    // CREATE USER
+    // ---------------------------------------------------------
 
     const user = {
       name,
@@ -186,154 +218,165 @@ export async function POST(request) {
 
       role,
 
-      program: role === "student" ? program : "",
+      program:
+        role === "student" ? program : "",
 
-      // Students need facilitator approval.
-      // Facilitators become active after email verification.
-      status: role === "student" ? "pending" : "active",
+      // Students require facilitator approval.
+      // Facilitators become active after registration.
+      status:
+        role === "student" ? "pending" : "active",
 
       studentId: null,
 
       emailVerified: false,
 
-      emailVerificationCode: verificationCode,
+      emailVerificationCode:
+        verificationCode,
 
-      emailVerificationExpiresAt: verificationExpiresAt,
+      emailVerificationExpiresAt:
+        verificationExpiresAt,
 
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    const result = await db.collection("users").insertOne(user);
+    const result = await db
+      .collection("users")
+      .insertOne(user);
 
-    // ---------------------------------------
+    // ---------------------------------------------------------
     // SEND VERIFICATION EMAIL
-    // ---------------------------------------
+    // ---------------------------------------------------------
 
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY);
+      const resend = new Resend(
+        process.env.RESEND_API_KEY
+      );
 
       const accountType =
-        role === "facilitator" ? "Facilitator" : "Student";
+        role === "facilitator"
+          ? "Facilitator"
+          : "Student";
 
-      const emailResult = await resend.emails.send({
-        from: process.env.EMAIL_FROM,
-        to: [email],
-        subject: `Dodoo Coding Club - Verify Your ${accountType} Account`,
-        html: `
-          <div style="
-            font-family: Arial, Helvetica, sans-serif;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 30px;
-            color: #172033;
-          ">
-
+      const emailResult =
+        await resend.emails.send({
+          from: process.env.EMAIL_FROM,
+          to: [email],
+          subject: `Dodoo Coding Club - Verify Your ${accountType} Account`,
+          html: `
             <div style="
-              background: #2563eb;
-              padding: 25px;
-              border-radius: 12px 12px 0 0;
-              text-align: center;
-            ">
-              <h1 style="
-                color: white;
-                margin: 0;
-                font-size: 24px;
-              ">
-                Dodoo Coding Club
-              </h1>
-            </div>
-
-            <div style="
-              border: 1px solid #e2e8f0;
-              border-top: none;
+              font-family: Arial, Helvetica, sans-serif;
+              max-width: 600px;
+              margin: 0 auto;
               padding: 30px;
-              border-radius: 0 0 12px 12px;
+              color: #172033;
             ">
-
-              <h2 style="margin-top: 0;">
-                Verify Your Email
-              </h2>
-
-              <p>
-                Hello <strong>${name}</strong>,
-              </p>
-
-              <p>
-                Thank you for registering as a
-                <strong>${accountType}</strong>
-                with Dodoo Coding Club.
-              </p>
-
-              <p>
-                Please enter the verification code below
-                to verify your email address:
-              </p>
 
               <div style="
-                margin: 30px 0;
+                background: #2563eb;
                 padding: 25px;
-                background: #eff6ff;
-                border: 1px solid #bfdbfe;
-                border-radius: 10px;
+                border-radius: 12px 12px 0 0;
                 text-align: center;
               ">
-
-                <div style="
-                  font-size: 36px;
-                  font-weight: bold;
-                  letter-spacing: 10px;
-                  color: #2563eb;
+                <h1 style="
+                  color: white;
+                  margin: 0;
+                  font-size: 24px;
                 ">
-                  ${verificationCode}
-                </div>
-
+                  Dodoo Coding Club
+                </h1>
               </div>
 
-              <p>
-                This verification code will expire in
-                <strong>10 minutes</strong>.
-              </p>
-
-              ${
-                role === "student"
-                  ? `
-                    <p>
-                      After verifying your email, your student
-                      account will remain pending until a
-                      facilitator reviews and approves your
-                      registration.
-                    </p>
-                  `
-                  : `
-                    <p>
-                      After verifying your email, you can log
-                      in to your facilitator account.
-                    </p>
-                  `
-              }
-
-              <p>
-                If you did not create this account, you can
-                safely ignore this email.
-              </p>
-
-              <p style="
-                margin-top: 30px;
-                color: #64748b;
+              <div style="
+                border: 1px solid #e2e8f0;
+                border-top: none;
+                padding: 30px;
+                border-radius: 0 0 12px 12px;
               ">
-                Regards,<br>
-                <strong>Dodoo Coding Club</strong>
-              </p>
 
+                <h2 style="margin-top: 0;">
+                  Verify Your Email
+                </h2>
+
+                <p>
+                  Hello <strong>${name}</strong>,
+                </p>
+
+                <p>
+                  Thank you for registering as a
+                  <strong>${accountType}</strong>
+                  with Dodoo Coding Club.
+                </p>
+
+                <p>
+                  Please enter the verification code below
+                  to verify your email address:
+                </p>
+
+                <div style="
+                  margin: 30px 0;
+                  padding: 25px;
+                  background: #eff6ff;
+                  border: 1px solid #bfdbfe;
+                  border-radius: 10px;
+                  text-align: center;
+                ">
+
+                  <div style="
+                    font-size: 36px;
+                    font-weight: bold;
+                    letter-spacing: 10px;
+                    color: #2563eb;
+                  ">
+                    ${verificationCode}
+                  </div>
+
+                </div>
+
+                <p>
+                  This verification code will expire in
+                  <strong>10 minutes</strong>.
+                </p>
+
+                ${
+                  role === "student"
+                    ? `
+                      <p>
+                        After verifying your email, your student
+                        account will remain pending until a
+                        facilitator reviews and approves your
+                        registration.
+                      </p>
+                    `
+                    : `
+                      <p>
+                        After verifying your email, you can log
+                        in to your facilitator account.
+                      </p>
+                    `
+                }
+
+                <p>
+                  If you did not create this account, you can
+                  safely ignore this email.
+                </p>
+
+                <p style="
+                  margin-top: 30px;
+                  color: #64748b;
+                ">
+                  Regards,<br>
+                  <strong>Dodoo Coding Club</strong>
+                </p>
+
+              </div>
             </div>
-          </div>
-        `,
-      });
+          `,
+        });
 
-      // ---------------------------------------
+      // -------------------------------------------------------
       // CHECK RESEND RESPONSE
-      // ---------------------------------------
+      // -------------------------------------------------------
 
       if (emailResult?.error) {
         console.error(
@@ -341,11 +384,11 @@ export async function POST(request) {
           emailResult.error
         );
 
-        // Delete account because email verification
-        // could not be completed.
-        await db.collection("users").deleteOne({
-          _id: result.insertedId,
-        });
+        await db
+          .collection("users")
+          .deleteOne({
+            _id: result.insertedId,
+          });
 
         return NextResponse.json(
           {
@@ -371,10 +414,13 @@ export async function POST(request) {
         emailError
       );
 
-      // Remove account if email could not be sent.
-      await db.collection("users").deleteOne({
-        _id: result.insertedId,
-      });
+      // Remove account if verification email
+      // could not be sent.
+      await db
+        .collection("users")
+        .deleteOne({
+          _id: result.insertedId,
+        });
 
       return NextResponse.json(
         {
@@ -386,9 +432,67 @@ export async function POST(request) {
       );
     }
 
-    // ---------------------------------------
+    // ---------------------------------------------------------
+    // NOTIFY FACILITATORS OF NEW STUDENT APPLICATION
+    // ---------------------------------------------------------
+
+    if (role === "student") {
+      try {
+        const facilitators = await db
+          .collection("users")
+          .find({
+            role: "facilitator",
+            status: "active",
+            emailVerified: true,
+          })
+          .project({
+            _id: 1,
+          })
+          .toArray();
+
+        if (facilitators.length > 0) {
+          const facilitatorNotifications =
+            facilitators.map((facilitator) => ({
+              userId:
+                facilitator._id.toString(),
+
+              title:
+                "New Student Registration",
+
+              message:
+                `${name} has submitted an application to join the Dodoo Coding Club Student Platform. Please review the application.`,
+
+              type: "student-request",
+
+              link: "/student-requests",
+            }));
+
+          await createNotifications(
+            facilitatorNotifications
+          );
+
+          console.log(
+            `New student notification sent to ${facilitators.length} facilitator(s).`
+          );
+        } else {
+          console.log(
+            "No active verified facilitators found to notify."
+          );
+        }
+      } catch (notificationError) {
+        console.error(
+          "FACILITATOR NOTIFICATION ERROR:",
+          notificationError
+        );
+
+        // Notification failure must not cancel
+        // the student's successful registration.
+      }
+    }
+
+    // ---------------------------------------------------------
     // SUCCESS
-    // ---------------------------------------
+    // ---------------------------------------------------------
 
     return NextResponse.json(
       {
@@ -400,7 +504,10 @@ export async function POST(request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("REGISTRATION ERROR:", error);
+    console.error(
+      "REGISTRATION ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
