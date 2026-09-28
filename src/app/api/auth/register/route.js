@@ -36,9 +36,9 @@ export async function POST(request) {
     const facilitatorCode =
       body.facilitatorCode?.trim() || "";
 
-    // ---------------------------------------------------------
+    // =========================================================
     // BASIC VALIDATION
-    // ---------------------------------------------------------
+    // =========================================================
 
     if (!name || !email || !password || !role) {
       return NextResponse.json(
@@ -89,9 +89,9 @@ export async function POST(request) {
       );
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // STUDENT VALIDATION
-    // ---------------------------------------------------------
+    // =========================================================
 
     if (role === "student" && !program) {
       return NextResponse.json(
@@ -116,9 +116,9 @@ export async function POST(request) {
       );
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // FACILITATOR VALIDATION
-    // ---------------------------------------------------------
+    // =========================================================
 
     if (role === "facilitator") {
       if (!facilitatorCode) {
@@ -146,9 +146,9 @@ export async function POST(request) {
       }
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // EMAIL CONFIGURATION
-    // ---------------------------------------------------------
+    // =========================================================
 
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json(
@@ -170,9 +170,9 @@ export async function POST(request) {
       );
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // DATABASE
-    // ---------------------------------------------------------
+    // =========================================================
 
     const client = await clientPromise;
 
@@ -201,30 +201,57 @@ export async function POST(request) {
           existingUser.status || ""
         ).toLowerCase();
 
-      // -------------------------------------------------------
-      // PREVIOUSLY REJECTED STUDENT
-      // -------------------------------------------------------
+      console.log(
+        "EXISTING USER FOUND DURING REGISTRATION:",
+        {
+          userId:
+            existingUser._id?.toString(),
+
+          email:
+            existingUser.email,
+
+          role:
+            existingRole,
+
+          status:
+            existingStatus,
+
+          emailVerified:
+            existingUser.emailVerified,
+        }
+      );
+
+      // =======================================================
+      // PREVIOUSLY REJECTED / REMOVED STUDENT
+      // =======================================================
       //
-      // A rejected student should be able to register again
-      // using the same email address.
+      // These accounts are allowed to register again.
       //
-      // We remove the old user and any old student profile
-      // before continuing with the new registration.
+      // We intentionally handle several old statuses because
+      // previous versions of the application may have stored
+      // different values.
       //
+      // This does NOT affect active facilitator accounts.
+      // =======================================================
+
+      const reusableStudentStatuses = [
+        "rejected",
+        "inactive",
+        "deleted",
+        "removed",
+        "declined",
+      ];
 
       if (
         role === "student" &&
         existingRole === "student" &&
-        (
-          existingStatus === "rejected" ||
-          existingStatus === "inactive"
+        reusableStudentStatuses.includes(
+          existingStatus
         )
       ) {
         console.log(
-          "OLD REJECTED/INACTIVE STUDENT FOUND:",
+          "REUSABLE OLD STUDENT ACCOUNT FOUND:",
           {
-            userId:
-              existingUser._id.toString(),
             email,
             status: existingStatus,
           }
@@ -242,16 +269,21 @@ export async function POST(request) {
             });
 
         if (oldStudentProfile) {
-          await db
-            .collection("students")
-            .deleteOne({
-              _id:
-                oldStudentProfile._id,
-            });
+          const deletedProfile =
+            await db
+              .collection("students")
+              .deleteOne({
+                _id:
+                  oldStudentProfile._id,
+              });
 
           console.log(
             "OLD STUDENT PROFILE DELETED:",
-            email
+            {
+              email,
+              deletedCount:
+                deletedProfile.deletedCount,
+            }
           );
         }
 
@@ -265,6 +297,7 @@ export async function POST(request) {
             .deleteOne({
               _id:
                 existingUser._id,
+
               role: "student",
             });
 
@@ -274,19 +307,22 @@ export async function POST(request) {
           return NextResponse.json(
             {
               error:
-                "The previous rejected student account could not be removed. Please contact the administrator.",
+                "The previous student account could not be removed. Please contact the administrator.",
             },
             { status: 500 }
           );
         }
 
         console.log(
-          "OLD REJECTED STUDENT ACCOUNT DELETED:",
-          email
+          "OLD STUDENT USER ACCOUNT DELETED:",
+          {
+            email,
+            status: existingStatus,
+          }
         );
       } else {
         // -----------------------------------------------------
-        // ACTIVE / PENDING / OTHER ACCOUNT
+        // EXISTING ACTIVE OR PENDING ACCOUNT
         // -----------------------------------------------------
 
         return NextResponse.json(
@@ -303,13 +339,11 @@ export async function POST(request) {
     // CHECK OLD STUDENT PROFILE
     // =========================================================
     //
-    // This is a second layer of protection.
+    // A previous rejection may have deleted the users record
+    // while leaving an old students record behind.
     //
-    // A previous rejection could have deleted the user but
-    // accidentally left a student profile behind.
-    //
-    // Only rejected/inactive/pending profiles are removed.
-    // Active student profiles are NEVER deleted here.
+    // Only stale/reusable profiles are removed.
+    // Active profiles are never removed here.
     // =========================================================
 
     if (role === "student") {
@@ -321,28 +355,42 @@ export async function POST(request) {
           });
 
       if (existingStudent) {
-        const existingStatus =
+        const existingStudentStatus =
           String(
             existingStudent.status || ""
           ).toLowerCase();
 
+        const reusableStudentStatuses = [
+          "rejected",
+          "inactive",
+          "pending",
+          "deleted",
+          "removed",
+          "declined",
+        ];
+
         if (
-          existingStatus === "rejected" ||
-          existingStatus === "inactive" ||
-          existingStatus === "pending"
+          reusableStudentStatuses.includes(
+            existingStudentStatus
+          )
         ) {
-          await db
-            .collection("students")
-            .deleteOne({
-              _id:
-                existingStudent._id,
-            });
+          const deletedProfile =
+            await db
+              .collection("students")
+              .deleteOne({
+                _id:
+                  existingStudent._id,
+              });
 
           console.log(
-            "OLD INACTIVE STUDENT PROFILE REMOVED:",
+            "OLD STALE STUDENT PROFILE REMOVED:",
             {
               email,
-              status: existingStatus,
+              status:
+                existingStudentStatus,
+
+              deletedCount:
+                deletedProfile.deletedCount,
             }
           );
         } else {
@@ -559,9 +607,9 @@ export async function POST(request) {
           `,
         });
 
-      // -------------------------------------------------------
+      // =======================================================
       // CHECK RESEND RESPONSE
-      // -------------------------------------------------------
+      // =======================================================
 
       if (emailResult?.error) {
         console.error(
@@ -572,7 +620,8 @@ export async function POST(request) {
         await db
           .collection("users")
           .deleteOne({
-            _id: result.insertedId,
+            _id:
+              result.insertedId,
           });
 
         return NextResponse.json(
@@ -604,7 +653,8 @@ export async function POST(request) {
       await db
         .collection("users")
         .deleteOne({
-          _id: result.insertedId,
+          _id:
+            result.insertedId,
         });
 
       return NextResponse.json(
