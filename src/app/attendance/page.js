@@ -1,123 +1,91 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
 function getToday() {
   const date = new Date();
   const offset = date.getTimezoneOffset();
 
-  return new Date(
-    date.getTime() - offset * 60000
-  )
+  return new Date(date.getTime() - offset * 60000)
     .toISOString()
     .split("T")[0];
 }
 
-export default function AttendancePage() {
-  const router = useRouter();
+function formatDate(dateString) {
+  if (!dateString) {
+    return "";
+  }
 
+  const date = new Date(`${dateString}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateString;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function normalizeStatus(status) {
+  if (!status) {
+    return "";
+  }
+
+  return String(status).trim().toLowerCase();
+}
+
+export default function AttendancePage() {
   const [students, setStudents] = useState([]);
   const [attendance, setAttendance] = useState([]);
 
-  const [date, setDate] =
-    useState(getToday());
+  const [date, setDate] = useState(getToday());
+  const [search, setSearch] = useState("");
 
-  const [search, setSearch] =
-    useState("");
+  const [user, setUser] = useState(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [checkingAccess, setCheckingAccess] =
-    useState(true);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  const [savingId, setSavingId] =
-    useState(null);
-
-  const [message, setMessage] =
-    useState("");
-
-  const [error, setError] =
-    useState("");
+  const today = getToday();
 
   // =====================================================
-  // CHECK CURRENT USER
+  // LOAD AUTHENTICATED USER
   // =====================================================
 
-  async function checkAccess() {
+  async function loadUser() {
+    const response = await fetch("/api/auth/me", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    let data = {};
+
     try {
-      setCheckingAccess(true);
-      setError("");
-
-      const response = await fetch(
-        "/api/auth/me",
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
+      data = await response.json();
+    } catch {
+      throw new Error(
+        "The authentication server returned an invalid response."
       );
-
-      if (!response.ok) {
-        router.replace("/login");
-        return false;
-      }
-
-      const data =
-        await response.json();
-
-      const currentUser =
-        data?.user || null;
-
-      if (!currentUser) {
-        router.replace("/login");
-        return false;
-      }
-
-      // =================================================
-      // STUDENT
-      // =================================================
-      // Students must use their own attendance page.
-      // =================================================
-
-      if (
-        currentUser.role ===
-        "student"
-      ) {
-        router.replace(
-          "/student/attendance"
-        );
-
-        return false;
-      }
-
-      // =================================================
-      // FACILITATOR
-      // =================================================
-
-      if (
-        currentUser.role !==
-        "facilitator"
-      ) {
-        router.replace("/");
-
-        return false;
-      }
-
-      return true;
-    } catch (err) {
-      console.error(
-        "ATTENDANCE ACCESS CHECK ERROR:",
-        err
-      );
-
-      router.replace("/login");
-
-      return false;
-    } finally {
-      setCheckingAccess(false);
     }
+
+    if (!response.ok || !data?.user) {
+      throw new Error(
+        data?.error ||
+          data?.message ||
+          "Your session has expired. Please log in again."
+      );
+    }
+
+    return data.user;
   }
 
   // =====================================================
@@ -125,175 +93,319 @@ export default function AttendancePage() {
   // =====================================================
 
   async function loadStudents() {
+    const response = await fetch("/api/students", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    let data = {};
+
     try {
-      const response =
-        await fetch(
-          "/api/students",
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          }
-        );
-
-      let data = {};
-
-      try {
-        data =
-          await response.json();
-      } catch {
-        data = {};
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          data.error ||
-            data.message ||
-            "Failed to load students."
-        );
-      }
-
-      setStudents(
-        Array.isArray(data)
-          ? data
-          : data.students || []
+      data = await response.json();
+    } catch {
+      throw new Error(
+        "The students server returned an invalid response."
       );
-    } catch (err) {
-      console.error(
-        "LOAD STUDENTS ERROR:",
-        err
-      );
+    }
 
-      setError(
-        err.message ||
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          data?.message ||
           "Failed to load students."
       );
     }
+
+    const studentList = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.students)
+        ? data.students
+        : [];
+
+    setStudents(studentList);
+
+    return studentList;
   }
 
   // =====================================================
   // LOAD ATTENDANCE
   // =====================================================
 
-  async function loadAttendance(
-    selectedDate
-  ) {
+  async function loadAttendance(selectedDate) {
+    if (!selectedDate) {
+      return;
+    }
+
     try {
-      const response =
-        await fetch(
-          `/api/attendance?date=${selectedDate}`,
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          }
-        );
+      const response = await fetch(
+        `/api/attendance?date=${encodeURIComponent(
+          selectedDate
+        )}`,
+        {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        }
+      );
 
       let data = {};
 
       try {
-        data =
-          await response.json();
+        data = await response.json();
       } catch {
-        data = {};
+        throw new Error(
+          "The attendance server returned an invalid response."
+        );
       }
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            data.message ||
+          data?.error ||
+            data?.message ||
             "Failed to load attendance."
         );
       }
 
-      setAttendance(
-        Array.isArray(data)
-          ? data
-          : Array.isArray(
-              data.attendance
-            )
-            ? data.attendance
-            : []
+      /*
+       * The API may return either:
+       *
+       * [
+       *   ...
+       * ]
+       *
+       * or:
+       *
+       * {
+       *   attendance: [...]
+       * }
+       */
+
+      const records = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.attendance)
+          ? data.attendance
+          : [];
+
+      /*
+       * Keep only valid attendance records.
+       */
+      const cleanedRecords = records.filter(
+        (record) =>
+          record &&
+          typeof record === "object" &&
+          record.date
       );
+
+      setAttendance(cleanedRecords);
+
+      return cleanedRecords;
     } catch (err) {
       console.error(
         "LOAD ATTENDANCE ERROR:",
         err
       );
 
-      setAttendance([]);
-
-      setError(
-        err.message ||
-          "Failed to load attendance."
-      );
+      /*
+       * Do not destroy existing attendance during
+       * an automatic refresh if the request temporarily
+       * fails.
+       */
+      throw err;
     }
   }
 
   // =====================================================
-  // LOAD DATA
+  // INITIALIZE PAGE
   // =====================================================
 
-  async function loadData() {
-    setLoading(true);
-    setError("");
-
+  async function initializePage() {
     try {
-      const allowed =
-        await checkAccess();
+      setLoading(true);
+      setError("");
+      setMessage("");
 
-      if (!allowed) {
+      const currentUser = await loadUser();
+
+      if (currentUser.role !== "facilitator") {
+        window.location.href = "/login";
         return;
       }
+
+      setUser(currentUser);
 
       await Promise.all([
         loadStudents(),
         loadAttendance(date),
       ]);
+    } catch (err) {
+      console.error(
+        "ATTENDANCE PAGE INITIALIZATION ERROR:",
+        err
+      );
+
+      const message =
+        err?.message ||
+        "Unable to load attendance.";
+
+      setError(message);
+
+      if (
+        message
+          .toLowerCase()
+          .includes("session has expired")
+      ) {
+        window.location.href = "/login";
+      }
     } finally {
       setLoading(false);
     }
   }
 
   // =====================================================
-  // INITIAL LOAD
+  // INITIAL PAGE LOAD
   // =====================================================
 
   useEffect(() => {
-    loadData();
+    initializePage();
 
-    // We intentionally run this once on page load.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // =====================================================
-  // DATE CHANGE
+  // LOAD ATTENDANCE WHEN DATE CHANGES
   // =====================================================
 
   useEffect(() => {
-    // Don't request attendance until access
-    // has been checked.
-    if (checkingAccess) {
+    if (!user || !date) {
       return;
     }
 
-    loadAttendance(date);
+    loadAttendance(date).catch((err) => {
+      console.error(
+        "DATE ATTENDANCE LOAD ERROR:",
+        err
+      );
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, checkingAccess]);
+      setError(
+        err?.message ||
+          "Failed to load attendance."
+      );
+    });
+  }, [date, user]);
+
+  // =====================================================
+  // AUTOMATIC REFRESH
+  // =====================================================
+
+  /*
+   * This keeps the facilitator's attendance screen
+   * synchronized with the database.
+   *
+   * It is especially useful if another facilitator
+   * changes attendance while this page is open.
+   */
+
+  useEffect(() => {
+    if (!user || !date) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      loadAttendance(date).catch((err) => {
+        console.error(
+          "AUTOMATIC ATTENDANCE REFRESH ERROR:",
+          err
+        );
+      });
+    }, 15000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [user, date]);
+
+  // =====================================================
+  // REFRESH WHEN TAB BECOMES VISIBLE
+  // =====================================================
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (
+        document.visibilityState === "visible" &&
+        user &&
+        date
+      ) {
+        loadAttendance(date).catch((err) => {
+          console.error(
+            "VISIBILITY ATTENDANCE REFRESH ERROR:",
+            err
+          );
+        });
+      }
+    }
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, [user, date]);
+
+  // =====================================================
+  // MANUAL REFRESH
+  // =====================================================
+
+  async function handleRefresh() {
+    try {
+      setRefreshing(true);
+      setError("");
+      setMessage("");
+
+      await Promise.all([
+        loadStudents(),
+        loadAttendance(date),
+      ]);
+
+      setMessage(
+        `Attendance refreshed for ${formatDate(date)}.`
+      );
+    } catch (err) {
+      console.error(
+        "MANUAL ATTENDANCE REFRESH ERROR:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Failed to refresh attendance."
+      );
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // =====================================================
   // GET ATTENDANCE FOR STUDENT
   // =====================================================
 
-  function getAttendance(
-    studentId
-  ) {
-    return attendance.find(
-      (record) =>
-        record.studentId?.toString() ===
-        studentId?.toString()
-    );
+  function getAttendance(studentId) {
+    if (!studentId) {
+      return undefined;
+    }
+
+    return attendance.find((record) => {
+      return (
+        String(record?.studentId) ===
+        String(studentId)
+      );
+    });
   }
 
   // =====================================================
@@ -304,56 +416,80 @@ export default function AttendancePage() {
     student,
     status
   ) {
-    setSavingId(student._id);
+    if (!student?._id) {
+      setError(
+        "Unable to identify this student."
+      );
+      return;
+    }
+
+    if (!user || user.role !== "facilitator") {
+      setError(
+        "Only facilitators can record attendance."
+      );
+      return;
+    }
+
+    const studentId = String(
+      student._id
+    );
+
+    setSavingId(studentId);
     setMessage("");
     setError("");
 
     try {
-      const response =
-        await fetch(
-          "/api/attendance",
-          {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              studentId:
-                student._id,
-
-              studentName: `${student.firstName} ${student.lastName}`,
-
-              date,
-
-              status,
-            }),
-          }
-        );
+      const response = await fetch(
+        "/api/attendance",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          credentials: "include",
+          cache: "no-store",
+          body: JSON.stringify({
+            studentId:
+              student._id,
+            studentName: `${student.firstName || ""} ${
+              student.lastName || ""
+            }`.trim(),
+            date,
+            status,
+          }),
+        }
+      );
 
       let data = {};
 
       try {
-        data =
-          await response.json();
+        data = await response.json();
       } catch {
-        data = {};
+        throw new Error(
+          "The attendance server returned an invalid response."
+        );
       }
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            data.message ||
+          data?.error ||
+            data?.message ||
             "Failed to save attendance."
         );
       }
 
-      setMessage(
-        `${student.firstName} ${student.lastName}: ${status}`
-      );
-
+      /*
+       * Reload the attendance directly from the
+       * database after saving.
+       */
       await loadAttendance(date);
+
+      setMessage(
+        `${student.firstName || ""} ${
+          student.lastName || ""
+        }: ${status} for ${formatDate(date)}`
+      );
     } catch (err) {
       console.error(
         "SAVE ATTENDANCE ERROR:",
@@ -361,13 +497,94 @@ export default function AttendancePage() {
       );
 
       setError(
-        err.message ||
+        err?.message ||
           "Failed to save attendance."
       );
     } finally {
       setSavingId(null);
     }
   }
+
+  // =====================================================
+  // DATE HELPERS
+  // =====================================================
+
+  function changeDate(
+    currentDate,
+    amount
+  ) {
+    const current = new Date(
+      `${currentDate}T00:00:00`
+    );
+
+    if (Number.isNaN(current.getTime())) {
+      return today;
+    }
+
+    current.setDate(
+      current.getDate() + amount
+    );
+
+    const year =
+      current.getFullYear();
+
+    const month = String(
+      current.getMonth() + 1
+    ).padStart(2, "0");
+
+    const day = String(
+      current.getDate()
+    ).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function goToPreviousDay() {
+    setMessage("");
+    setError("");
+
+    setDate((currentDate) =>
+      changeDate(currentDate, -1)
+    );
+  }
+
+  function goToNextDay() {
+    setMessage("");
+    setError("");
+
+    const nextDate = changeDate(
+      date,
+      1
+    );
+
+    /*
+     * Do not allow the facilitator to
+     * move into a future date.
+     */
+    if (nextDate <= today) {
+      setDate(nextDate);
+    }
+  }
+
+  function goToToday() {
+    setMessage("");
+    setError("");
+    setDate(today);
+  }
+
+  // =====================================================
+  // DATE STATE
+  // =====================================================
+
+  const isToday = date === today;
+
+  const nextDate = changeDate(
+    date,
+    1
+  );
+
+  const canGoForward =
+    nextDate <= today;
 
   // =====================================================
   // FILTER STUDENTS
@@ -391,14 +608,18 @@ export default function AttendancePage() {
               student.lastName || ""
             }`.toLowerCase();
 
+          const email =
+            student.email
+              ?.toLowerCase() || "";
+
+          const program =
+            student.program
+              ?.toLowerCase() || "";
+
           return (
             name.includes(value) ||
-            student.email
-              ?.toLowerCase()
-              .includes(value) ||
-            student.program
-              ?.toLowerCase()
-              .includes(value)
+            email.includes(value) ||
+            program.includes(value)
           );
         }
       );
@@ -408,49 +629,33 @@ export default function AttendancePage() {
   // STATISTICS
   // =====================================================
 
-  const stats =
-    useMemo(() => {
-      return {
-        present:
-          attendance.filter(
-            (record) =>
-              record.status ===
-              "Present"
-          ).length,
+  const stats = useMemo(() => {
+    return {
+      present:
+        attendance.filter(
+          (record) =>
+            normalizeStatus(
+              record.status
+            ) === "present"
+        ).length,
 
-        late:
-          attendance.filter(
-            (record) =>
-              record.status ===
-              "Late"
-          ).length,
+      late:
+        attendance.filter(
+          (record) =>
+            normalizeStatus(
+              record.status
+            ) === "late"
+        ).length,
 
-        absent:
-          attendance.filter(
-            (record) =>
-              record.status ===
-              "Absent"
-          ).length,
-      };
-    }, [attendance]);
-
-  // =====================================================
-  // ACCESS CHECK LOADING
-  // =====================================================
-
-  if (checkingAccess) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
-        <div className="text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
-
-          <p className="mt-4 text-sm font-medium text-slate-600">
-            Checking access...
-          </p>
-        </div>
-      </main>
-    );
-  }
+      absent:
+        attendance.filter(
+          (record) =>
+            normalizeStatus(
+              record.status
+            ) === "absent"
+        ).length,
+    };
+  }, [attendance]);
 
   // =====================================================
   // PAGE
@@ -464,18 +669,42 @@ export default function AttendancePage() {
             HEADER
         ================================================= */}
 
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-slate-900">
-            Attendance
-          </h1>
+        <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
 
-          <p className="mt-2 text-lg text-slate-600">
-            Record and monitor student attendance.
-          </p>
+          <div>
+            <h1 className="text-4xl font-bold text-slate-900">
+              Attendance
+            </h1>
+
+            <p className="mt-2 text-lg text-slate-600">
+              Record and monitor student attendance.
+            </p>
+
+            {user?.name && (
+              <p className="mt-2 text-sm text-slate-500">
+                Facilitator:{" "}
+                <span className="font-semibold text-slate-700">
+                  {user.name}
+                </span>
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {refreshing
+              ? "Refreshing..."
+              : "Refresh Attendance"}
+          </button>
+
         </div>
 
         {/* =================================================
-            SUCCESS MESSAGE
+            MESSAGES
         ================================================= */}
 
         {message && (
@@ -483,10 +712,6 @@ export default function AttendancePage() {
             {message}
           </div>
         )}
-
-        {/* =================================================
-            ERROR MESSAGE
-        ================================================= */}
 
         {error && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
@@ -499,7 +724,8 @@ export default function AttendancePage() {
         ================================================= */}
 
         <div className="mb-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
 
             {/* DATE */}
 
@@ -508,16 +734,69 @@ export default function AttendancePage() {
                 Attendance Date
               </label>
 
-              <input
-                type="date"
-                value={date}
-                onChange={(event) =>
-                  setDate(
-                    event.target.value
-                  )
-                }
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
+              <div className="flex flex-wrap items-center gap-2">
+
+                <button
+                  type="button"
+                  onClick={
+                    goToPreviousDay
+                  }
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Previous
+                </button>
+
+                <input
+                  type="date"
+                  value={date}
+                  max={today}
+                  onChange={(event) => {
+                    setMessage("");
+                    setError("");
+
+                    const selected =
+                      event.target.value;
+
+                    if (
+                      selected &&
+                      selected <= today
+                    ) {
+                      setDate(selected);
+                    }
+                  }}
+                  className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+
+                <button
+                  type="button"
+                  onClick={
+                    goToNextDay
+                  }
+                  disabled={
+                    !canGoForward
+                  }
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+
+                {!isToday && (
+                  <button
+                    type="button"
+                    onClick={
+                      goToToday
+                    }
+                    className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    Today
+                  </button>
+                )}
+
+              </div>
+
+              <p className="mt-2 text-sm text-slate-500">
+                {formatDate(date)}
+              </p>
             </div>
 
             {/* SEARCH */}
@@ -536,7 +815,7 @@ export default function AttendancePage() {
                   )
                 }
                 placeholder="Search by name, email or program..."
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-80"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 lg:w-96"
               />
             </div>
 
@@ -549,8 +828,6 @@ export default function AttendancePage() {
 
         <div className="mb-8 grid gap-5 sm:grid-cols-3">
 
-          {/* PRESENT */}
-
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-medium text-slate-500">
               Present
@@ -561,8 +838,6 @@ export default function AttendancePage() {
             </p>
           </div>
 
-          {/* LATE */}
-
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-medium text-slate-500">
               Late
@@ -572,8 +847,6 @@ export default function AttendancePage() {
               {stats.late}
             </p>
           </div>
-
-          {/* ABSENT */}
 
           <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
             <p className="text-sm font-medium text-slate-500">
@@ -607,8 +880,7 @@ export default function AttendancePage() {
             <div className="py-12 text-center text-slate-500">
               Loading students...
             </div>
-          ) : filteredStudents.length ===
-            0 ? (
+          ) : filteredStudents.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500">
               No students found.
             </div>
@@ -627,19 +899,19 @@ export default function AttendancePage() {
 
                   const isSaving =
                     savingId ===
-                    student._id;
+                    String(
+                      student._id
+                    );
 
                   return (
                     <div
-                      key={
-                        student._id
-                      }
+                      key={student._id}
                       className="rounded-2xl border border-slate-200 p-5 transition hover:shadow-sm"
                     >
 
                       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
 
-                        {/* STUDENT INFORMATION */}
+                        {/* STUDENT */}
 
                         <div className="flex items-center gap-4">
 
@@ -648,30 +920,24 @@ export default function AttendancePage() {
                               src={
                                 student.profileImage
                               }
-                              alt={`${student.firstName} ${student.lastName}`}
+                              alt={`${student.firstName || ""} ${
+                                student.lastName || ""
+                              }`}
                               className="h-14 w-14 rounded-full object-cover ring-2 ring-blue-100"
                             />
                           ) : (
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
-                              {
-                                student
-                                  .firstName?.[0]
-                              }
-                              {
-                                student
-                                  .lastName?.[0]
-                              }
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold text-blue-700">
+                              {student.firstName?.[0] ||
+                                ""}
+                              {student.lastName?.[0] ||
+                                ""}
                             </div>
                           )}
 
                           <div>
                             <h3 className="font-bold text-slate-900">
-                              {
-                                student.firstName
-                              }{" "}
-                              {
-                                student.lastName
-                              }
+                              {student.firstName}{" "}
+                              {student.lastName}
                             </h3>
 
                             <p className="text-sm text-slate-500">
@@ -680,19 +946,24 @@ export default function AttendancePage() {
                             </p>
 
                             <p className="text-sm text-slate-500">
-                              {
-                                student.email
-                              }
+                              {student.email}
                             </p>
+
+                            {currentStatus && (
+                              <p className="mt-1 text-xs font-medium text-slate-600">
+                                Current status:{" "}
+                                <span className="font-semibold">
+                                  {currentStatus}
+                                </span>
+                              </p>
+                            )}
                           </div>
 
                         </div>
 
-                        {/* ATTENDANCE BUTTONS */}
+                        {/* STATUS BUTTONS */}
 
                         <div className="flex flex-wrap gap-2">
-
-                          {/* PRESENT */}
 
                           <button
                             type="button"
@@ -706,16 +977,22 @@ export default function AttendancePage() {
                               )
                             }
                             className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-                              currentStatus ===
-                              "Present"
+                              normalizeStatus(
+                                currentStatus
+                              ) ===
+                              "present"
                                 ? "bg-green-600 text-white"
                                 : "border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
-                            } disabled:opacity-50`}
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
                           >
-                            Present
+                            {isSaving &&
+                            normalizeStatus(
+                              currentStatus
+                            ) !==
+                              "present"
+                              ? "Saving..."
+                              : "Present"}
                           </button>
-
-                          {/* LATE */}
 
                           <button
                             type="button"
@@ -729,16 +1006,22 @@ export default function AttendancePage() {
                               )
                             }
                             className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-                              currentStatus ===
-                              "Late"
+                              normalizeStatus(
+                                currentStatus
+                              ) ===
+                              "late"
                                 ? "bg-yellow-500 text-white"
                                 : "border border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
-                            } disabled:opacity-50`}
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
                           >
-                            Late
+                            {isSaving &&
+                            normalizeStatus(
+                              currentStatus
+                            ) !==
+                              "late"
+                              ? "Saving..."
+                              : "Late"}
                           </button>
-
-                          {/* ABSENT */}
 
                           <button
                             type="button"
@@ -752,13 +1035,21 @@ export default function AttendancePage() {
                               )
                             }
                             className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
-                              currentStatus ===
-                              "Absent"
+                              normalizeStatus(
+                                currentStatus
+                              ) ===
+                              "absent"
                                 ? "bg-red-600 text-white"
                                 : "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                            } disabled:opacity-50`}
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
                           >
-                            Absent
+                            {isSaving &&
+                            normalizeStatus(
+                              currentStatus
+                            ) !==
+                              "absent"
+                              ? "Saving..."
+                              : "Absent"}
                           </button>
 
                         </div>
@@ -774,6 +1065,7 @@ export default function AttendancePage() {
           )}
 
         </section>
+
       </div>
     </main>
   );
