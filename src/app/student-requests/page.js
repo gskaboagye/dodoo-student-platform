@@ -146,7 +146,9 @@ export default function StudentRequestsPage() {
     }
 
     const confirmed = window.confirm(
-      `Are you sure you want to accept ${request.name || "this student"}?`
+      `Are you sure you want to accept ${
+        request.name || "this student"
+      }?`
     );
 
     if (!confirmed) {
@@ -757,6 +759,7 @@ export default function StudentRequestsPage() {
               aria-modal="true"
               aria-labelledby="reject-title"
             >
+
               {/* Modal Header */}
 
               <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
@@ -823,8 +826,8 @@ export default function StudentRequestsPage() {
 
                 <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
                   <span>
-                    This reason will be included in the
-                    student's notification and email.
+                    This reason will be included in
+                    the student's email.
                   </span>
 
                   <span>
@@ -832,11 +835,14 @@ export default function StudentRequestsPage() {
                   </span>
                 </div>
 
-                <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-                  <p className="text-xs leading-5 text-amber-800">
-                    The student will receive an in-app
-                    notification and an email explaining
-                    that the application was not approved.
+                <div className="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-xs leading-5 text-red-800">
+                    The student will receive an email
+                    containing this reason. After the
+                    rejection is processed, the
+                    student's pending account will be
+                    permanently deleted from the
+                    platform.
                   </p>
                 </div>
               </div>
@@ -868,6 +874,7 @@ export default function StudentRequestsPage() {
                         size={17}
                         className="animate-spin"
                       />
+
                       Rejecting...
                     </>
                   ) : (
