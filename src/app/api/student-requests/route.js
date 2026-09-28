@@ -659,6 +659,19 @@ async function sendRejectionEmail({
                   color: #64748b;
                 "
               >
+                Your pending student account has been
+                removed from the Dodoo Coding Club
+                Student Platform.
+              </p>
+
+              <p
+                style="
+                  margin: 0 0 16px;
+                  font-size: 15px;
+                  line-height: 1.7;
+                  color: #64748b;
+                "
+              >
                 If you believe this decision was made
                 in error or would like additional
                 information, please contact the
@@ -724,6 +737,8 @@ After reviewing your application, we are unable to approve your request at this 
 Reason provided:
 
 ${reasonText}
+
+Your pending student account has been removed from the Dodoo Coding Club Student Platform.
 
 If you believe this decision was made in error or would like additional information, please contact the Dodoo Coding Club administration.
 
@@ -823,17 +838,14 @@ async function notifyStudentRequest({
     link = "/dashboard";
   }
 
+  /*
+   * We intentionally do not create a rejection
+   * notification because rejected student accounts
+   * are permanently deleted.
+   */
+
   if (action === "reject") {
-    title = "Application Not Approved";
-
-    const cleanReason =
-      String(reason || "").trim();
-
-    message = cleanReason
-      ? `Your request to join the Dodoo Coding Club Student Platform was not approved. Reason: ${cleanReason}`
-      : "Your request to join the Dodoo Coding Club Student Platform was not approved.";
-
-    link = "/login";
+    return;
   }
 
   try {
@@ -960,6 +972,7 @@ export async function POST(request) {
 
     const userId = body?.userId;
     const action = body?.action;
+
     const rejectionReason =
       typeof body?.reason === "string"
         ? body.reason.trim()
@@ -1079,51 +1092,36 @@ export async function POST(request) {
     // =======================================================
 
     if (action === "reject") {
-      const rejectedAt = new Date();
+      // -------------------------------------------------------
+      // Capture student information BEFORE deleting account.
+      // -------------------------------------------------------
 
-      const updateResult =
-        await db
-          .collection("users")
-          .updateOne(
-            {
-              _id: user._id,
-              role: "student",
-              status: "pending",
-            },
-            {
-              $set: {
-                status: "rejected",
-                rejectionReason,
-                rejectedAt,
-                updatedAt: rejectedAt,
-              },
-            }
-          );
+      const studentName =
+        user.name ||
+        `${user.firstName || ""} ${
+          user.lastName || ""
+        }`.trim() ||
+        "Student";
 
-      if (updateResult.modifiedCount === 0) {
+      const studentEmail =
+        String(user.email || "")
+          .trim()
+          .toLowerCase();
+
+      if (!studentEmail) {
         return NextResponse.json(
           {
             error:
-              "The student request could not be rejected because it may have already been processed.",
+              "The student account does not have a valid email address.",
           },
           {
-            status: 409,
+            status: 400,
           }
         );
       }
 
       // -------------------------------------------------------
-      // In-app notification
-      // -------------------------------------------------------
-
-      await notifyStudentRequest({
-        user,
-        action: "reject",
-        reason: rejectionReason,
-      });
-
-      // -------------------------------------------------------
-      // Rejection email
+      // Send rejection email
       // -------------------------------------------------------
 
       let emailSent = false;
@@ -1133,14 +1131,8 @@ export async function POST(request) {
       try {
         const emailResult =
           await sendRejectionEmail({
-            name:
-              user.name ||
-              `${user.firstName || ""} ${
-                user.lastName || ""
-              }`.trim(),
-
-            email: user.email,
-
+            name: studentName,
+            email: studentEmail,
             reason: rejectionReason,
           });
 
@@ -1152,16 +1144,14 @@ export async function POST(request) {
         console.log(
           "STUDENT REJECTION EMAIL SENT:",
           {
-            studentEmail: user.email,
+            studentEmail,
             resendId: emailResponseId,
           }
         );
       } catch (emailError) {
         /*
-         * The student has already been rejected.
-         *
-         * We do NOT undo the rejection if the
-         * email fails.
+         * The account will still be deleted even if
+         * the email fails.
          */
 
         emailErrorMessage =
@@ -1177,22 +1167,61 @@ export async function POST(request) {
             stack:
               emailError?.stack,
 
-            studentEmail:
-              user.email,
+            studentEmail,
           }
         );
       }
 
       // -------------------------------------------------------
-      // Rejection response
+      // PERMANENTLY DELETE STUDENT ACCOUNT
+      // -------------------------------------------------------
+
+      const deleteResult =
+        await db
+          .collection("users")
+          .deleteOne({
+            _id: user._id,
+            role: "student",
+            status: "pending",
+          });
+
+      if (deleteResult.deletedCount !== 1) {
+        return NextResponse.json(
+          {
+            success: false,
+
+            error:
+              "The student account could not be deleted because it may have already been processed.",
+
+            emailSent,
+
+            emailResponseId,
+
+            emailError: emailSent
+              ? null
+              : emailErrorMessage,
+          },
+          {
+            status: 409,
+          }
+        );
+      }
+
+      // -------------------------------------------------------
+      // NO REJECTION NOTIFICATION
+      //
+      // The account has been deleted, so there is no
+      // account left to receive an in-app notification.
       // -------------------------------------------------------
 
       return NextResponse.json({
         success: true,
 
         message: emailSent
-          ? "Student request rejected. A rejection email has been sent to the student."
-          : "Student request rejected, but the rejection email could not be sent.",
+          ? "Student request rejected. The rejection email has been sent and the student account has been permanently deleted."
+          : "Student request rejected and the student account has been permanently deleted, but the rejection email could not be sent.",
+
+        accountDeleted: true,
 
         emailSent,
 
