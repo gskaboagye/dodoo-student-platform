@@ -45,7 +45,6 @@ export default function StudentsPage() {
         return;
       }
 
-      // STUDENT MANAGEMENT IS FACILITATOR ONLY
       if (data.user.role !== "facilitator") {
         router.replace("/");
         return;
@@ -61,7 +60,7 @@ export default function StudentsPage() {
   }
 
   // =====================================================
-  // LOAD STUDENTS
+  // LOAD STUDENTS + CALCULATED PROGRESS
   // =====================================================
 
   async function loadStudents() {
@@ -69,57 +68,170 @@ export default function StudentsPage() {
       setLoading(true);
       setError("");
 
-      // Extra protection:
-      // Do not request the student list unless the
-      // authenticated user is a facilitator.
       if (!user || user.role !== "facilitator") {
         router.replace("/");
         return;
       }
 
-      const response = await fetch("/api/students", {
+      // -------------------------------------------------
+      // LOAD STUDENT RECORDS
+      // -------------------------------------------------
+
+      const studentsResponse = await fetch("/api/students", {
         cache: "no-store",
       });
 
-      const data = await response.json();
+      const studentsData = await studentsResponse.json();
 
-      if (!response.ok) {
+      if (!studentsResponse.ok) {
         throw new Error(
-          data.message || "Failed to load students."
+          studentsData.message || "Failed to load students."
         );
       }
 
-      const studentList = Array.isArray(data)
-        ? data
-        : data.students || [];
+      const studentList = Array.isArray(studentsData)
+        ? studentsData
+        : studentsData.students || [];
 
-      setStudents(studentList);
+      // -------------------------------------------------
+      // LOAD CALCULATED PROGRESS
+      // -------------------------------------------------
 
-      // Keep the selected profile updated
-      if (selectedStudent) {
-        const updatedStudent = studentList.find(
-          (student) => student._id === selectedStudent._id
+      const progressResponse = await fetch("/api/progress", {
+        cache: "no-store",
+      });
+
+      const progressData = await progressResponse.json();
+
+      if (!progressResponse.ok) {
+        throw new Error(
+          progressData.message ||
+            "Failed to load student progress."
+        );
+      }
+
+      const progressList = Array.isArray(progressData.students)
+        ? progressData.students
+        : [];
+
+      // -------------------------------------------------
+      // MERGE STUDENT RECORDS WITH PROGRESS RECORDS
+      // -------------------------------------------------
+
+      const studentsWithProgress = studentList.map((student) => {
+        const progressStudent = progressList.find(
+          (item) =>
+            String(item._id) === String(student._id)
         );
 
-        if (updatedStudent) {
-          setSelectedStudent(updatedStudent);
-        } else {
-          setSelectedStudent(null);
+        // The progress API is the source of truth for
+        // calculated progress.
+        const overallProgress = safePercentage(
+          progressStudent?.progress ??
+            progressStudent?.overallProgress ??
+            progressStudent?.progressDetails?.overallProgress ??
+            0
+        );
+
+        return {
+          ...student,
+
+          progress: overallProgress,
+          overallProgress,
+
+          projectProgress: safePercentage(
+            progressStudent?.projectProgress ??
+              progressStudent?.progressDetails?.projectProgress ??
+              0
+          ),
+
+          attendanceProgress: safePercentage(
+            progressStudent?.attendanceProgress ??
+              progressStudent?.progressDetails?.attendanceProgress ??
+              0
+          ),
+
+          timelineProgress: safePercentage(
+            progressStudent?.timelineProgress ??
+              progressStudent?.progressDetails?.timelineProgress ??
+              0
+          ),
+
+          progressDetails:
+            progressStudent?.progressDetails || {},
+
+          projectCount:
+            progressStudent?.projectCount ?? 0,
+
+          completedProjects:
+            progressStudent?.completedProjects ?? 0,
+
+          attendanceCount:
+            progressStudent?.attendanceCount ?? 0,
+        };
+      });
+
+      console.log(
+        "STUDENTS WITH CALCULATED PROGRESS:",
+        studentsWithProgress
+      );
+
+      setStudents(studentsWithProgress);
+
+      // Keep selected profile synchronized
+      setSelectedStudent((currentStudent) => {
+        if (!currentStudent) {
+          return null;
         }
-      }
+
+        const updatedStudent = studentsWithProgress.find(
+          (student) =>
+            String(student._id) ===
+            String(currentStudent._id)
+        );
+
+        return updatedStudent || null;
+      });
     } catch (err) {
-      console.error("Load students error:", err);
-      setError(err.message);
+      console.error(
+        "Load students/progress error:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Failed to load students and progress."
+      );
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    if (!checkingAccess && user?.role === "facilitator") {
+    if (
+      !checkingAccess &&
+      user?.role === "facilitator"
+    ) {
       loadStudents();
     }
   }, [checkingAccess, user]);
+
+  // =====================================================
+  // SAFE PERCENTAGE
+  // =====================================================
+
+  function safePercentage(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+      return 0;
+    }
+
+    return Math.min(
+      Math.max(Math.round(number), 0),
+      100
+    );
+  }
 
   // =====================================================
   // SEARCH
@@ -197,7 +309,6 @@ export default function StudentsPage() {
     setMessage("");
     setError("");
 
-    // Extra client-side protection
     if (!user || user.role !== "facilitator") {
       setError("Only facilitators can manage students.");
       router.replace("/");
@@ -304,8 +415,30 @@ export default function StudentsPage() {
         selectedStudent.lastName?.[0] || ""
       }`.toUpperCase() || "S";
 
-    const progress =
-      Number(selectedStudent.progress) || 0;
+    const progress = safePercentage(
+      selectedStudent.progress ??
+        selectedStudent.overallProgress ??
+        selectedStudent.progressDetails?.overallProgress ??
+        0
+    );
+
+    const projectProgress = safePercentage(
+      selectedStudent.projectProgress ??
+        selectedStudent.progressDetails?.projectProgress ??
+        0
+    );
+
+    const attendanceProgress = safePercentage(
+      selectedStudent.attendanceProgress ??
+        selectedStudent.progressDetails?.attendanceProgress ??
+        0
+    );
+
+    const timelineProgress = safePercentage(
+      selectedStudent.timelineProgress ??
+        selectedStudent.progressDetails?.timelineProgress ??
+        0
+    );
 
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
@@ -346,8 +479,6 @@ export default function StudentsPage() {
             <div className="bg-slate-900 px-6 py-8 md:px-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center">
 
-                {/* PROFILE IMAGE */}
-
                 {selectedStudent.profileImage ? (
                   <img
                     src={selectedStudent.profileImage}
@@ -359,8 +490,6 @@ export default function StudentsPage() {
                     {initials}
                   </div>
                 )}
-
-                {/* NAME */}
 
                 <div className="flex-1">
                   <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">
@@ -377,22 +506,20 @@ export default function StudentsPage() {
                   </p>
                 </div>
 
-                {/* STATUS */}
-
                 <div>
                   <span
                     className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${
                       selectedStudent.status === "Active"
                         ? "bg-green-100 text-green-700"
-                        : selectedStudent.status === "Completed"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-slate-200 text-slate-700"
+                        : selectedStudent.status ===
+                            "Completed"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-slate-200 text-slate-700"
                     }`}
                   >
                     {selectedStudent.status || "Active"}
                   </span>
                 </div>
-
               </div>
             </div>
 
@@ -410,7 +537,6 @@ export default function StudentsPage() {
                 </p>
 
                 <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
                   <InfoItem
                     label="First Name"
                     value={selectedStudent.firstName}
@@ -463,7 +589,6 @@ export default function StudentsPage() {
                     value={selectedStudent.address}
                     wide
                   />
-
                 </div>
               </section>
 
@@ -480,7 +605,6 @@ export default function StudentsPage() {
                 </p>
 
                 <div className="mt-5 grid gap-5 sm:grid-cols-2">
-
                   <InfoItem
                     label="Contact Name"
                     value={
@@ -494,7 +618,6 @@ export default function StudentsPage() {
                       selectedStudent.emergencyContactPhone
                     }
                   />
-
                 </div>
               </section>
 
@@ -506,7 +629,6 @@ export default function StudentsPage() {
                 </h2>
 
                 <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
                   <InfoItem
                     label="Student ID"
                     value={selectedStudent.studentId}
@@ -541,14 +663,12 @@ export default function StudentsPage() {
                       selectedStudent.status || "Active"
                     }
                   />
-
                 </div>
               </section>
 
-              {/* PROGRESS */}
+              {/* OVERALL PROGRESS */}
 
               <section className="mt-10 border-t border-slate-200 pt-8">
-
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">
@@ -556,11 +676,12 @@ export default function StudentsPage() {
                     </h2>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      Current student progress.
+                      Automatically calculated from projects,
+                      attendance and program timeline.
                     </p>
                   </div>
 
-                  <span className="text-2xl font-bold text-blue-600">
+                  <span className="text-3xl font-bold text-blue-600">
                     {progress}%
                   </span>
                 </div>
@@ -569,20 +690,37 @@ export default function StudentsPage() {
                   <div
                     className="h-full rounded-full bg-blue-600 transition-all"
                     style={{
-                      width: `${Math.min(
-                        Math.max(progress, 0),
-                        100
-                      )}%`,
+                      width: `${progress}%`,
                     }}
                   />
                 </div>
 
+                {/* PROGRESS BREAKDOWN */}
+
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  <ProgressItem
+                    title="Projects"
+                    progress={projectProgress}
+                    description="50% of overall progress"
+                  />
+
+                  <ProgressItem
+                    title="Attendance"
+                    progress={attendanceProgress}
+                    description="30% of overall progress"
+                  />
+
+                  <ProgressItem
+                    title="Program Timeline"
+                    progress={timelineProgress}
+                    description="20% of overall progress"
+                  />
+                </div>
               </section>
 
               {/* ACTIONS */}
 
               <section className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row sm:justify-between">
-
                 <button
                   type="button"
                   onClick={handleBackToStudents}
@@ -600,9 +738,7 @@ export default function StudentsPage() {
                 >
                   Delete Student
                 </button>
-
               </section>
-
             </div>
           </section>
         </div>
@@ -626,7 +762,8 @@ export default function StudentsPage() {
           </h1>
 
           <p className="mt-2 text-lg text-slate-600">
-            View and manage student profiles.
+            View registered students and their learning
+            progress.
           </p>
         </div>
 
@@ -653,7 +790,6 @@ export default function StudentsPage() {
           {/* SECTION HEADER */}
 
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
             <div>
               <h2 className="text-2xl font-bold text-slate-900">
                 Student Records
@@ -674,14 +810,13 @@ export default function StudentsPage() {
               }
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 md:w-80"
             />
-
           </div>
 
           {/* LOADING */}
 
           {loading ? (
             <div className="py-12 text-center text-slate-500">
-              Loading students...
+              Loading students and progress...
             </div>
           ) : filteredStudents.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 px-6 py-12 text-center text-slate-500">
@@ -689,7 +824,6 @@ export default function StudentsPage() {
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-
               {filteredStudents.map((student) => {
                 const fullName =
                   `${student.firstName || ""} ${
@@ -701,8 +835,13 @@ export default function StudentsPage() {
                     student.lastName?.[0] || ""
                   }`.toUpperCase() || "S";
 
-                const progress =
-                  Number(student.progress) || 0;
+                const progress = safePercentage(
+                  student.progress ??
+                    student.overallProgress ??
+                    student.progressDetails
+                      ?.overallProgress ??
+                    0
+                );
 
                 return (
                   <button
@@ -718,7 +857,6 @@ export default function StudentsPage() {
                       {/* STUDENT HEADER */}
 
                       <div className="flex items-start gap-4">
-
                         {student.profileImage ? (
                           <img
                             src={student.profileImage}
@@ -741,13 +879,11 @@ export default function StudentsPage() {
                               "No email provided"}
                           </p>
                         </div>
-
                       </div>
 
                       {/* BASIC INFORMATION */}
 
                       <div className="mt-5 space-y-3">
-
                         {student.studentId && (
                           <div className="flex justify-between gap-4 text-sm">
                             <span className="text-slate-500">
@@ -783,13 +919,11 @@ export default function StudentsPage() {
                             </span>
                           </div>
                         )}
-
                       </div>
 
                       {/* PROGRESS */}
 
                       <div className="mt-5 border-t border-slate-100 pt-5">
-
                         <div className="mb-2 flex items-center justify-between">
                           <span className="text-sm text-slate-500">
                             Progress
@@ -804,27 +938,23 @@ export default function StudentsPage() {
                           <div
                             className="h-full rounded-full bg-blue-600 transition-all"
                             style={{
-                              width: `${Math.min(
-                                Math.max(progress, 0),
-                                100
-                              )}%`,
+                              width: `${progress}%`,
                             }}
                           />
                         </div>
-
                       </div>
 
                       {/* STATUS + VIEW PROFILE */}
 
                       <div className="mt-5 flex items-center justify-between">
-
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             student.status === "Active"
                               ? "bg-green-100 text-green-700"
-                              : student.status === "Completed"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-slate-100 text-slate-600"
+                              : student.status ===
+                                  "Completed"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-slate-100 text-slate-600"
                           }`}
                         >
                           {student.status || "Active"}
@@ -833,17 +963,13 @@ export default function StudentsPage() {
                         <span className="text-sm font-semibold text-blue-600 group-hover:underline">
                           View Profile →
                         </span>
-
                       </div>
-
                     </article>
                   </button>
                 );
               })}
-
             </div>
           )}
-
         </section>
       </div>
     </main>
@@ -851,10 +977,56 @@ export default function StudentsPage() {
 }
 
 // =====================================================
+// PROGRESS ITEM
+// =====================================================
+
+function ProgressItem({
+  title,
+  progress,
+  description,
+}) {
+  const value = Math.min(
+    Math.max(Math.round(Number(progress) || 0), 0),
+    100
+  );
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex items-center justify-between">
+        <p className="font-semibold text-slate-800">
+          {title}
+        </p>
+
+        <span className="font-bold text-blue-600">
+          {value}%
+        </span>
+      </div>
+
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
+        <div
+          className="h-full rounded-full bg-blue-600 transition-all"
+          style={{
+            width: `${value}%`,
+          }}
+        />
+      </div>
+
+      <p className="mt-2 text-xs text-slate-500">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+// =====================================================
 // READ-ONLY INFORMATION ITEM
 // =====================================================
 
-function InfoItem({ label, value, wide = false }) {
+function InfoItem({
+  label,
+  value,
+  wide = false,
+}) {
   return (
     <div
       className={`rounded-xl bg-slate-50 p-4 ${
