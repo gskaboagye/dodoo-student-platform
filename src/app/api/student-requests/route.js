@@ -12,7 +12,6 @@ import { createNotification } from "@/lib/notifications";
 
 async function getSession() {
   const cookieStore = await cookies();
-
   const token = cookieStore.get("dcc_session")?.value;
 
   if (!token) {
@@ -40,7 +39,9 @@ async function requireFacilitator() {
         {
           error: "You must be logged in.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       ),
     };
   }
@@ -49,10 +50,11 @@ async function requireFacilitator() {
     return {
       error: NextResponse.json(
         {
-          error:
-            "Only facilitators can perform this action.",
+          error: "Only facilitators can perform this action.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       ),
     };
   }
@@ -154,12 +156,10 @@ async function sendApprovalEmail({
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1.0"
   />
-
   <title>
     Dodoo Coding Club - Application Approved
   </title>
@@ -199,8 +199,6 @@ async function sendApprovalEmail({
           "
         >
 
-          <!-- HEADER -->
-
           <tr>
             <td
               style="
@@ -230,8 +228,6 @@ async function sendApprovalEmail({
               </p>
             </td>
           </tr>
-
-          <!-- CONTENT -->
 
           <tr>
             <td
@@ -291,8 +287,6 @@ async function sendApprovalEmail({
                 projects, and other available features.
               </p>
 
-              <!-- LOGIN BUTTON -->
-
               <div
                 style="
                   text-align: center;
@@ -347,18 +341,12 @@ async function sendApprovalEmail({
                 "
               >
                 Best regards,<br />
-
-                <strong>
-                  Dodoo Coding Club
-                </strong><br />
-
+                <strong>Dodoo Coding Club</strong><br />
                 Student Success &amp; Impact Platform
               </p>
 
             </td>
           </tr>
-
-          <!-- FOOTER -->
 
           <tr>
             <td
@@ -390,7 +378,8 @@ async function sendApprovalEmail({
 </html>
 `;
 
-  const text = `Hello ${studentName},
+  const text = `
+Hello ${studentName},
 
 Your request to join the Dodoo Coding Club Student Platform has been approved.
 
@@ -405,16 +394,10 @@ You can now access your student resources, profile, attendance, progress, projec
 Welcome to Dodoo Coding Club!
 
 Best regards,
-Dodoo Coding Club
-Student Success & Impact Platform`;
 
-  console.log(
-    "SENDING STUDENT APPROVAL EMAIL:",
-    {
-      to: email,
-      from: fromEmail,
-    }
-  );
+Dodoo Coding Club
+Student Success & Impact Platform
+`;
 
   const response = await fetch(
     "https://api.resend.com/emails",
@@ -443,13 +426,355 @@ Student Success & Impact Platform`;
     data = await response.json();
   } catch (jsonError) {
     console.error(
-      "RESEND RESPONSE JSON ERROR:",
+      "RESEND APPROVAL JSON ERROR:",
+      jsonError
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+        data?.error ||
+        `Resend request failed with status ${response.status}.`
+    );
+  }
+
+  return data;
+}
+
+// =========================================================
+// SEND REJECTION EMAIL
+// =========================================================
+
+async function sendRejectionEmail({
+  name,
+  email,
+  reason = "",
+}) {
+  const apiKey =
+    process.env.RESEND_API_KEY;
+
+  const fromEmail =
+    process.env.EMAIL_FROM ||
+    "Dodoo Coding Club <hello@dccstudentplatform.com>";
+
+  if (!apiKey) {
+    throw new Error(
+      "RESEND_API_KEY is not configured."
+    );
+  }
+
+  if (!email) {
+    throw new Error(
+      "Student email address is missing."
+    );
+  }
+
+  const studentName =
+    String(name || "Student").trim();
+
+  const safeStudentName =
+    escapeHtml(studentName);
+
+  const safeReason =
+    escapeHtml(
+      String(reason || "").trim()
+    );
+
+  const reasonText =
+    String(reason || "").trim() ||
+    "No specific reason was provided.";
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <title>
+    Dodoo Coding Club - Application Update
+  </title>
+</head>
+
+<body
+  style="
+    margin: 0;
+    padding: 0;
+    background-color: #f1f5f9;
+    font-family: Arial, Helvetica, sans-serif;
+  "
+>
+  <table
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
+    style="
+      background-color: #f1f5f9;
+      padding: 40px 20px;
+    "
+  >
+    <tr>
+      <td align="center">
+
+        <table
+          width="100%"
+          cellpadding="0"
+          cellspacing="0"
+          border="0"
+          style="
+            max-width: 600px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+          "
+        >
+
+          <tr>
+            <td
+              style="
+                background-color: #0f172a;
+                padding: 30px;
+                text-align: center;
+              "
+            >
+              <h1
+                style="
+                  margin: 0;
+                  color: #ffffff;
+                  font-size: 26px;
+                "
+              >
+                Dodoo Coding Club
+              </h1>
+
+              <p
+                style="
+                  margin: 8px 0 0;
+                  color: #cbd5e1;
+                  font-size: 14px;
+                "
+              >
+                Student Success &amp; Impact Platform
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td
+              style="
+                padding: 40px 35px;
+                color: #334155;
+              "
+            >
+
+              <h2
+                style="
+                  margin: 0 0 20px;
+                  color: #0f172a;
+                  font-size: 24px;
+                "
+              >
+                Application Update
+              </h2>
+
+              <p
+                style="
+                  margin: 0 0 16px;
+                  font-size: 16px;
+                  line-height: 1.7;
+                "
+              >
+                Hello
+                <strong>${safeStudentName}</strong>,
+              </p>
+
+              <p
+                style="
+                  margin: 0 0 16px;
+                  font-size: 16px;
+                  line-height: 1.7;
+                "
+              >
+                Thank you for your interest in joining
+                the
+                <strong>
+                  Dodoo Coding Club Student Platform
+                </strong>.
+              </p>
+
+              <p
+                style="
+                  margin: 0 0 20px;
+                  font-size: 16px;
+                  line-height: 1.7;
+                "
+              >
+                After reviewing your application,
+                we are unable to approve your request
+                at this time.
+              </p>
+
+              <div
+                style="
+                  margin: 25px 0;
+                  padding: 20px;
+                  background-color: #f8fafc;
+                  border: 1px solid #e2e8f0;
+                  border-radius: 10px;
+                "
+              >
+                <p
+                  style="
+                    margin: 0 0 8px;
+                    color: #0f172a;
+                    font-size: 15px;
+                    font-weight: bold;
+                  "
+                >
+                  Reason provided:
+                </p>
+
+                <p
+                  style="
+                    margin: 0;
+                    color: #475569;
+                    font-size: 15px;
+                    line-height: 1.7;
+                  "
+                >
+                  ${safeReason ||
+                    "No specific reason was provided."}
+                </p>
+              </div>
+
+              <p
+                style="
+                  margin: 0 0 16px;
+                  font-size: 15px;
+                  line-height: 1.7;
+                  color: #64748b;
+                "
+              >
+                If you believe this decision was made
+                in error or would like additional
+                information, please contact the
+                Dodoo Coding Club administration.
+              </p>
+
+              <p
+                style="
+                  margin: 25px 0 0;
+                  font-size: 15px;
+                  line-height: 1.6;
+                "
+              >
+                Best regards,<br />
+                <strong>Dodoo Coding Club</strong><br />
+                Student Success &amp; Impact Platform
+              </p>
+
+            </td>
+          </tr>
+
+          <tr>
+            <td
+              style="
+                background-color: #f8fafc;
+                padding: 20px 30px;
+                text-align: center;
+              "
+            >
+              <p
+                style="
+                  margin: 0;
+                  color: #94a3b8;
+                  font-size: 12px;
+                "
+              >
+                This is an automated message from
+                the Dodoo Coding Club Student Platform.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+
+  const text = `
+DODOO CODING CLUB
+
+APPLICATION UPDATE
+
+Hello ${studentName},
+
+Thank you for your interest in joining the Dodoo Coding Club Student Platform.
+
+After reviewing your application, we are unable to approve your request at this time.
+
+Reason provided:
+
+${reasonText}
+
+If you believe this decision was made in error or would like additional information, please contact the Dodoo Coding Club administration.
+
+Best regards,
+
+Dodoo Coding Club
+Student Success & Impact Platform
+`;
+
+  console.log(
+    "SENDING STUDENT REJECTION EMAIL:",
+    {
+      to: email,
+      from: fromEmail,
+    }
+  );
+
+  const response = await fetch(
+    "https://api.resend.com/emails",
+    {
+      method: "POST",
+
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+
+      body: JSON.stringify({
+        from: fromEmail,
+        to: [email],
+        subject:
+          "Your Dodoo Coding Club Application Update",
+        text,
+        html,
+      }),
+    }
+  );
+
+  let data = {};
+
+  try {
+    data = await response.json();
+  } catch (jsonError) {
+    console.error(
+      "RESEND REJECTION JSON ERROR:",
       jsonError
     );
   }
 
   console.log(
-    "RESEND APPROVAL EMAIL RESPONSE:",
+    "RESEND REJECTION EMAIL RESPONSE:",
     {
       status: response.status,
       ok: response.ok,
@@ -458,15 +783,6 @@ Student Success & Impact Platform`;
   );
 
   if (!response.ok) {
-    console.error(
-      "RESEND APPROVAL EMAIL ERROR:",
-      {
-        status: response.status,
-        data,
-        recipient: email,
-      }
-    );
-
     throw new Error(
       data?.message ||
         data?.error ||
@@ -484,6 +800,7 @@ Student Success & Impact Platform`;
 async function notifyStudentRequest({
   user,
   action,
+  reason = "",
 }) {
   if (!user?._id) {
     return;
@@ -509,8 +826,12 @@ async function notifyStudentRequest({
   if (action === "reject") {
     title = "Application Not Approved";
 
-    message =
-      "Your request to join the Dodoo Coding Club Student Platform was not approved.";
+    const cleanReason =
+      String(reason || "").trim();
+
+    message = cleanReason
+      ? `Your request to join the Dodoo Coding Club Student Platform was not approved. Reason: ${cleanReason}`
+      : "Your request to join the Dodoo Coding Club Student Platform was not approved.";
 
     link = "/login";
   }
@@ -626,7 +947,7 @@ export async function POST(request) {
 
     try {
       body = await request.json();
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         {
           error: "Invalid request body.",
@@ -637,8 +958,12 @@ export async function POST(request) {
       );
     }
 
-    const userId = body.userId;
-    const action = body.action;
+    const userId = body?.userId;
+    const action = body?.action;
+    const rejectionReason =
+      typeof body?.reason === "string"
+        ? body.reason.trim()
+        : "";
 
     // -------------------------------------------------------
     // Validate request
@@ -674,6 +999,40 @@ export async function POST(request) {
       return NextResponse.json(
         {
           error: "Invalid user ID.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    // -------------------------------------------------------
+    // Require rejection reason
+    // -------------------------------------------------------
+
+    if (
+      action === "reject" &&
+      !rejectionReason
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Please provide a reason for rejecting the student application.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (
+      action === "reject" &&
+      rejectionReason.length > 1000
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "The rejection reason must be 1000 characters or fewer.",
         },
         {
           status: 400,
@@ -720,21 +1079,26 @@ export async function POST(request) {
     // =======================================================
 
     if (action === "reject") {
-      const updateResult = await db
-        .collection("users")
-        .updateOne(
-          {
-            _id: user._id,
-            role: "student",
-            status: "pending",
-          },
-          {
-            $set: {
-              status: "rejected",
-              updatedAt: new Date(),
+      const rejectedAt = new Date();
+
+      const updateResult =
+        await db
+          .collection("users")
+          .updateOne(
+            {
+              _id: user._id,
+              role: "student",
+              status: "pending",
             },
-          }
-        );
+            {
+              $set: {
+                status: "rejected",
+                rejectionReason,
+                rejectedAt,
+                updatedAt: rejectedAt,
+              },
+            }
+          );
 
       if (updateResult.modifiedCount === 0) {
         return NextResponse.json(
@@ -748,16 +1112,95 @@ export async function POST(request) {
         );
       }
 
-      // Notify student
+      // -------------------------------------------------------
+      // In-app notification
+      // -------------------------------------------------------
+
       await notifyStudentRequest({
         user,
         action: "reject",
+        reason: rejectionReason,
       });
+
+      // -------------------------------------------------------
+      // Rejection email
+      // -------------------------------------------------------
+
+      let emailSent = false;
+      let emailResponseId = null;
+      let emailErrorMessage = "";
+
+      try {
+        const emailResult =
+          await sendRejectionEmail({
+            name:
+              user.name ||
+              `${user.firstName || ""} ${
+                user.lastName || ""
+              }`.trim(),
+
+            email: user.email,
+
+            reason: rejectionReason,
+          });
+
+        emailSent = true;
+
+        emailResponseId =
+          emailResult?.id || null;
+
+        console.log(
+          "STUDENT REJECTION EMAIL SENT:",
+          {
+            studentEmail: user.email,
+            resendId: emailResponseId,
+          }
+        );
+      } catch (emailError) {
+        /*
+         * The student has already been rejected.
+         *
+         * We do NOT undo the rejection if the
+         * email fails.
+         */
+
+        emailErrorMessage =
+          emailError?.message ||
+          "Unknown email error.";
+
+        console.error(
+          "STUDENT REJECTION EMAIL FAILED:",
+          {
+            message:
+              emailError?.message,
+
+            stack:
+              emailError?.stack,
+
+            studentEmail:
+              user.email,
+          }
+        );
+      }
+
+      // -------------------------------------------------------
+      // Rejection response
+      // -------------------------------------------------------
 
       return NextResponse.json({
         success: true,
-        message:
-          "Student request rejected.",
+
+        message: emailSent
+          ? "Student request rejected. A rejection email has been sent to the student."
+          : "Student request rejected, but the rejection email could not be sent.",
+
+        emailSent,
+
+        emailResponseId,
+
+        emailError: emailSent
+          ? null
+          : emailErrorMessage,
       });
     }
 
@@ -784,7 +1227,8 @@ export async function POST(request) {
     // -------------------------------------------------------
 
     if (existingStudent) {
-      studentId = existingStudent._id;
+      studentId =
+        existingStudent._id;
 
       await db
         .collection("students")
@@ -865,11 +1309,14 @@ export async function POST(request) {
         updatedAt: new Date(),
       };
 
-      const result = await db
-        .collection("students")
-        .insertOne(student);
+      const result =
+        await db
+          .collection("students")
+          .insertOne(student);
 
-      studentId = result.insertedId;
+      studentId =
+        result.insertedId;
+
       studentWasCreated = true;
     }
 
@@ -894,6 +1341,11 @@ export async function POST(request) {
 
               updatedAt: new Date(),
             },
+
+            $unset: {
+              rejectionReason: "",
+              rejectedAt: "",
+            },
           }
         );
 
@@ -904,10 +1356,10 @@ export async function POST(request) {
     if (
       userUpdateResult.modifiedCount === 0
     ) {
-      // If we created a brand-new student record but
-      // could not activate the user, remove the student
-      // record so we do not leave an orphaned student.
-      if (studentWasCreated && studentId) {
+      if (
+        studentWasCreated &&
+        studentId
+      ) {
         await db
           .collection("students")
           .deleteOne({
