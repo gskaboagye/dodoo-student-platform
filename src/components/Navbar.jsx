@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import Notifications from "./Notifications";
 
 const PUBLIC_ROUTES = [
   "/login",
@@ -16,19 +15,16 @@ export default function Navbar() {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const isPublicRoute =
-    PUBLIC_ROUTES.some(
-      (route) =>
-        pathname === route ||
-        pathname?.startsWith(`${route}/`)
-    );
+  const isPublicRoute = PUBLIC_ROUTES.some(
+    (route) =>
+      pathname === route ||
+      pathname?.startsWith(`${route}/`)
+  );
 
   useEffect(() => {
     let mounted = true;
 
     async function loadUser() {
-      // Never check/render authenticated controls
-      // on public authentication pages.
       if (isPublicRoute) {
         if (mounted) {
           setUser(null);
@@ -39,14 +35,11 @@ export default function Navbar() {
       }
 
       try {
-        const response = await fetch(
-          "/api/auth/me",
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          }
-        );
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
 
         if (!response.ok) {
           if (mounted) {
@@ -56,13 +49,10 @@ export default function Navbar() {
           return;
         }
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
         if (mounted) {
-          setUser(
-            data?.user || null
-          );
+          setUser(data?.user || null);
         }
       } catch (error) {
         console.error(
@@ -87,16 +77,20 @@ export default function Navbar() {
     };
   }, [pathname, isPublicRoute]);
 
-  /*
-   * PUBLIC PAGES
-   *
-   * Do not show notification or profile controls
-   * while the user is logged out.
-   */
-  const showAuthenticatedControls =
-    !isPublicRoute &&
-    !checkingAuth &&
-    user;
+  // Don't render authenticated navbar on public pages.
+  if (isPublicRoute) {
+    return null;
+  }
+
+  // Don't render the navbar while checking authentication.
+  if (checkingAuth) {
+    return null;
+  }
+
+  // Don't render it for logged-out users.
+  if (!user) {
+    return null;
+  }
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white">
@@ -157,43 +151,32 @@ export default function Navbar() {
           </a>
         </nav>
 
-        {/* Authenticated controls */}
-        {showAuthenticatedControls && (
-          <div className="flex items-center gap-4">
-
-            {/* Notification */}
-            <Notifications />
-
-            {/* User */}
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 font-bold text-white">
-                {(
-                  user?.name ||
-                  user?.firstName ||
-                  "U"
-                )
-                  .charAt(0)
-                  .toUpperCase()}
-              </div>
-
-              <div className="hidden lg:block">
-                <p className="text-sm font-bold text-gray-900">
-                  {user?.name ||
-                    `${user?.firstName || ""} ${
-                      user?.lastName || ""
-                    }`.trim() ||
-                    "User"}
-                </p>
-
-                <p className="text-xs capitalize text-gray-500">
-                  {user?.role ||
-                    "User"}
-                </p>
-              </div>
-            </div>
-
+        {/* User */}
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 font-bold text-white">
+            {(
+              user?.name ||
+              user?.firstName ||
+              "U"
+            )
+              .charAt(0)
+              .toUpperCase()}
           </div>
-        )}
+
+          <div className="hidden lg:block">
+            <p className="text-sm font-bold text-gray-900">
+              {user?.name ||
+                `${user?.firstName || ""} ${
+                  user?.lastName || ""
+                }`.trim() ||
+                "User"}
+            </p>
+
+            <p className="text-xs capitalize text-gray-500">
+              {user?.role || "User"}
+            </p>
+          </div>
+        </div>
 
       </div>
     </header>
