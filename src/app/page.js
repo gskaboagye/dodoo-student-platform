@@ -104,10 +104,15 @@ export default function Dashboard() {
           return;
         }
 
+        // =====================================================
+        // LOAD STUDENT DATA
+        // =====================================================
+
         const [
           profileResponse,
           attendanceResponse,
           projectsResponse,
+          progressResponse,
         ] = await Promise.all([
           fetch("/api/student/profile", {
             cache: "no-store",
@@ -120,25 +125,57 @@ export default function Dashboard() {
           fetch("/api/projects", {
             cache: "no-store",
           }),
+
+          fetch("/api/progress", {
+            cache: "no-store",
+          }),
         ]);
+
+        // =====================================================
+        // PROFILE
+        // =====================================================
 
         const profileData = profileResponse.ok
           ? await profileResponse.json()
           : null;
 
+        // =====================================================
+        // ATTENDANCE
+        // =====================================================
+
         const attendanceData = attendanceResponse.ok
           ? await attendanceResponse.json()
           : { attendance: [] };
 
+        // =====================================================
+        // PROJECTS
+        // =====================================================
+
         const projectsData = projectsResponse.ok
           ? await projectsResponse.json()
           : { projects: [] };
+
+        // =====================================================
+        // PROGRESS
+        // =====================================================
+
+        const progressData = progressResponse.ok
+          ? await progressResponse.json()
+          : null;
+
+        // =====================================================
+        // NORMALIZE ATTENDANCE DATA
+        // =====================================================
 
         const attendance = Array.isArray(attendanceData)
           ? attendanceData
           : Array.isArray(attendanceData?.attendance)
             ? attendanceData.attendance
             : [];
+
+        // =====================================================
+        // NORMALIZE PROJECT DATA
+        // =====================================================
 
         const projects = Array.isArray(projectsData)
           ? projectsData
@@ -162,7 +199,7 @@ export default function Dashboard() {
         });
 
         // =====================================================
-        // ATTENDANCE
+        // ATTENDANCE STATISTICS
         // =====================================================
 
         const present = attendance.filter(
@@ -203,6 +240,22 @@ export default function Dashboard() {
               )
             : 0;
 
+        // =====================================================
+        // OFFICIAL OVERALL PROGRESS
+        // =====================================================
+
+        const overallProgress = normalizeProgressValue(
+          progressData?.progress?.overall ??
+            progressData?.overallProgress ??
+            progressData?.progress?.percentage ??
+            progressData?.percentage ??
+            0
+        );
+
+        // =====================================================
+        // SAVE STUDENT DATA
+        // =====================================================
+
         setStudentData({
           profile:
             profileData?.student ||
@@ -214,18 +267,27 @@ export default function Dashboard() {
           projects: myProjects,
 
           present,
-
           late,
-
           absent,
 
           attendanceRate,
 
           projectProgress,
+
+          overallProgress,
+
+          progressDetails:
+            progressData?.progressDetails ||
+            progressData?.progress?.details ||
+            null,
         });
 
         return;
       }
+
+      // =====================================================
+      // UNKNOWN ROLE
+      // =====================================================
 
       setError("Your account role is not recognized.");
     } catch (err) {
@@ -304,13 +366,11 @@ export default function Dashboard() {
           <div className="relative z-10">
 
             <div className="mb-4 flex items-center gap-2 text-blue-400">
-
               <Terminal className="h-5 w-5" />
 
               <span className="font-mono text-sm font-semibold">
                 DCC_CODE_LAB
               </span>
-
             </div>
 
             <p className="text-sm font-medium text-blue-400">
@@ -541,6 +601,7 @@ export default function Dashboard() {
     return (
       <div className="p-4 sm:p-6">
         <div className="flex min-h-[70vh] items-center justify-center">
+
           <div className="w-full max-w-2xl rounded-2xl border border-blue-200 bg-blue-50 p-6 shadow-sm sm:p-8">
 
             <div className="text-center">
@@ -588,6 +649,7 @@ export default function Dashboard() {
 
                   {studentData.email && (
                     <div className="mt-4 rounded-lg bg-slate-50 p-3">
+
                       <p className="text-xs text-slate-500">
                         Notification email
                       </p>
@@ -595,6 +657,7 @@ export default function Dashboard() {
                       <p className="mt-1 break-all text-sm font-medium text-slate-800">
                         {studentData.email}
                       </p>
+
                     </div>
                   )}
 
@@ -620,6 +683,7 @@ export default function Dashboard() {
             </div>
 
           </div>
+
         </div>
       </div>
     );
@@ -630,6 +694,12 @@ export default function Dashboard() {
   // =========================================================
 
   const profile = studentData?.profile;
+
+  const overallProgress =
+    studentData?.overallProgress ?? 0;
+
+  const projectProgress =
+    studentData?.projectProgress ?? 0;
 
   return (
     <div className="p-4 sm:p-6">
@@ -770,19 +840,18 @@ export default function Dashboard() {
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 
-        {/* UPDATED: STUDENT ATTENDANCE */}
+        <StatCard
+          title="Overall Progress"
+          value={`${overallProgress}%`}
+          icon={<ChartNoAxesCombined size={22} />}
+          href="/progress"
+        />
+
         <StatCard
           title="My Attendance"
           value={`${studentData?.attendanceRate ?? 0}%`}
           icon={<CalendarCheck size={22} />}
           href="/student/attendance"
-        />
-
-        <StatCard
-          title="Project Progress"
-          value={`${studentData?.projectProgress ?? 0}%`}
-          icon={<ChartNoAxesCombined size={22} />}
-          href="/progress"
         />
 
         <StatCard
@@ -798,6 +867,163 @@ export default function Dashboard() {
           icon={<BookOpen size={22} />}
           href="/resources"
         />
+
+      </div>
+
+      {/* =================================================
+          PROGRESS OVERVIEW
+      ================================================= */}
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-3">
+
+        {/* OVERALL PROGRESS */}
+
+        <DashboardCard
+          title="Overall Progress"
+          description="Your combined learning progress"
+          icon={<ChartNoAxesCombined size={20} />}
+        >
+
+          <div>
+
+            <div className="mb-2 flex items-center justify-between">
+
+              <span className="text-sm text-slate-500">
+                Overall progress
+              </span>
+
+              <span className="text-sm font-semibold text-slate-800">
+                {overallProgress}%
+              </span>
+
+            </div>
+
+            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-500"
+                style={{
+                  width: `${overallProgress}%`,
+                }}
+              />
+
+            </div>
+
+            <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+              <span>0%</span>
+              <span>100%</span>
+            </div>
+
+          </div>
+
+          <Link
+            href="/progress"
+            className="mt-5 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            View detailed progress
+            <ArrowRight size={16} />
+          </Link>
+
+        </DashboardCard>
+
+        {/* ATTENDANCE PROGRESS */}
+
+        <DashboardCard
+          title="Attendance Progress"
+          description="Your attendance performance"
+          icon={<CalendarCheck size={20} />}
+        >
+
+          <div>
+
+            <div className="mb-2 flex items-center justify-between">
+
+              <span className="text-sm text-slate-500">
+                Attendance rate
+              </span>
+
+              <span className="text-sm font-semibold text-slate-800">
+                {studentData?.attendanceRate ?? 0}%
+              </span>
+
+            </div>
+
+            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-500"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.max(
+                      0,
+                      studentData?.attendanceRate ?? 0
+                    )
+                  )}%`,
+                }}
+              />
+
+            </div>
+
+          </div>
+
+          <Link
+            href="/student/attendance"
+            className="mt-5 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            View my attendance
+            <ArrowRight size={16} />
+          </Link>
+
+        </DashboardCard>
+
+        {/* PROJECT PROGRESS */}
+
+        <DashboardCard
+          title="Project Progress"
+          description="Your average project completion"
+          icon={<FolderKanban size={20} />}
+        >
+
+          <div>
+
+            <div className="mb-2 flex items-center justify-between">
+
+              <span className="text-sm text-slate-500">
+                Project progress
+              </span>
+
+              <span className="text-sm font-semibold text-slate-800">
+                {projectProgress}%
+              </span>
+
+            </div>
+
+            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+
+              <div
+                className="h-full rounded-full bg-blue-600 transition-all duration-500"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    Math.max(0, projectProgress)
+                  )}%`,
+                }}
+              />
+
+            </div>
+
+          </div>
+
+          <Link
+            href="/projects"
+            className="mt-5 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            View my projects
+            <ArrowRight size={16} />
+          </Link>
+
+        </DashboardCard>
 
       </div>
 
@@ -876,59 +1102,11 @@ export default function Dashboard() {
 
           </div>
 
-          {/* UPDATED: STUDENT ATTENDANCE */}
           <Link
             href="/student/attendance"
             className="mt-5 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
           >
             View my attendance
-            <ArrowRight size={16} />
-          </Link>
-
-        </DashboardCard>
-
-        {/* MY PROGRESS */}
-
-        <DashboardCard
-          title="My Progress"
-          description="Your current project progress"
-          icon={<ChartNoAxesCombined size={20} />}
-        >
-
-          <div>
-
-            <div className="mb-2 flex items-center justify-between">
-
-              <span className="text-sm text-slate-500">
-                Project progress
-              </span>
-
-              <span className="text-sm font-semibold text-slate-800">
-                {studentData?.projectProgress ?? 0}%
-              </span>
-
-            </div>
-
-            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-
-              <div
-                className="h-full rounded-full bg-blue-600 transition-all"
-                style={{
-                  width: `${
-                    studentData?.projectProgress ?? 0
-                  }%`,
-                }}
-              />
-
-            </div>
-
-          </div>
-
-          <Link
-            href="/progress"
-            className="mt-5 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
-          >
-            View my progress
             <ArrowRight size={16} />
           </Link>
 
@@ -968,11 +1146,15 @@ export default function Dashboard() {
                     <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
 
                       <div
-                        className="h-full rounded-full bg-blue-600"
+                        className="h-full rounded-full bg-blue-600 transition-all"
                         style={{
-                          width: `${
-                            project.progress || 0
-                          }%`,
+                          width: `${Math.min(
+                            100,
+                            Math.max(
+                              0,
+                              Number(project.progress) || 0
+                            )
+                          )}%`,
                         }}
                       />
 
@@ -993,6 +1175,43 @@ export default function Dashboard() {
             className="mt-5 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
           >
             View my projects
+            <ArrowRight size={16} />
+          </Link>
+
+        </DashboardCard>
+
+        {/* PROGRESS BREAKDOWN */}
+
+        <DashboardCard
+          title="Progress Breakdown"
+          description="Key areas contributing to your progress"
+          icon={<Target size={20} />}
+        >
+
+          <div className="space-y-4">
+
+            <ProgressItem
+              label="Attendance"
+              value={studentData?.attendanceRate ?? 0}
+            />
+
+            <ProgressItem
+              label="Projects"
+              value={projectProgress}
+            />
+
+            <ProgressItem
+              label="Overall"
+              value={overallProgress}
+            />
+
+          </div>
+
+          <Link
+            href="/progress"
+            className="mt-5 flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            View full progress report
             <ArrowRight size={16} />
           </Link>
 
@@ -1020,7 +1239,6 @@ export default function Dashboard() {
               text="My Profile"
             />
 
-            {/* UPDATED: STUDENT ATTENDANCE */}
             <QuickAction
               href="/student/attendance"
               icon={<CalendarCheck size={18} />}
@@ -1046,6 +1264,23 @@ export default function Dashboard() {
       </div>
 
     </div>
+  );
+}
+
+// =========================================================
+// NORMALIZE PROGRESS VALUE
+// =========================================================
+
+function normalizeProgressValue(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+
+  return Math.min(
+    100,
+    Math.max(0, Math.round(number))
   );
 }
 
@@ -1156,6 +1391,46 @@ function MiniStat({
       <p className="text-xs text-slate-500">
         {label}
       </p>
+
+    </div>
+  );
+}
+
+// =========================================================
+// PROGRESS ITEM
+// =========================================================
+
+function ProgressItem({
+  label,
+  value,
+}) {
+  const normalizedValue = normalizeProgressValue(value);
+
+  return (
+    <div>
+
+      <div className="mb-2 flex items-center justify-between">
+
+        <span className="text-sm text-slate-600">
+          {label}
+        </span>
+
+        <span className="text-sm font-semibold text-slate-800">
+          {normalizedValue}%
+        </span>
+
+      </div>
+
+      <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+
+        <div
+          className="h-full rounded-full bg-blue-600 transition-all duration-500"
+          style={{
+            width: `${normalizedValue}%`,
+          }}
+        />
+
+      </div>
 
     </div>
   );
