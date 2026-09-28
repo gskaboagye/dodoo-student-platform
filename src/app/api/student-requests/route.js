@@ -646,8 +646,10 @@ async function sendRejectionEmail({
                     line-height: 1.7;
                   "
                 >
-                  ${safeReason ||
-                    "No specific reason was provided."}
+                  ${
+                    safeReason ||
+                    "No specific reason was provided."
+                  }
                 </p>
               </div>
 
@@ -839,9 +841,9 @@ async function notifyStudentRequest({
   }
 
   /*
-   * We intentionally do not create a rejection
-   * notification because rejected student accounts
-   * are permanently deleted.
+   * Rejected accounts are permanently deleted,
+   * so we intentionally do not create a rejection
+   * notification.
    */
 
   if (action === "reject") {
@@ -1173,7 +1175,35 @@ export async function POST(request) {
       }
 
       // -------------------------------------------------------
-      // PERMANENTLY DELETE STUDENT ACCOUNT
+      // PERMANENTLY DELETE OLD STUDENT PROFILE
+      // -------------------------------------------------------
+      //
+      // A previous version of the rejection process could
+      // leave a student profile behind in the students
+      // collection.
+      //
+      // Delete any profile belonging to this email so that
+      // the student can register again with the same email.
+      //
+
+      const deletedStudentProfile =
+        await db
+          .collection("students")
+          .deleteOne({
+            email: studentEmail,
+          });
+
+      console.log(
+        "OLD STUDENT PROFILE DELETED:",
+        {
+          email: studentEmail,
+          deletedCount:
+            deletedStudentProfile.deletedCount,
+        }
+      );
+
+      // -------------------------------------------------------
+      // PERMANENTLY DELETE USER ACCOUNT
       // -------------------------------------------------------
 
       const deleteResult =
@@ -1207,11 +1237,21 @@ export async function POST(request) {
         );
       }
 
+      console.log(
+        "STUDENT ACCOUNT PERMANENTLY DELETED:",
+        {
+          userId: user._id.toString(),
+          email: studentEmail,
+        }
+      );
+
       // -------------------------------------------------------
       // NO REJECTION NOTIFICATION
+      // -------------------------------------------------------
       //
-      // The account has been deleted, so there is no
-      // account left to receive an in-app notification.
+      // The account has been permanently deleted,
+      // so there is no account left to receive an
+      // in-app notification.
       // -------------------------------------------------------
 
       return NextResponse.json({
@@ -1222,6 +1262,9 @@ export async function POST(request) {
           : "Student request rejected and the student account has been permanently deleted, but the rejection email could not be sent.",
 
         accountDeleted: true,
+
+        studentProfileDeleted:
+          deletedStudentProfile.deletedCount > 0,
 
         emailSent,
 
@@ -1506,6 +1549,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         success: false,
+
         error:
           error?.message ||
           "Failed to process student request.",

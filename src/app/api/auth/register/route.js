@@ -169,16 +169,19 @@ export async function POST(request) {
 
     const client = await clientPromise;
 
-    const dbName = process.env.DB_NAME || "DCCPlatform";
+    const dbName =
+      process.env.DB_NAME || "DCCPlatform";
+
     const db = client.db(dbName);
 
     // ---------------------------------------------------------
-    // CHECK EXISTING ACCOUNT
+    // CHECK EXISTING USER ACCOUNT
     // ---------------------------------------------------------
 
-    const existingUser = await db.collection("users").findOne({
-      email,
-    });
+    const existingUser =
+      await db.collection("users").findOne({
+        email,
+      });
 
     if (existingUser) {
       return NextResponse.json(
@@ -191,10 +194,56 @@ export async function POST(request) {
     }
 
     // ---------------------------------------------------------
+    // CHECK OLD STUDENT PROFILE
+    // ---------------------------------------------------------
+    //
+    // A rejected student account is deleted from the users
+    // collection. However, an old student profile could still
+    // remain in the students collection.
+    //
+    // Remove only old inactive/rejected/pending profiles so
+    // the student can start a completely new registration.
+    //
+    // Do NOT delete an active student profile.
+    // ---------------------------------------------------------
+
+    if (role === "student") {
+      const existingStudent =
+        await db.collection("students").findOne({
+          email,
+        });
+
+      if (existingStudent) {
+        const existingStatus = String(
+          existingStudent.status || ""
+        ).toLowerCase();
+
+        if (
+          existingStatus === "rejected" ||
+          existingStatus === "inactive" ||
+          existingStatus === "pending"
+        ) {
+          await db.collection("students").deleteOne({
+            _id: existingStudent._id,
+          });
+        } else {
+          return NextResponse.json(
+            {
+              error:
+                "A student profile with this email already exists.",
+            },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
+    // ---------------------------------------------------------
     // PASSWORD
     // ---------------------------------------------------------
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash =
+      await bcrypt.hash(password, 12);
 
     // ---------------------------------------------------------
     // EMAIL VERIFICATION
@@ -224,7 +273,9 @@ export async function POST(request) {
       // Students require facilitator approval.
       // Facilitators become active after registration.
       status:
-        role === "student" ? "pending" : "active",
+        role === "student"
+          ? "pending"
+          : "active",
 
       studentId: null,
 
@@ -438,34 +489,37 @@ export async function POST(request) {
 
     if (role === "student") {
       try {
-        const facilitators = await db
-          .collection("users")
-          .find({
-            role: "facilitator",
-            status: "active",
-            emailVerified: true,
-          })
-          .project({
-            _id: 1,
-          })
-          .toArray();
+        const facilitators =
+          await db
+            .collection("users")
+            .find({
+              role: "facilitator",
+              status: "active",
+              emailVerified: true,
+            })
+            .project({
+              _id: 1,
+            })
+            .toArray();
 
         if (facilitators.length > 0) {
           const facilitatorNotifications =
-            facilitators.map((facilitator) => ({
-              userId:
-                facilitator._id.toString(),
+            facilitators.map(
+              (facilitator) => ({
+                userId:
+                  facilitator._id.toString(),
 
-              title:
-                "New Student Registration",
+                title:
+                  "New Student Registration",
 
-              message:
-                `${name} has submitted an application to join the Dodoo Coding Club Student Platform. Please review the application.`,
+                message:
+                  `${name} has submitted an application to join the Dodoo Coding Club Student Platform. Please review the application.`,
 
-              type: "student-request",
+                type: "student-request",
 
-              link: "/student-requests",
-            }));
+                link: "/student-requests",
+              })
+            );
 
           await createNotifications(
             facilitatorNotifications
