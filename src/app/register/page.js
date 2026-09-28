@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -193,60 +192,68 @@ export default function RegisterPage() {
               </p>
             </div>
 
-            {/* Application Status */}
+            {/* Application Process */}
             <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
               <h2 className="font-semibold text-blue-900">
-                What happens next?
+                Application Process
               </h2>
 
-              <div className="mt-4 space-y-4">
+              <p className="mt-1 text-sm text-blue-700">
+                Complete the following steps to access your student account.
+              </p>
+
+              <div className="mt-5 space-y-5">
+                {/* Step 1 */}
                 <div className="flex gap-3">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
                     1
                   </div>
 
                   <div>
-                    <p className="font-medium text-slate-900">
-                      Verify your email
+                    <p className="font-semibold text-slate-900">
+                      Verify Your Email
                     </p>
 
                     <p className="mt-1 text-sm leading-5 text-slate-600">
-                      Check your email and complete the verification process.
+                      Check your inbox and verify the email address you used to
+                      register.
                     </p>
                   </div>
                 </div>
 
+                {/* Step 2 */}
                 <div className="flex gap-3">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
                     2
                   </div>
 
                   <div>
-                    <p className="font-medium text-slate-900">
-                      Wait for facilitator approval
+                    <p className="font-semibold text-slate-900">
+                      Wait for Facilitator Approval
                     </p>
 
                     <p className="mt-1 text-sm leading-5 text-slate-600">
                       After verifying your email, your application will remain
-                      pending until a facilitator reviews it.
+                      pending while a facilitator reviews and approves it.
                     </p>
                   </div>
                 </div>
 
+                {/* Step 3 */}
                 <div className="flex gap-3">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-600 text-sm font-bold text-white">
                     3
                   </div>
 
                   <div>
-                    <p className="font-medium text-slate-900">
-                      Receive your approval email
+                    <p className="font-semibold text-slate-900">
+                      Receive Your Approval Email
                     </p>
 
                     <p className="mt-1 text-sm leading-5 text-slate-600">
-                      Once a facilitator approves your application, you will
-                      receive an email confirming that your account is active
-                      and ready to use.
+                      Once your application is approved, you will receive an
+                      email confirming that your account is active and ready
+                      to use.
                     </p>
                   </div>
                 </div>
@@ -407,18 +414,6 @@ export default function RegisterPage() {
               <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
 
               <p className="text-sm leading-6 text-green-700">{success}</p>
-            </div>
-          )}
-
-          {/* Student Notice */}
-          {role === "student" && (
-            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p className="text-sm leading-6 text-blue-700">
-                After registration, please verify your email address. Your
-                application will remain pending until a facilitator reviews and
-                approves it. Once approved, you will receive an email
-                confirming that your student account is active.
-              </p>
             </div>
           )}
 
