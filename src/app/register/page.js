@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -14,6 +15,7 @@ import {
   LoaderCircle,
   CheckCircle,
   AlertCircle,
+  ArrowRight,
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -36,6 +38,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -50,6 +54,7 @@ export default function RegisterPage() {
     setRole(newRole);
     setError("");
     setSuccess("");
+    setSubmitted(false);
 
     setForm((prev) => ({
       ...prev,
@@ -142,15 +147,19 @@ export default function RegisterPage() {
         return;
       }
 
-      setSuccess(
-        role === "student"
-          ? "Registration submitted successfully. Please check your email to verify your account. After verification, your application will remain pending until a facilitator approves it. You will receive an email when your application is approved."
-          : "Registration successful. Redirecting you to email verification..."
-      );
+      setSubmittedEmail(email);
 
-      setTimeout(() => {
-        router.push(`/verify-email?email=${encodeURIComponent(email)}`);
-      }, 1500);
+      if (role === "student") {
+        setSubmitted(true);
+      } else {
+        setSuccess(
+          "Registration successful. Please verify your email address."
+        );
+
+        setTimeout(() => {
+          router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+        }, 1500);
+      }
     } catch (error) {
       console.error(error);
       setError("Unable to connect to the server. Please try again.");
@@ -158,6 +167,150 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  /*
+   * Student application submitted successfully
+   */
+  if (submitted && role === "student") {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-10">
+        <div className="mx-auto flex min-h-[80vh] w-full max-w-lg items-center justify-center">
+          <div className="w-full rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+            {/* Success Icon */}
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle className="h-12 w-12 text-green-600" />
+            </div>
+
+            {/* Heading */}
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-slate-900">
+                Application Submitted Successfully!
+              </h1>
+
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Your student account has been created and your application has
+                been submitted for facilitator approval.
+              </p>
+            </div>
+
+            {/* Application Status */}
+            <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
+              <h2 className="font-semibold text-blue-900">
+                What happens next?
+              </h2>
+
+              <div className="mt-4 space-y-4">
+                <div className="flex gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                    1
+                  </div>
+
+                  <div>
+                    <p className="font-medium text-slate-900">
+                      Verify your email
+                    </p>
+
+                    <p className="mt-1 text-sm leading-5 text-slate-600">
+                      Check your email and complete the verification process.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                    2
+                  </div>
+
+                  <div>
+                    <p className="font-medium text-slate-900">
+                      Wait for facilitator approval
+                    </p>
+
+                    <p className="mt-1 text-sm leading-5 text-slate-600">
+                      After verifying your email, your application will remain
+                      pending until a facilitator reviews it.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                    3
+                  </div>
+
+                  <div>
+                    <p className="font-medium text-slate-900">
+                      Receive your approval email
+                    </p>
+
+                    <p className="mt-1 text-sm leading-5 text-slate-600">
+                      Once a facilitator approves your application, you will
+                      receive an email confirming that your account is active
+                      and ready to use.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Registered Email */}
+            <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-start gap-3">
+                <Mail className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
+
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Registered Email
+                  </p>
+
+                  <p className="mt-1 break-all font-medium text-slate-900">
+                    {submittedEmail}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Important Notice */}
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm leading-6 text-amber-800">
+                <strong>Important:</strong> Please check your spam or junk
+                folder if you do not see the verification or approval email in
+                your inbox.
+              </p>
+            </div>
+
+            {/* Continue Button */}
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/verify-email?email=${encodeURIComponent(submittedEmail)}`
+                )
+              }
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700"
+            >
+              Continue to Email Verification
+              <ArrowRight className="h-5 w-5" />
+            </button>
+
+            {/* Login */}
+            <div className="mt-5 text-center">
+              <p className="text-sm text-slate-600">
+                Already verified your email?{" "}
+                <button
+                  type="button"
+                  onClick={() => router.push("/login")}
+                  className="font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  Go to Login
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-10">
@@ -239,22 +392,21 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Messages */}
+          {/* Error */}
           {error && (
             <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
 
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm leading-6 text-red-700">{error}</p>
             </div>
           )}
 
+          {/* Success */}
           {success && (
             <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
               <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
 
-              <p className="text-sm leading-6 text-green-700">
-                {success}
-              </p>
+              <p className="text-sm leading-6 text-green-700">{success}</p>
             </div>
           )}
 
@@ -263,10 +415,9 @@ export default function RegisterPage() {
             <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
               <p className="text-sm leading-6 text-blue-700">
                 After registration, please verify your email address. Your
-                account will remain pending until a facilitator reviews and
-                approves your application. Once your application is approved,
-                you will receive an email confirming your approval and letting
-                you know that you can log in to the student platform.
+                application will remain pending until a facilitator reviews and
+                approves it. Once approved, you will receive an email
+                confirming that your student account is active.
               </p>
             </div>
           )}
@@ -493,6 +644,7 @@ export default function RegisterPage() {
             </button>
           </form>
 
+          {/* Login */}
           <div className="mt-6 text-center">
             <p className="text-sm text-slate-600">
               Already have an account?{" "}
