@@ -1,22 +1,52 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import Notifications from "./Notifications";
 
+const PUBLIC_ROUTES = [
+  "/login",
+  "/register",
+  "/verify-email",
+];
+
 export default function Navbar() {
+  const pathname = usePathname();
+
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+
+  const isPublicRoute =
+    PUBLIC_ROUTES.some(
+      (route) =>
+        pathname === route ||
+        pathname?.startsWith(`${route}/`)
+    );
 
   useEffect(() => {
     let mounted = true;
 
     async function loadUser() {
+      // Never check/render authenticated controls
+      // on public authentication pages.
+      if (isPublicRoute) {
+        if (mounted) {
+          setUser(null);
+          setCheckingAuth(false);
+        }
+
+        return;
+      }
+
       try {
-        const response = await fetch("/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        });
+        const response = await fetch(
+          "/api/auth/me",
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+          }
+        );
 
         if (!response.ok) {
           if (mounted) {
@@ -26,10 +56,13 @@ export default function Navbar() {
           return;
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (mounted) {
-          setUser(data?.user || null);
+          setUser(
+            data?.user || null
+          );
         }
       } catch (error) {
         console.error(
@@ -52,7 +85,18 @@ export default function Navbar() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [pathname, isPublicRoute]);
+
+  /*
+   * PUBLIC PAGES
+   *
+   * Do not show notification or profile controls
+   * while the user is logged out.
+   */
+  const showAuthenticatedControls =
+    !isPublicRoute &&
+    !checkingAuth &&
+    user;
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white">
@@ -113,45 +157,43 @@ export default function Navbar() {
           </a>
         </nav>
 
-        {/* Right side */}
-        <div className="hidden items-center gap-4 md:flex">
+        {/* Authenticated controls */}
+        {showAuthenticatedControls && (
+          <div className="flex items-center gap-4">
 
-          {/* Only show authenticated-user controls */}
-          {!checkingAuth && user && (
-            <>
-              {/* Notification Bell */}
-              <Notifications />
+            {/* Notification */}
+            <Notifications />
 
-              {/* Profile */}
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 font-bold text-white">
-                  {(
-                    user.name ||
-                    user.firstName ||
-                    "U"
-                  )
-                    .charAt(0)
-                    .toUpperCase()}
-                </div>
-
-                <div className="hidden lg:block">
-                  <p className="text-sm font-bold text-gray-900">
-                    {user.name ||
-                      `${user.firstName || ""} ${
-                        user.lastName || ""
-                      }`.trim() ||
-                      "User"}
-                  </p>
-
-                  <p className="text-xs capitalize text-gray-500">
-                    {user.role || "User"}
-                  </p>
-                </div>
+            {/* User */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 font-bold text-white">
+                {(
+                  user?.name ||
+                  user?.firstName ||
+                  "U"
+                )
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
-            </>
-          )}
 
-        </div>
+              <div className="hidden lg:block">
+                <p className="text-sm font-bold text-gray-900">
+                  {user?.name ||
+                    `${user?.firstName || ""} ${
+                      user?.lastName || ""
+                    }`.trim() ||
+                    "User"}
+                </p>
+
+                <p className="text-xs capitalize text-gray-500">
+                  {user?.role ||
+                    "User"}
+                </p>
+              </div>
+            </div>
+
+          </div>
+        )}
 
       </div>
     </header>
