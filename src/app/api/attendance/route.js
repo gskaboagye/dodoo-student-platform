@@ -4,10 +4,11 @@ import { NextResponse } from "next/server";
 
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
-/* =========================================================
-   DATABASE
-========================================================= */
+// =========================================================
+// DATABASE
+// =========================================================
 
 async function getDatabase() {
   const client = await clientPromise;
@@ -17,14 +18,15 @@ async function getDatabase() {
   );
 }
 
-/* =========================================================
-   SESSION
-========================================================= */
+// =========================================================
+// SESSION
+// =========================================================
 
 async function getSession() {
   const cookieStore = await cookies();
 
-  const token = cookieStore.get("dcc_session")?.value;
+  const token =
+    cookieStore.get("dcc_session")?.value;
 
   if (!token) {
     return null;
@@ -33,9 +35,9 @@ async function getSession() {
   return await verifySession(token);
 }
 
-/* =========================================================
-   DATE VALIDATION
-========================================================= */
+// =========================================================
+// DATE VALIDATION
+// =========================================================
 
 function isValidDateString(date) {
   if (!date || typeof date !== "string") {
@@ -46,15 +48,16 @@ function isValidDateString(date) {
     return false;
   }
 
-  const parsed = new Date(`${date}T00:00:00Z`);
+  const parsed = new Date(
+    `${date}T00:00:00Z`
+  );
 
   if (Number.isNaN(parsed.getTime())) {
     return false;
   }
 
-  const [year, month, day] = date
-    .split("-")
-    .map(Number);
+  const [year, month, day] =
+    date.split("-").map(Number);
 
   return (
     parsed.getUTCFullYear() === year &&
@@ -63,9 +66,9 @@ function isValidDateString(date) {
   );
 }
 
-/* =========================================================
-   FORMAT ATTENDANCE RECORD
-========================================================= */
+// =========================================================
+// FORMAT ATTENDANCE RECORD
+// =========================================================
 
 function formatAttendanceRecord(record) {
   if (!record) {
@@ -86,9 +89,9 @@ function formatAttendanceRecord(record) {
   };
 }
 
-/* =========================================================
-   STUDENT ID QUERY
-========================================================= */
+// =========================================================
+// STUDENT ID QUERY
+// =========================================================
 
 function buildStudentIdQuery(studentId) {
   const idString = String(studentId);
@@ -100,74 +103,84 @@ function buildStudentIdQuery(studentId) {
   }
 
   return {
-    $in: values,
+    studentId: {
+      $in: values,
+    },
   };
 }
 
-/* =========================================================
-   RESOLVE STUDENT PROFILE
-========================================================= */
+// =========================================================
+// RESOLVE STUDENT PROFILE
+// =========================================================
 
-/*
- * This is important.
- *
- * Instead of trusting only session.studentId, we first try
- * to find the current user in the users collection.
- *
- * Then we use that user's studentId to find the actual
- * student profile in the students collection.
- *
- * We also have fallbacks for older sessions.
- */
+async function resolveStudentProfile(
+  db,
+  session
+) {
+  const usersCollection =
+    db.collection("users");
 
-async function resolveStudentProfile(db, session) {
-  const usersCollection = db.collection("users");
-  const studentsCollection = db.collection("students");
+  const studentsCollection =
+    db.collection("students");
 
-  let studentId = session?.studentId || null;
+  let studentId =
+    session?.studentId || null;
 
-  /* -------------------------------------------------------
-     Try to resolve from the current user account
-  ------------------------------------------------------- */
+  // -------------------------------------------------------
+  // Try to resolve from current user account
+  // -------------------------------------------------------
 
   if (
     session?.userId &&
-    ObjectId.isValid(String(session.userId))
+    ObjectId.isValid(
+      String(session.userId)
+    )
   ) {
-    const user = await usersCollection.findOne({
-      _id: new ObjectId(String(session.userId)),
-    });
+    const user =
+      await usersCollection.findOne({
+        _id: new ObjectId(
+          String(session.userId)
+        ),
+      });
 
     if (user?.studentId) {
       studentId = user.studentId;
     }
   }
 
-  /* -------------------------------------------------------
-     Find student using studentId
-  ------------------------------------------------------- */
+  // -------------------------------------------------------
+  // Find student using studentId
+  // -------------------------------------------------------
 
   if (
     studentId &&
-    ObjectId.isValid(String(studentId))
+    ObjectId.isValid(
+      String(studentId)
+    )
   ) {
-    const student = await studentsCollection.findOne({
-      _id: new ObjectId(String(studentId)),
-    });
+    const student =
+      await studentsCollection.findOne({
+        _id: new ObjectId(
+          String(studentId)
+        ),
+      });
 
     if (student) {
       return student;
     }
   }
 
-  /* -------------------------------------------------------
-     Fallback: find student by email
-  ------------------------------------------------------- */
+  // -------------------------------------------------------
+  // Fallback: find student by email
+  // -------------------------------------------------------
 
   if (session?.email) {
-    const student = await studentsCollection.findOne({
-      email: String(session.email).toLowerCase(),
-    });
+    const student =
+      await studentsCollection.findOne({
+        email: String(
+          session.email
+        ).toLowerCase(),
+      });
 
     if (student) {
       return student;
@@ -177,13 +190,489 @@ async function resolveStudentProfile(db, session) {
   return null;
 }
 
-/* =========================================================
-   GET ATTENDANCE
-========================================================= */
+// =========================================================
+// FIND USER ACCOUNT FOR STUDENT
+// =========================================================
+
+async function findStudentUser(
+  db,
+  student
+) {
+  if (!student) {
+    return null;
+  }
+
+  const usersCollection =
+    db.collection("users");
+
+  // -------------------------------------------------------
+  // Try studentId as ObjectId
+  // -------------------------------------------------------
+
+  const userByStudentId =
+    await usersCollection.findOne({
+      studentId: student._id,
+    });
+
+  if (userByStudentId) {
+    return userByStudentId;
+  }
+
+  // -------------------------------------------------------
+  // Try studentId as string
+  // -------------------------------------------------------
+
+  const userByStudentIdString =
+    await usersCollection.findOne({
+      studentId:
+        student._id.toString(),
+    });
+
+  if (userByStudentIdString) {
+    return userByStudentIdString;
+  }
+
+  // -------------------------------------------------------
+  // Fallback to email
+  // -------------------------------------------------------
+
+  if (student.email) {
+    const userByEmail =
+      await usersCollection.findOne({
+        email: String(
+          student.email
+        ).toLowerCase(),
+      });
+
+    if (userByEmail) {
+      return userByEmail;
+    }
+  }
+
+  return null;
+}
+
+// =========================================================
+// CREATE ATTENDANCE NOTIFICATION
+// =========================================================
+
+async function notifyAttendanceChange({
+  db,
+  student,
+  date,
+  status,
+  action,
+}) {
+  try {
+    const studentUser =
+      await findStudentUser(
+        db,
+        student
+      );
+
+    if (!studentUser?._id) {
+      console.warn(
+        "No user account found for student:",
+        student?._id?.toString()
+      );
+
+      return;
+    }
+
+    let title =
+      "Attendance Updated";
+
+    let message =
+      `Your attendance for ${date} has been updated to ${status}.`;
+
+    if (action === "created") {
+      title =
+        "Attendance Recorded";
+
+      message =
+        `Your attendance for ${date} has been recorded as ${status}.`;
+    }
+
+    if (action === "deleted") {
+      title =
+        "Attendance Removed";
+
+      message =
+        `Your attendance record for ${date} has been removed.`;
+    }
+
+    await createNotification({
+      userId:
+        studentUser._id.toString(),
+
+      title,
+
+      message,
+
+      type: "attendance",
+
+      link: "/student/attendance",
+    });
+  } catch (error) {
+    // Notification errors should never
+    // prevent attendance from succeeding.
+    console.error(
+      "ATTENDANCE NOTIFICATION ERROR:",
+      error
+    );
+  }
+}
+
+// =========================================================
+// PROGRESS HELPERS
+// =========================================================
+
+function normalizeProgress(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+
+  return Math.min(
+    Math.max(Math.round(number), 0),
+    100
+  );
+}
+
+// =========================================================
+// TIMELINE PROGRESS
+// =========================================================
+
+function calculateTimelineProgress(student) {
+  if (!student?.enrollmentDate) {
+    return 0;
+  }
+
+  const start =
+    new Date(
+      student.enrollmentDate
+    );
+
+  if (Number.isNaN(start.getTime())) {
+    return 0;
+  }
+
+  let end;
+
+  if (student.expectedCompletionDate) {
+    end =
+      new Date(
+        student.expectedCompletionDate
+      );
+  } else {
+    end =
+      new Date(start);
+
+    end.setMonth(
+      end.getMonth() + 24
+    );
+  }
+
+  if (Number.isNaN(end.getTime())) {
+    return 0;
+  }
+
+  const now =
+    new Date();
+
+  // Program has not started
+  if (now <= start) {
+    return 0;
+  }
+
+  // Program has finished
+  if (now >= end) {
+    return 100;
+  }
+
+  const totalDuration =
+    end.getTime() -
+    start.getTime();
+
+  const elapsed =
+    now.getTime() -
+    start.getTime();
+
+  if (totalDuration <= 0) {
+    return 0;
+  }
+
+  return normalizeProgress(
+    (elapsed / totalDuration) *
+      100
+  );
+}
+
+// =========================================================
+// ATTENDANCE PROGRESS
+// =========================================================
+
+function calculateAttendanceProgress(
+  attendance
+) {
+  if (
+    !Array.isArray(attendance) ||
+    attendance.length === 0
+  ) {
+    return 0;
+  }
+
+  let totalScore = 0;
+
+  for (
+    const record of attendance
+  ) {
+    const status =
+      String(
+        record?.status || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    if (
+      status === "present"
+    ) {
+      totalScore += 100;
+    } else if (
+      status === "late"
+    ) {
+      totalScore += 50;
+    } else if (
+      status === "absent"
+    ) {
+      totalScore += 0;
+    }
+  }
+
+  return normalizeProgress(
+    totalScore /
+      attendance.length
+  );
+}
+
+// =========================================================
+// PROJECT PROGRESS
+// =========================================================
+
+function calculateProjectProgress(
+  projects
+) {
+  if (
+    !Array.isArray(projects) ||
+    projects.length === 0
+  ) {
+    return 0;
+  }
+
+  let total = 0;
+
+  for (
+    const project of projects
+  ) {
+    total +=
+      normalizeProgress(
+        project?.progress ?? 0
+      );
+  }
+
+  return normalizeProgress(
+    total /
+      projects.length
+  );
+}
+
+// =========================================================
+// OVERALL PROGRESS
+// =========================================================
+
+function calculateOverallProgress({
+  timelineProgress,
+  attendanceProgress,
+  projectProgress,
+}) {
+  const timeline =
+    normalizeProgress(
+      timelineProgress
+    );
+
+  const attendance =
+    normalizeProgress(
+      attendanceProgress
+    );
+
+  const projects =
+    normalizeProgress(
+      projectProgress
+    );
+
+  return normalizeProgress(
+    timeline * 0.2 +
+    attendance * 0.3 +
+    projects * 0.5
+  );
+}
+
+// =========================================================
+// GET STUDENT OVERALL PROGRESS
+// =========================================================
+
+async function getStudentOverallProgress(
+  db,
+  student
+) {
+  if (!student?._id) {
+    return 0;
+  }
+
+  const attendance =
+    await db
+      .collection("attendance")
+      .find(
+        buildStudentIdQuery(
+          student._id
+        )
+      )
+      .toArray();
+
+  const projects =
+    await db
+      .collection("projects")
+      .find(
+        buildStudentIdQuery(
+          student._id
+        )
+      )
+      .toArray();
+
+  const timelineProgress =
+    calculateTimelineProgress(
+      student
+    );
+
+  const attendanceProgress =
+    calculateAttendanceProgress(
+      attendance
+    );
+
+  const projectProgress =
+    calculateProjectProgress(
+      projects
+    );
+
+  return calculateOverallProgress({
+    timelineProgress,
+    attendanceProgress,
+    projectProgress,
+  });
+}
+
+// =========================================================
+// PROGRESS CHANGE NOTIFICATION
+// =========================================================
+
+async function notifyProgressChange({
+  db,
+  student,
+  previousProgress,
+}) {
+  try {
+    const currentProgress =
+      await getStudentOverallProgress(
+        db,
+        student
+      );
+
+    const previous =
+      normalizeProgress(
+        previousProgress
+      );
+
+    const current =
+      normalizeProgress(
+        currentProgress
+      );
+
+    // Do not notify if the percentage
+    // did not actually change.
+    if (
+      previous === current
+    ) {
+      return;
+    }
+
+    const studentUser =
+      await findStudentUser(
+        db,
+        student
+      );
+
+    if (!studentUser?._id) {
+      console.warn(
+        "PROGRESS NOTIFICATION: User account not found for student:",
+        student?._id?.toString()
+      );
+
+      return;
+    }
+
+    const message =
+      current > previous
+        ? `Your overall progress has increased from ${previous}% to ${current}%.`
+        : `Your overall progress has changed from ${previous}% to ${current}%.`;
+
+    await createNotification({
+      userId:
+        studentUser._id.toString(),
+
+      title:
+        "Progress Updated",
+
+      message,
+
+      type:
+        "progress",
+
+      link:
+        "/progress",
+    });
+
+    console.log(
+      "PROGRESS NOTIFICATION CREATED:",
+      {
+        student:
+          `${student.firstName || ""} ${
+            student.lastName || ""
+          }`.trim(),
+
+        previous,
+
+        current,
+      }
+    );
+  } catch (error) {
+    // A notification error must never
+    // prevent attendance from succeeding.
+    console.error(
+      "PROGRESS NOTIFICATION ERROR:",
+      error
+    );
+  }
+}
+
+// =========================================================
+// GET ATTENDANCE
+// =========================================================
 
 export async function GET(request) {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
       return NextResponse.json(
@@ -191,28 +680,34 @@ export async function GET(request) {
           message:
             "Unauthorized. Please log in again.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
     const { searchParams } =
       new URL(request.url);
 
-    const date = searchParams.get("date");
+    const date =
+      searchParams.get("date");
 
-    const db = await getDatabase();
+    const db =
+      await getDatabase();
 
     const attendanceCollection =
-      db.collection("attendance");
+      db.collection(
+        "attendance"
+      );
 
-    /* =====================================================
-       STUDENT VIEW
-    ===================================================== */
+    // =====================================================
+    // STUDENT VIEW
+    // =====================================================
 
-    if (session.role === "student") {
-      /*
-       * Resolve the student's actual profile.
-       */
+    if (
+      session.role ===
+      "student"
+    ) {
       const student =
         await resolveStudentProfile(
           db,
@@ -225,44 +720,40 @@ export async function GET(request) {
             message:
               "Your account is not linked to a student profile.",
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
-      /*
-       * Find attendance using the student's actual
-       * database _id.
-       *
-       * This supports both ObjectId and string records.
-       */
       const query = {
-        studentId: buildStudentIdQuery(
-          student._id
-        ),
+        studentId:
+          buildStudentIdQuery(
+            student._id
+          ),
       };
 
-      /*
-       * If a date was selected, return only
-       * that day's attendance.
-       */
       if (date) {
-        if (!isValidDateString(date)) {
+        if (
+          !isValidDateString(
+            date
+          )
+        ) {
           return NextResponse.json(
             {
               message:
                 "Invalid date format. Use YYYY-MM-DD.",
             },
-            { status: 400 }
+            {
+              status: 400,
+            }
           );
         }
 
-        query.date = date;
+        query.date =
+          date;
       }
 
-      /*
-       * Without a date, ALL attendance records
-       * for the student are returned.
-       */
       const attendance =
         await attendanceCollection
           .find(query)
@@ -279,28 +770,35 @@ export async function GET(request) {
       });
     }
 
-    /* =====================================================
-       FACILITATOR VIEW
-    ===================================================== */
+    // =====================================================
+    // FACILITATOR VIEW
+    // =====================================================
 
-    if (session.role === "facilitator") {
+    if (
+      session.role ===
+      "facilitator"
+    ) {
       const query = {};
 
-      /*
-       * Facilitators can select any date.
-       */
       if (date) {
-        if (!isValidDateString(date)) {
+        if (
+          !isValidDateString(
+            date
+          )
+        ) {
           return NextResponse.json(
             {
               message:
                 "Invalid date format. Use YYYY-MM-DD.",
             },
-            { status: 400 }
+            {
+              status: 400,
+            }
           );
         }
 
-        query.date = date;
+        query.date =
+          date;
       }
 
       const attendance =
@@ -325,7 +823,9 @@ export async function GET(request) {
         message:
           "You do not have permission to view attendance.",
       },
-      { status: 403 }
+      {
+        status: 403,
+      }
     );
   } catch (error) {
     console.error(
@@ -337,21 +837,25 @@ export async function GET(request) {
       {
         message:
           "Failed to load attendance.",
-        error: error.message,
+        error:
+          error.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
-/* =========================================================
-   POST ATTENDANCE
-   FACILITATORS ONLY
-========================================================= */
+// =========================================================
+// POST ATTENDANCE
+// FACILITATORS ONLY
+// =========================================================
 
 export async function POST(request) {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
       return NextResponse.json(
@@ -359,21 +863,29 @@ export async function POST(request) {
           message:
             "Unauthorized. Please log in again.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    if (session.role !== "facilitator") {
+    if (
+      session.role !==
+      "facilitator"
+    ) {
       return NextResponse.json(
         {
           message:
             "Only facilitators can record attendance.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const {
       studentId,
@@ -382,25 +894,35 @@ export async function POST(request) {
       status,
     } = body;
 
-    /* =====================================================
-       VALIDATION
-    ===================================================== */
+    // =====================================================
+    // VALIDATION
+    // =====================================================
 
     if (!studentId) {
       return NextResponse.json(
         {
-          message: "Student ID is required.",
+          message:
+            "Student ID is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    if (!ObjectId.isValid(studentId)) {
+    if (
+      !ObjectId.isValid(
+        studentId
+      )
+    ) {
       return NextResponse.json(
         {
-          message: "Invalid student ID.",
+          message:
+            "Invalid student ID.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -410,17 +932,25 @@ export async function POST(request) {
           message:
             "Attendance date is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    if (!isValidDateString(date)) {
+    if (
+      !isValidDateString(
+        date
+      )
+    ) {
       return NextResponse.json(
         {
           message:
             "Invalid date. Use YYYY-MM-DD.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -430,38 +960,52 @@ export async function POST(request) {
       "Absent",
     ];
 
-    if (!allowedStatuses.includes(status)) {
+    if (
+      !allowedStatuses.includes(
+        status
+      )
+    ) {
       return NextResponse.json(
         {
           message:
             "Invalid attendance status. Use Present, Late, or Absent.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /* =====================================================
-       DATABASE
-    ===================================================== */
+    // =====================================================
+    // DATABASE
+    // =====================================================
 
-    const db = await getDatabase();
+    const db =
+      await getDatabase();
 
     const attendanceCollection =
-      db.collection("attendance");
+      db.collection(
+        "attendance"
+      );
 
     const studentsCollection =
-      db.collection("students");
+      db.collection(
+        "students"
+      );
 
     const studentObjectId =
-      new ObjectId(studentId);
+      new ObjectId(
+        studentId
+      );
 
-    /* =====================================================
-       FIND STUDENT PROFILE
-    ===================================================== */
+    // =====================================================
+    // FIND STUDENT PROFILE
+    // =====================================================
 
     const student =
       await studentsCollection.findOne({
-        _id: studentObjectId,
+        _id:
+          studentObjectId,
       });
 
     if (!student) {
@@ -469,6 +1013,7 @@ export async function POST(request) {
         "ATTENDANCE STUDENT NOT FOUND:",
         {
           studentId,
+
           database:
             process.env.DB_NAME ||
             "DCCPlatform",
@@ -480,13 +1025,15 @@ export async function POST(request) {
           message:
             "Student profile was not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
-    /* =====================================================
-       STUDENT NAME
-    ===================================================== */
+    // =====================================================
+    // STUDENT NAME
+    // =====================================================
 
     const databaseStudentName =
       `${student.firstName || ""} ${
@@ -500,9 +1047,9 @@ export async function POST(request) {
       studentName ||
       "Student";
 
-    /* =====================================================
-       FIND EXISTING ATTENDANCE
-    ===================================================== */
+    // =====================================================
+    // FIND EXISTING ATTENDANCE
+    // =====================================================
 
     const existingRecord =
       await attendanceCollection.findOne({
@@ -512,33 +1059,67 @@ export async function POST(request) {
             studentObjectId.toString(),
           ],
         },
+
         date,
       });
 
-    /* =====================================================
-       UPDATE EXISTING ATTENDANCE
-    ===================================================== */
+    // =====================================================
+    // UPDATE EXISTING ATTENDANCE
+    // =====================================================
 
     if (existingRecord) {
+      // Get progress BEFORE changing attendance.
+      const previousProgress =
+        await getStudentOverallProgress(
+          db,
+          student
+        );
+
       await attendanceCollection.updateOne(
         {
-          _id: existingRecord._id,
+          _id:
+            existingRecord._id,
         },
         {
           $set: {
-            studentId: studentObjectId,
-            studentName: finalStudentName,
+            studentId:
+              studentObjectId,
+
+            studentName:
+              finalStudentName,
+
             date,
+
             status,
-            updatedAt: new Date(),
+
+            updatedAt:
+              new Date(),
           },
         }
       );
 
       const updatedRecord =
         await attendanceCollection.findOne({
-          _id: existingRecord._id,
+          _id:
+            existingRecord._id,
         });
+
+      // Attendance notification
+      await notifyAttendanceChange({
+        db,
+        student,
+        date,
+        status,
+        action:
+          "updated",
+      });
+
+      // Progress notification
+      await notifyProgressChange({
+        db,
+        student,
+        previousProgress,
+      });
 
       return NextResponse.json(
         {
@@ -550,26 +1131,39 @@ export async function POST(request) {
               updatedRecord
             ),
         },
-        { status: 200 }
+        {
+          status: 200,
+        }
       );
     }
 
-    /* =====================================================
-       CREATE NEW ATTENDANCE
-    ===================================================== */
+    // =====================================================
+    // CREATE NEW ATTENDANCE
+    // =====================================================
+
+    // Get progress BEFORE creating attendance.
+    const previousProgress =
+      await getStudentOverallProgress(
+        db,
+        student
+      );
 
     const newRecord = {
-      studentId: studentObjectId,
+      studentId:
+        studentObjectId,
 
-      studentName: finalStudentName,
+      studentName:
+        finalStudentName,
 
       date,
 
       status,
 
-      createdAt: new Date(),
+      createdAt:
+        new Date(),
 
-      updatedAt: new Date(),
+      updatedAt:
+        new Date(),
     };
 
     const result =
@@ -579,8 +1173,29 @@ export async function POST(request) {
 
     const createdRecord =
       await attendanceCollection.findOne({
-        _id: result.insertedId,
+        _id:
+          result.insertedId,
       });
+
+    // =====================================================
+    // NOTIFY STUDENT
+    // =====================================================
+
+    await notifyAttendanceChange({
+      db,
+      student,
+      date,
+      status,
+      action:
+        "created",
+    });
+
+    // Progress notification
+    await notifyProgressChange({
+      db,
+      student,
+      previousProgress,
+    });
 
     return NextResponse.json(
       {
@@ -592,7 +1207,9 @@ export async function POST(request) {
             createdRecord
           ),
       },
-      { status: 201 }
+      {
+        status: 201,
+      }
     );
   } catch (error) {
     console.error(
@@ -600,13 +1217,18 @@ export async function POST(request) {
       error
     );
 
-    if (error?.code === 11000) {
+    if (
+      error?.code ===
+      11000
+    ) {
       return NextResponse.json(
         {
           message:
             "Attendance already exists for this student and date.",
         },
-        { status: 409 }
+        {
+          status: 409,
+        }
       );
     }
 
@@ -614,21 +1236,25 @@ export async function POST(request) {
       {
         message:
           "Failed to save attendance.",
-        error: error.message,
+        error:
+          error.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
-/* =========================================================
-   PUT ATTENDANCE
-   FACILITATORS ONLY
-========================================================= */
+// =========================================================
+// PUT ATTENDANCE
+// FACILITATORS ONLY
+// =========================================================
 
 export async function PUT(request) {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
       return NextResponse.json(
@@ -636,21 +1262,29 @@ export async function PUT(request) {
           message:
             "Unauthorized. Please log in again.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    if (session.role !== "facilitator") {
+    if (
+      session.role !==
+      "facilitator"
+    ) {
       return NextResponse.json(
         {
           message:
             "Only facilitators can update attendance.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const {
       attendanceId,
@@ -663,17 +1297,25 @@ export async function PUT(request) {
           message:
             "Attendance ID is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    if (!ObjectId.isValid(attendanceId)) {
+    if (
+      !ObjectId.isValid(
+        attendanceId
+      )
+    ) {
       return NextResponse.json(
         {
           message:
             "Invalid attendance ID.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -683,51 +1325,170 @@ export async function PUT(request) {
       "Absent",
     ];
 
-    if (!allowedStatuses.includes(status)) {
+    if (
+      !allowedStatuses.includes(
+        status
+      )
+    ) {
       return NextResponse.json(
         {
           message:
             "Invalid attendance status. Use Present, Late, or Absent.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    const db = await getDatabase();
+    const db =
+      await getDatabase();
 
     const attendanceCollection =
-      db.collection("attendance");
-
-    const attendanceObjectId =
-      new ObjectId(attendanceId);
-
-    const result =
-      await attendanceCollection.updateOne(
-        {
-          _id: attendanceObjectId,
-        },
-        {
-          $set: {
-            status,
-            updatedAt: new Date(),
-          },
-        }
+      db.collection(
+        "attendance"
       );
 
-    if (result.matchedCount === 0) {
+    const studentsCollection =
+      db.collection(
+        "students"
+      );
+
+    const attendanceObjectId =
+      new ObjectId(
+        attendanceId
+      );
+
+    // =====================================================
+    // GET EXISTING RECORD
+    // =====================================================
+
+    const existingRecord =
+      await attendanceCollection.findOne({
+        _id:
+          attendanceObjectId,
+      });
+
+    if (!existingRecord) {
       return NextResponse.json(
         {
           message:
             "Attendance record not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
+      );
+    }
+
+    // =====================================================
+    // FIND STUDENT
+    // =====================================================
+
+    let student =
+      null;
+
+    if (
+      existingRecord.studentId
+    ) {
+      const studentId =
+        String(
+          existingRecord.studentId
+        );
+
+      if (
+        ObjectId.isValid(
+          studentId
+        )
+      ) {
+        student =
+          await studentsCollection.findOne({
+            _id:
+              new ObjectId(
+                studentId
+              ),
+          });
+      }
+    }
+
+    // =====================================================
+    // GET PREVIOUS PROGRESS
+    // =====================================================
+
+    const previousProgress =
+      student
+        ? await getStudentOverallProgress(
+            db,
+            student
+          )
+        : 0;
+
+    // =====================================================
+    // UPDATE ATTENDANCE
+    // =====================================================
+
+    const result =
+      await attendanceCollection.updateOne(
+        {
+          _id:
+            attendanceObjectId,
+        },
+        {
+          $set: {
+            status,
+
+            updatedAt:
+              new Date(),
+          },
+        }
+      );
+
+    if (
+      result.matchedCount ===
+      0
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            "Attendance record not found.",
+        },
+        {
+          status: 404,
+        }
       );
     }
 
     const updatedRecord =
       await attendanceCollection.findOne({
-        _id: attendanceObjectId,
+        _id:
+          attendanceObjectId,
       });
+
+    // =====================================================
+    // NOTIFY STUDENT
+    // =====================================================
+
+    if (student) {
+      await notifyAttendanceChange({
+        db,
+        student,
+
+        date:
+          updatedRecord?.date ||
+          existingRecord.date,
+
+        status,
+
+        action:
+          "updated",
+      });
+
+      await notifyProgressChange({
+        db,
+        student,
+        previousProgress,
+      });
+    }
 
     return NextResponse.json({
       message:
@@ -748,21 +1509,27 @@ export async function PUT(request) {
       {
         message:
           "Failed to update attendance.",
-        error: error.message,
+        error:
+          error.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
-/* =========================================================
-   DELETE ATTENDANCE
-   FACILITATORS ONLY
-========================================================= */
+// =========================================================
+// DELETE ATTENDANCE
+// FACILITATORS ONLY
+// =========================================================
 
-export async function DELETE(request) {
+export async function DELETE(
+  request
+) {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
       return NextResponse.json(
@@ -770,17 +1537,24 @@ export async function DELETE(request) {
           message:
             "Unauthorized. Please log in again.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    if (session.role !== "facilitator") {
+    if (
+      session.role !==
+      "facilitator"
+    ) {
       return NextResponse.json(
         {
           message:
             "Only facilitators can delete attendance.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
@@ -788,7 +1562,9 @@ export async function DELETE(request) {
       new URL(request.url);
 
     const attendanceId =
-      searchParams.get("id");
+      searchParams.get(
+        "id"
+      );
 
     if (!attendanceId) {
       return NextResponse.json(
@@ -796,38 +1572,159 @@ export async function DELETE(request) {
           message:
             "Attendance ID is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    if (!ObjectId.isValid(attendanceId)) {
+    if (
+      !ObjectId.isValid(
+        attendanceId
+      )
+    ) {
       return NextResponse.json(
         {
           message:
             "Invalid attendance ID.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    const db = await getDatabase();
+    const db =
+      await getDatabase();
 
     const attendanceCollection =
-      db.collection("attendance");
+      db.collection(
+        "attendance"
+      );
 
-    const result =
-      await attendanceCollection.deleteOne({
-        _id: new ObjectId(attendanceId),
+    const studentsCollection =
+      db.collection(
+        "students"
+      );
+
+    const attendanceObjectId =
+      new ObjectId(
+        attendanceId
+      );
+
+    // =====================================================
+    // GET RECORD BEFORE DELETING
+    // =====================================================
+
+    const existingRecord =
+      await attendanceCollection.findOne({
+        _id:
+          attendanceObjectId,
       });
 
-    if (result.deletedCount === 0) {
+    if (!existingRecord) {
       return NextResponse.json(
         {
           message:
             "Attendance record not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
+    }
+
+    // =====================================================
+    // FIND STUDENT
+    // =====================================================
+
+    let student =
+      null;
+
+    if (
+      existingRecord.studentId
+    ) {
+      const studentId =
+        String(
+          existingRecord.studentId
+        );
+
+      if (
+        ObjectId.isValid(
+          studentId
+        )
+      ) {
+        student =
+          await studentsCollection.findOne({
+            _id:
+              new ObjectId(
+                studentId
+              ),
+          });
+      }
+    }
+
+    // =====================================================
+    // GET PREVIOUS PROGRESS
+    // =====================================================
+
+    const previousProgress =
+      student
+        ? await getStudentOverallProgress(
+            db,
+            student
+          )
+        : 0;
+
+    // =====================================================
+    // DELETE ATTENDANCE
+    // =====================================================
+
+    const result =
+      await attendanceCollection.deleteOne({
+        _id:
+          attendanceObjectId,
+      });
+
+    if (
+      result.deletedCount ===
+      0
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            "Attendance record not found.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    // =====================================================
+    // NOTIFY STUDENT
+    // =====================================================
+
+    if (student) {
+      await notifyAttendanceChange({
+        db,
+        student,
+
+        date:
+          existingRecord.date,
+
+        status:
+          existingRecord.status,
+
+        action:
+          "deleted",
+      });
+
+      await notifyProgressChange({
+        db,
+        student,
+        previousProgress,
+      });
     }
 
     return NextResponse.json({
@@ -844,9 +1741,12 @@ export async function DELETE(request) {
       {
         message:
           "Failed to delete attendance.",
-        error: error.message,
+        error:
+          error.message,
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

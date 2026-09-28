@@ -3,14 +3,17 @@ import { cookies } from "next/headers";
 
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
-/* =========================================================
-   GET SESSION
-========================================================= */
+// =========================================================
+// GET SESSION
+// =========================================================
 
 async function getSession() {
   const cookieStore = await cookies();
-  const token = cookieStore.get("dcc_session")?.value;
+
+  const token =
+    cookieStore.get("dcc_session")?.value;
 
   if (!token) {
     return null;
@@ -19,9 +22,9 @@ async function getSession() {
   return await verifySession(token);
 }
 
-/* =========================================================
-   GET DATABASE
-========================================================= */
+// =========================================================
+// GET DATABASE
+// =========================================================
 
 async function getDatabase() {
   const client = await clientPromise;
@@ -31,65 +34,71 @@ async function getDatabase() {
   );
 }
 
-/* =========================================================
-   GET USER
-========================================================= */
+// =========================================================
+// GET USER
+// =========================================================
 
-async function getCurrentUser(db, session) {
+async function getCurrentUser(
+  db,
+  session
+) {
   if (!session?.userId) {
     return null;
   }
 
   let user = null;
 
-  /*
-   * Normal case:
-   * users._id is a MongoDB ObjectId.
-   */
-
-  if (ObjectId.isValid(session.userId)) {
-    user = await db.collection("users").findOne({
-      _id: new ObjectId(session.userId),
-    });
+  if (
+    ObjectId.isValid(
+      String(session.userId)
+    )
+  ) {
+    user =
+      await db
+        .collection("users")
+        .findOne({
+          _id: new ObjectId(
+            String(session.userId)
+          ),
+        });
   }
 
-  /*
-   * Fallback for older accounts where _id may be stored
-   * differently.
-   */
-
   if (!user) {
-    user = await db.collection("users").findOne({
-      _id: session.userId,
-    });
+    user =
+      await db
+        .collection("users")
+        .findOne({
+          _id: session.userId,
+        });
   }
 
   return user;
 }
 
-/* =========================================================
-   RESOLVE STUDENT PROFILE
-========================================================= */
+// =========================================================
+// RESOLVE STUDENT PROFILE
+// =========================================================
 
-async function resolveStudent(db, session) {
-  if (!session || session.role !== "student") {
+async function resolveStudent(
+  db,
+  session
+) {
+  if (
+    !session ||
+    session.role !== "student"
+  ) {
     return null;
   }
 
-  /*
-   * Find the actual logged-in user.
-   */
-
-  const user = await getCurrentUser(db, session);
+  const user =
+    await getCurrentUser(
+      db,
+      session
+    );
 
   if (!user) {
     return null;
   }
-
-  /*
-   * The users collection should contain the student's
-   * studentId, which points to students._id.
-   */
 
   let studentId =
     user.studentId ||
@@ -100,26 +109,25 @@ async function resolveStudent(db, session) {
     return null;
   }
 
-  /*
-   * Convert the ID safely to ObjectId.
-   */
-
-  if (!ObjectId.isValid(studentId.toString())) {
+  if (
+    !ObjectId.isValid(
+      String(studentId)
+    )
+  ) {
     return null;
   }
 
   const studentObjectId =
-    new ObjectId(studentId.toString());
+    new ObjectId(
+      String(studentId)
+    );
 
-  /*
-   * Find the actual student profile.
-   */
-
-  const student = await db
-    .collection("students")
-    .findOne({
-      _id: studentObjectId,
-    });
+  const student =
+    await db
+      .collection("students")
+      .findOne({
+        _id: studentObjectId,
+      });
 
   if (!student) {
     return null;
@@ -128,24 +136,457 @@ async function resolveStudent(db, session) {
   return {
     user,
     student,
-    studentId: studentObjectId,
+    studentId:
+      studentObjectId,
   };
 }
 
-/* =========================================================
-   GET - VIEW PROJECTS
-=========================================================
+// =========================================================
+// FIND USER ACCOUNT FOR STUDENT
+// =========================================================
 
-Facilitators:
-  - Can see all projects.
+async function findStudentUser(
+  db,
+  student
+) {
+  if (!student) {
+    return null;
+  }
 
-Students:
-  - Can see only their own projects.
-========================================================= */
+  const usersCollection =
+    db.collection("users");
+
+  // Try ObjectId studentId
+  const userByStudentId =
+    await usersCollection.findOne({
+      studentId: student._id,
+    });
+
+  if (userByStudentId) {
+    return userByStudentId;
+  }
+
+  // Try string studentId
+  const userByStudentIdString =
+    await usersCollection.findOne({
+      studentId:
+        student._id.toString(),
+    });
+
+  if (userByStudentIdString) {
+    return userByStudentIdString;
+  }
+
+  // Fallback to email
+  if (student.email) {
+    const userByEmail =
+      await usersCollection.findOne({
+        email: String(
+          student.email
+        ).toLowerCase(),
+      });
+
+    if (userByEmail) {
+      return userByEmail;
+    }
+  }
+
+  return null;
+}
+
+// =========================================================
+// NOTIFY STUDENT
+// =========================================================
+
+async function notifyStudent({
+  db,
+  student,
+  title,
+  message,
+  type = "project",
+  link = "/projects",
+}) {
+  try {
+    const studentUser =
+      await findStudentUser(
+        db,
+        student
+      );
+
+    if (!studentUser?._id) {
+      console.warn(
+        "No user account found for student:",
+        student?._id?.toString()
+      );
+
+      return;
+    }
+
+    await createNotification({
+      userId:
+        studentUser._id.toString(),
+
+      title,
+
+      message,
+
+      type,
+
+      link,
+    });
+  } catch (error) {
+    // Notification failure must never
+    // break the project operation.
+    console.error(
+      "PROJECT NOTIFICATION ERROR:",
+      error
+    );
+  }
+}
+
+// =========================================================
+// PROGRESS HELPERS
+// =========================================================
+
+function normalizeProgress(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return 0;
+  }
+
+  return Math.min(
+    Math.max(Math.round(number), 0),
+    100
+  );
+}
+
+// =========================================================
+// TIMELINE PROGRESS
+// =========================================================
+
+function calculateTimelineProgress(
+  student
+) {
+  if (!student?.enrollmentDate) {
+    return 0;
+  }
+
+  const start =
+    new Date(
+      student.enrollmentDate
+    );
+
+  if (Number.isNaN(start.getTime())) {
+    return 0;
+  }
+
+  let end;
+
+  if (student.expectedCompletionDate) {
+    end =
+      new Date(
+        student.expectedCompletionDate
+      );
+  } else {
+    end =
+      new Date(start);
+
+    end.setMonth(
+      end.getMonth() + 24
+    );
+  }
+
+  if (Number.isNaN(end.getTime())) {
+    return 0;
+  }
+
+  const now =
+    new Date();
+
+  if (now <= start) {
+    return 0;
+  }
+
+  if (now >= end) {
+    return 100;
+  }
+
+  const totalDuration =
+    end.getTime() -
+    start.getTime();
+
+  const elapsed =
+    now.getTime() -
+    start.getTime();
+
+  if (totalDuration <= 0) {
+    return 0;
+  }
+
+  return normalizeProgress(
+    (elapsed / totalDuration) *
+      100
+  );
+}
+
+// =========================================================
+// ATTENDANCE PROGRESS
+// =========================================================
+
+function calculateAttendanceProgress(
+  attendance
+) {
+  if (
+    !Array.isArray(attendance) ||
+    attendance.length === 0
+  ) {
+    return 0;
+  }
+
+  let totalScore = 0;
+
+  for (
+    const record of attendance
+  ) {
+    const status =
+      String(
+        record?.status || ""
+      )
+        .trim()
+        .toLowerCase();
+
+    if (
+      status === "present"
+    ) {
+      totalScore += 100;
+    } else if (
+      status === "late"
+    ) {
+      totalScore += 50;
+    }
+  }
+
+  return normalizeProgress(
+    totalScore /
+      attendance.length
+  );
+}
+
+// =========================================================
+// PROJECT PROGRESS
+// =========================================================
+
+function calculateProjectProgress(
+  projects
+) {
+  if (
+    !Array.isArray(projects) ||
+    projects.length === 0
+  ) {
+    return 0;
+  }
+
+  let total = 0;
+
+  for (
+    const project of projects
+  ) {
+    total +=
+      normalizeProgress(
+        project?.progress ?? 0
+      );
+  }
+
+  return normalizeProgress(
+    total /
+      projects.length
+  );
+}
+
+// =========================================================
+// OVERALL PROGRESS
+// =========================================================
+
+function calculateOverallProgress({
+  timelineProgress,
+  attendanceProgress,
+  projectProgress,
+}) {
+  return normalizeProgress(
+    normalizeProgress(
+      timelineProgress
+    ) * 0.2 +
+      normalizeProgress(
+        attendanceProgress
+      ) * 0.3 +
+      normalizeProgress(
+        projectProgress
+      ) * 0.5
+  );
+}
+
+// =========================================================
+// GET CURRENT OVERALL PROGRESS
+// =========================================================
+
+async function getStudentOverallProgress(
+  db,
+  student
+) {
+  if (!student?._id) {
+    return 0;
+  }
+
+  const attendance =
+    await db
+      .collection("attendance")
+      .find({
+        studentId: {
+          $in: [
+            student._id,
+            student._id.toString(),
+          ],
+        },
+      })
+      .toArray();
+
+  const projects =
+    await db
+      .collection("projects")
+      .find({
+        studentId: {
+          $in: [
+            student._id,
+            student._id.toString(),
+          ],
+        },
+      })
+      .toArray();
+
+  const timelineProgress =
+    calculateTimelineProgress(
+      student
+    );
+
+  const attendanceProgress =
+    calculateAttendanceProgress(
+      attendance
+    );
+
+  const projectProgress =
+    calculateProjectProgress(
+      projects
+    );
+
+  return calculateOverallProgress({
+    timelineProgress,
+    attendanceProgress,
+    projectProgress,
+  });
+}
+
+// =========================================================
+// PROGRESS CHANGE NOTIFICATION
+// =========================================================
+
+async function notifyProgressChange({
+  db,
+  student,
+  previousProgress,
+}) {
+  try {
+    const currentProgress =
+      await getStudentOverallProgress(
+        db,
+        student
+      );
+
+    const previous =
+      normalizeProgress(
+        previousProgress
+      );
+
+    const current =
+      normalizeProgress(
+        currentProgress
+      );
+
+    // No notification if progress
+    // did not actually change.
+    if (
+      previous === current
+    ) {
+      return;
+    }
+
+    const studentUser =
+      await findStudentUser(
+        db,
+        student
+      );
+
+    if (!studentUser?._id) {
+      console.warn(
+        "PROGRESS NOTIFICATION: User account not found:",
+        student?._id?.toString()
+      );
+
+      return;
+    }
+
+    const message =
+      current > previous
+        ? `Your overall progress has increased from ${previous}% to ${current}%.`
+        : `Your overall progress has changed from ${previous}% to ${current}%.`;
+
+    await createNotification({
+      userId:
+        studentUser._id.toString(),
+
+      title:
+        "Progress Updated",
+
+      message,
+
+      type:
+        "progress",
+
+      link:
+        "/progress",
+    });
+
+    console.log(
+      "PROJECT PROGRESS NOTIFICATION CREATED:",
+      {
+        student:
+          `${student.firstName || ""} ${
+            student.lastName || ""
+          }`.trim(),
+
+        previous,
+
+        current,
+      }
+    );
+  } catch (error) {
+    // Never allow notification errors
+    // to break project operations.
+    console.error(
+      "PROGRESS NOTIFICATION ERROR:",
+      error
+    );
+  }
+}
+
+// =========================================================
+// GET - VIEW PROJECTS
+// =========================================================
 
 export async function GET() {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
       return Response.json(
@@ -153,21 +594,29 @@ export async function GET() {
           message:
             "You must be logged in to view projects.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    const db = await getDatabase();
+    const db =
+      await getDatabase();
 
     let filter = {};
 
-    /* -----------------------------------------------------
-       STUDENT
-    ----------------------------------------------------- */
+    // =====================================================
+    // STUDENT
+    // =====================================================
 
-    if (session.role === "student") {
+    if (
+      session.role === "student"
+    ) {
       const resolvedStudent =
-        await resolveStudent(db, session);
+        await resolveStudent(
+          db,
+          session
+        );
 
       if (!resolvedStudent) {
         return Response.json(
@@ -175,7 +624,9 @@ export async function GET() {
             message:
               "Your account is not linked to a valid student profile.",
           },
-          { status: 403 }
+          {
+            status: 403,
+          }
         );
       }
 
@@ -185,39 +636,44 @@ export async function GET() {
       };
     }
 
-    /* -----------------------------------------------------
-       FACILITATOR
-    ----------------------------------------------------- */
+    // =====================================================
+    // FACILITATOR
+    // =====================================================
 
-    else if (session.role === "facilitator") {
-      /*
-       * Facilitators can see all projects.
-       */
+    else if (
+      session.role === "facilitator"
+    ) {
       filter = {};
     }
 
-    /* -----------------------------------------------------
-       UNKNOWN ROLE
-    ----------------------------------------------------- */
+    // =====================================================
+    // UNKNOWN ROLE
+    // =====================================================
 
     else {
       return Response.json(
         {
-          message: "Unauthorized.",
+          message:
+            "Unauthorized.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    const projects = await db
-      .collection("projects")
-      .find(filter)
-      .sort({
-        createdAt: -1,
-      })
-      .toArray();
+    const projects =
+      await db
+        .collection("projects")
+        .find(filter)
+        .sort({
+          createdAt: -1,
+        })
+        .toArray();
 
-    return Response.json(projects);
+    return Response.json(
+      projects
+    );
   } catch (error) {
     console.error(
       "Projects GET error:",
@@ -229,26 +685,23 @@ export async function GET() {
         message:
           "Failed to load projects.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
-/* =========================================================
-   POST - CREATE PROJECT
-=========================================================
+// =========================================================
+// POST - CREATE PROJECT
+// =========================================================
 
-Students:
-  - Can create unlimited projects.
-  - Project automatically belongs to themselves.
-
-Facilitators:
-  - Can create projects for any student.
-========================================================= */
-
-export async function POST(request) {
+export async function POST(
+  request
+) {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
     if (!session) {
       return Response.json(
@@ -256,11 +709,14 @@ export async function POST(request) {
           message:
             "You must be logged in to create a project.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    const body = await request.json();
+    const body =
+      await request.json();
 
     const {
       title,
@@ -272,9 +728,9 @@ export async function POST(request) {
       githubUrl = "",
     } = body;
 
-    /* -----------------------------------------------------
-       REQUIRED FIELDS
-    ----------------------------------------------------- */
+    // =====================================================
+    // REQUIRED FIELDS
+    // =====================================================
 
     if (
       !title ||
@@ -286,39 +742,34 @@ export async function POST(request) {
           message:
             "Title, description and technology are required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /* -----------------------------------------------------
-       DATABASE
-    ----------------------------------------------------- */
+    const db =
+      await getDatabase();
 
-    const db = await getDatabase();
-
-    /* -----------------------------------------------------
-       DETERMINE PROJECT OWNER
-    ----------------------------------------------------- */
+    // =====================================================
+    // DETERMINE PROJECT OWNER
+    // =====================================================
 
     let studentId;
     let student;
 
-    /* =====================================================
-       STUDENT
-    ===================================================== */
+    // =====================================================
+    // STUDENT
+    // =====================================================
 
-    if (session.role === "student") {
-      /*
-       * IMPORTANT:
-       *
-       * Do NOT trust a studentId sent from the browser.
-       *
-       * Resolve the student from the authenticated
-       * user's database record.
-       */
-
+    if (
+      session.role === "student"
+    ) {
       const resolvedStudent =
-        await resolveStudent(db, session);
+        await resolveStudent(
+          db,
+          session
+        );
 
       if (!resolvedStudent) {
         return Response.json(
@@ -326,7 +777,9 @@ export async function POST(request) {
             message:
               "Your account is not linked to a valid student profile.",
           },
-          { status: 403 }
+          {
+            status: 403,
+          }
         );
       }
 
@@ -337,29 +790,28 @@ export async function POST(request) {
         resolvedStudent.student;
     }
 
-    /* =====================================================
-       FACILITATOR
-    ===================================================== */
+    // =====================================================
+    // FACILITATOR
+    // =====================================================
 
-    else if (session.role === "facilitator") {
-      /*
-       * Facilitators must specify which student owns
-       * the project.
-       */
-
+    else if (
+      session.role === "facilitator"
+    ) {
       if (!body.studentId) {
         return Response.json(
           {
             message:
               "A student must be selected for this project.",
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
       if (
         !ObjectId.isValid(
-          body.studentId.toString()
+          String(body.studentId)
         )
       ) {
         return Response.json(
@@ -367,20 +819,24 @@ export async function POST(request) {
             message:
               "Invalid student ID.",
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
       studentId =
         new ObjectId(
-          body.studentId.toString()
+          String(body.studentId)
         );
 
-      student = await db
-        .collection("students")
-        .findOne({
-          _id: studentId,
-        });
+      student =
+        await db
+          .collection("students")
+          .findOne({
+            _id:
+              studentId,
+          });
 
       if (!student) {
         return Response.json(
@@ -388,33 +844,40 @@ export async function POST(request) {
             message:
               "Student not found.",
           },
-          { status: 404 }
+          {
+            status: 404,
+          }
         );
       }
     }
 
-    /* =====================================================
-       UNKNOWN ROLE
-    ===================================================== */
+    // =====================================================
+    // UNKNOWN ROLE
+    // =====================================================
 
     else {
       return Response.json(
         {
-          message: "Unauthorized.",
+          message:
+            "Unauthorized.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    /* -----------------------------------------------------
-       VALIDATE PROGRESS
-    ----------------------------------------------------- */
+    // =====================================================
+    // VALIDATE PROGRESS
+    // =====================================================
 
     const numericProgress =
       Number(progress);
 
     if (
-      Number.isNaN(numericProgress) ||
+      Number.isNaN(
+        numericProgress
+      ) ||
       numericProgress < 0 ||
       numericProgress > 100
     ) {
@@ -423,13 +886,25 @@ export async function POST(request) {
           message:
             "Progress must be between 0 and 100.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /* -----------------------------------------------------
-       CREATE PROJECT
-    ----------------------------------------------------- */
+    // =====================================================
+    // GET PROGRESS BEFORE PROJECT CREATION
+    // =====================================================
+
+    const previousProgress =
+      await getStudentOverallProgress(
+        db,
+        student
+      );
+
+    // =====================================================
+    // STUDENT NAME
+    // =====================================================
 
     const studentName =
       `${student.firstName || ""} ${
@@ -440,8 +915,13 @@ export async function POST(request) {
       student.email ||
       "Student";
 
+    // =====================================================
+    // CREATE PROJECT
+    // =====================================================
+
     const project = {
-      title: title.trim(),
+      title:
+        title.trim(),
 
       description:
         description.trim(),
@@ -462,10 +942,14 @@ export async function POST(request) {
         ),
 
       projectUrl:
-        String(projectUrl).trim(),
+        String(
+          projectUrl
+        ).trim(),
 
       githubUrl:
-        String(githubUrl).trim(),
+        String(
+          githubUrl
+        ).trim(),
 
       createdAt:
         new Date(),
@@ -477,7 +961,40 @@ export async function POST(request) {
     const result =
       await db
         .collection("projects")
-        .insertOne(project);
+        .insertOne(
+          project
+        );
+
+    // =====================================================
+    // PROJECT NOTIFICATION
+    // =====================================================
+
+    await notifyStudent({
+      db,
+      student,
+
+      title:
+        "New Project",
+
+      message:
+        `A new project "${project.title}" has been added to your account.`,
+
+      type:
+        "project",
+
+      link:
+        "/projects",
+    });
+
+    // =====================================================
+    // PROGRESS NOTIFICATION
+    // =====================================================
+
+    await notifyProgressChange({
+      db,
+      student,
+      previousProgress,
+    });
 
     return Response.json(
       {
@@ -486,11 +1003,14 @@ export async function POST(request) {
 
         project: {
           ...project,
+
           _id:
             result.insertedId,
         },
       },
-      { status: 201 }
+      {
+        status: 201,
+      }
     );
   } catch (error) {
     console.error(
@@ -503,24 +1023,20 @@ export async function POST(request) {
         message:
           "Failed to create project.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
-/* =========================================================
-   PUT - UPDATE PROJECT
-=========================================================
+// =========================================================
+// PUT - UPDATE PROJECT
+// =========================================================
 
-Facilitators:
-  - Can edit any project.
-
-Students:
-  - Can edit only their own projects.
-  - Cannot change project ownership.
-========================================================= */
-
-export async function PUT(request) {
+export async function PUT(
+  request
+) {
   try {
     const session =
       await getSession();
@@ -531,7 +1047,9 @@ export async function PUT(request) {
           message:
             "You must be logged in to edit a project.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
@@ -549,9 +1067,9 @@ export async function PUT(request) {
       githubUrl = "",
     } = body;
 
-    /* -----------------------------------------------------
-       VALIDATE PROJECT ID
-    ----------------------------------------------------- */
+    // =====================================================
+    // VALIDATE PROJECT ID
+    // =====================================================
 
     if (
       !id ||
@@ -562,13 +1080,15 @@ export async function PUT(request) {
           message:
             "Valid project ID is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /* -----------------------------------------------------
-       VALIDATE REQUIRED FIELDS
-    ----------------------------------------------------- */
+    // =====================================================
+    // VALIDATE REQUIRED FIELDS
+    // =====================================================
 
     if (
       !title ||
@@ -581,19 +1101,23 @@ export async function PUT(request) {
           message:
             "Title, description, technology and status are required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    /* -----------------------------------------------------
-       VALIDATE PROGRESS
-    ----------------------------------------------------- */
+    // =====================================================
+    // VALIDATE PROGRESS
+    // =====================================================
 
     const numericProgress =
       Number(progress);
 
     if (
-      Number.isNaN(numericProgress) ||
+      Number.isNaN(
+        numericProgress
+      ) ||
       numericProgress < 0 ||
       numericProgress > 100
     ) {
@@ -602,16 +1126,18 @@ export async function PUT(request) {
           message:
             "Progress must be between 0 and 100.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     const db =
       await getDatabase();
 
-    /* -----------------------------------------------------
-       FIND EXISTING PROJECT
-    ----------------------------------------------------- */
+    // =====================================================
+    // FIND EXISTING PROJECT
+    // =====================================================
 
     const existingProject =
       await db
@@ -627,28 +1153,26 @@ export async function PUT(request) {
           message:
             "Project not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
-    /* -----------------------------------------------------
-       DETERMINE STUDENT
-    ----------------------------------------------------- */
+    // =====================================================
+    // DETERMINE STUDENT
+    // =====================================================
 
     let studentId;
     let student;
 
-    /* =====================================================
-       STUDENT EDIT
-    ===================================================== */
+    // =====================================================
+    // STUDENT EDIT
+    // =====================================================
 
     if (
       session.role === "student"
     ) {
-      /*
-       * Resolve the real logged-in student.
-       */
-
       const resolvedStudent =
         await resolveStudent(
           db,
@@ -661,7 +1185,9 @@ export async function PUT(request) {
             message:
               "Your account is not linked to a valid student profile.",
           },
-          { status: 403 }
+          {
+            status: 403,
+          }
         );
       }
 
@@ -670,11 +1196,6 @@ export async function PUT(request) {
 
       student =
         resolvedStudent.student;
-
-      /*
-       * Make sure this project belongs to
-       * the logged-in student.
-       */
 
       const projectStudentId =
         existingProject.studentId
@@ -689,30 +1210,27 @@ export async function PUT(request) {
             message:
               "You can only edit your own projects.",
           },
-          { status: 403 }
+          {
+            status: 403,
+          }
         );
       }
     }
 
-    /* =====================================================
-       FACILITATOR EDIT
-    ===================================================== */
+    // =====================================================
+    // FACILITATOR EDIT
+    // =====================================================
 
     else if (
       session.role ===
       "facilitator"
     ) {
-      /*
-       * Facilitators may change the student
-       * assigned to the project.
-       */
-
-      if (
-        body.studentId
-      ) {
+      if (body.studentId) {
         if (
           !ObjectId.isValid(
-            body.studentId.toString()
+            String(
+              body.studentId
+            )
           )
         ) {
           return Response.json(
@@ -720,13 +1238,17 @@ export async function PUT(request) {
               message:
                 "Invalid student ID.",
             },
-            { status: 400 }
+            {
+              status: 400,
+            }
           );
         }
 
         studentId =
           new ObjectId(
-            body.studentId.toString()
+            String(
+              body.studentId
+            )
           );
       } else {
         studentId =
@@ -736,7 +1258,7 @@ export async function PUT(request) {
       if (
         !studentId ||
         !ObjectId.isValid(
-          studentId.toString()
+          String(studentId)
         )
       ) {
         return Response.json(
@@ -744,7 +1266,9 @@ export async function PUT(request) {
             message:
               "The project is not linked to a valid student.",
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
@@ -754,7 +1278,7 @@ export async function PUT(request) {
           .findOne({
             _id:
               new ObjectId(
-                studentId.toString()
+                String(studentId)
               ),
           });
 
@@ -764,19 +1288,21 @@ export async function PUT(request) {
             message:
               "Student not found.",
           },
-          { status: 404 }
+          {
+            status: 404,
+          }
         );
       }
 
       studentId =
         new ObjectId(
-          studentId.toString()
+          String(studentId)
         );
     }
 
-    /* =====================================================
-       UNKNOWN ROLE
-    ===================================================== */
+    // =====================================================
+    // UNKNOWN ROLE
+    // =====================================================
 
     else {
       return Response.json(
@@ -784,13 +1310,25 @@ export async function PUT(request) {
           message:
             "Unauthorized.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
-    /* -----------------------------------------------------
-       STUDENT NAME
-    ----------------------------------------------------- */
+    // =====================================================
+    // GET PREVIOUS OVERALL PROGRESS
+    // =====================================================
+
+    const previousProgress =
+      await getStudentOverallProgress(
+        db,
+        student
+      );
+
+    // =====================================================
+    // STUDENT NAME
+    // =====================================================
 
     const studentName =
       `${student.firstName || ""} ${
@@ -801,9 +1339,36 @@ export async function PUT(request) {
       student.email ||
       "Student";
 
-    /* -----------------------------------------------------
-       UPDATE PROJECT
-    ----------------------------------------------------- */
+    // =====================================================
+    // CHECK IMPORTANT CHANGES
+    // =====================================================
+
+    const oldStatus =
+      existingProject.status;
+
+    const oldProgress =
+      Number(
+        existingProject.progress || 0
+      );
+
+    const oldStudentId =
+      existingProject.studentId
+        ?.toString();
+
+    const newStatus =
+      String(status).trim();
+
+    const newProgress =
+      Math.round(
+        numericProgress
+      );
+
+    const newStudentId =
+      studentId.toString();
+
+    // =====================================================
+    // UPDATE PROJECT
+    // =====================================================
 
     const result =
       await db
@@ -832,12 +1397,10 @@ export async function PUT(request) {
                 technology.trim(),
 
               status:
-                String(status).trim(),
+                newStatus,
 
               progress:
-                Math.round(
-                  numericProgress
-                ),
+                newProgress,
 
               projectUrl:
                 String(
@@ -856,16 +1419,105 @@ export async function PUT(request) {
         );
 
     if (
-      result.matchedCount === 0
+      result.matchedCount ===
+      0
     ) {
       return Response.json(
         {
           message:
             "Project not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
+
+    // =====================================================
+    // PROJECT NOTIFICATIONS
+    // =====================================================
+
+    if (
+      oldStatus !==
+      newStatus
+    ) {
+      await notifyStudent({
+        db,
+        student,
+
+        title:
+          "Project Status Updated",
+
+        message:
+          `Your project "${title.trim()}" is now ${newStatus}.`,
+
+        type:
+          "project",
+
+        link:
+          "/projects",
+      });
+    }
+
+    if (
+      oldProgress !==
+      newProgress
+    ) {
+      await notifyStudent({
+        db,
+        student,
+
+        title:
+          "Project Progress Updated",
+
+        message:
+          `Your project "${title.trim()}" is now ${newProgress}% complete.`,
+
+        type:
+          "project",
+
+        link:
+          "/projects",
+      });
+    }
+
+    // If neither status nor progress
+    // changed, notify about the edit.
+    if (
+      oldStatus ===
+        newStatus &&
+      oldProgress ===
+        newProgress &&
+      oldStudentId ===
+        newStudentId
+    ) {
+      await notifyStudent({
+        db,
+        student,
+
+        title:
+          "Project Updated",
+
+        message:
+          `Your project "${title.trim()}" has been updated.`,
+
+        type:
+          "project",
+
+        link:
+          "/projects",
+      });
+    }
+
+    // =====================================================
+    // OVERALL PROGRESS NOTIFICATION
+    // =====================================================
+
+    await notifyProgressChange({
+      db,
+      student,
+      previousProgress,
+    });
 
     return Response.json({
       message:
@@ -882,17 +1534,17 @@ export async function PUT(request) {
         message:
           "Failed to update project.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
 
-/* =========================================================
-   DELETE - DELETE PROJECT
-=========================================================
-
-Facilitators only.
-========================================================= */
+// =========================================================
+// DELETE - DELETE PROJECT
+// FACILITATORS ONLY
+// =========================================================
 
 export async function DELETE(
   request
@@ -907,7 +1559,9 @@ export async function DELETE(
           message:
             "You must be logged in to delete a project.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
@@ -920,7 +1574,9 @@ export async function DELETE(
           message:
             "Only facilitators can delete projects.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
@@ -939,12 +1595,86 @@ export async function DELETE(
           message:
             "Valid project ID is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     const db =
       await getDatabase();
+
+    // =====================================================
+    // GET PROJECT BEFORE DELETING
+    // =====================================================
+
+    const existingProject =
+      await db
+        .collection("projects")
+        .findOne({
+          _id:
+            new ObjectId(id),
+        });
+
+    if (!existingProject) {
+      return Response.json(
+        {
+          message:
+            "Project not found.",
+        },
+        {
+          status: 404,
+        }
+      );
+    }
+
+    // =====================================================
+    // FIND STUDENT
+    // =====================================================
+
+    let student =
+      null;
+
+    if (
+      existingProject.studentId
+    ) {
+      const studentId =
+        String(
+          existingProject.studentId
+        );
+
+      if (
+        ObjectId.isValid(
+          studentId
+        )
+      ) {
+        student =
+          await db
+            .collection("students")
+            .findOne({
+              _id:
+                new ObjectId(
+                  studentId
+                ),
+            });
+      }
+    }
+
+    // =====================================================
+    // GET PROGRESS BEFORE DELETE
+    // =====================================================
+
+    const previousProgress =
+      student
+        ? await getStudentOverallProgress(
+            db,
+            student
+          )
+        : 0;
+
+    // =====================================================
+    // DELETE PROJECT
+    // =====================================================
 
     const result =
       await db
@@ -955,15 +1685,51 @@ export async function DELETE(
         });
 
     if (
-      result.deletedCount === 0
+      result.deletedCount ===
+      0
     ) {
       return Response.json(
         {
           message:
             "Project not found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
+    }
+
+    // =====================================================
+    // PROJECT REMOVED NOTIFICATION
+    // =====================================================
+
+    if (student) {
+      await notifyStudent({
+        db,
+        student,
+
+        title:
+          "Project Removed",
+
+        message:
+          `Your project "${existingProject.title}" has been removed.`,
+
+        type:
+          "project",
+
+        link:
+          "/projects",
+      });
+
+      // ===================================================
+      // OVERALL PROGRESS NOTIFICATION
+      // ===================================================
+
+      await notifyProgressChange({
+        db,
+        student,
+        previousProgress,
+      });
     }
 
     return Response.json({
@@ -981,7 +1747,9 @@ export async function DELETE(
         message:
           "Failed to delete project.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 // =========================================================
 // SESSION
@@ -12,7 +13,8 @@ import { verifySession } from "@/lib/auth";
 async function getSession() {
   const cookieStore = await cookies();
 
-  const token = cookieStore.get("dcc_session")?.value;
+  const token =
+    cookieStore.get("dcc_session")?.value;
 
   if (!token) {
     return null;
@@ -26,13 +28,15 @@ async function getSession() {
 // =========================================================
 
 async function requireFacilitator() {
-  const session = await getSession();
+  const session =
+    await getSession();
 
   if (!session) {
     return {
       error: NextResponse.json(
         {
-          error: "You must be logged in.",
+          error:
+            "You must be logged in.",
         },
         {
           status: 401,
@@ -41,11 +45,15 @@ async function requireFacilitator() {
     };
   }
 
-  if (session.role !== "facilitator") {
+  if (
+    session.role !==
+    "facilitator"
+  ) {
     return {
       error: NextResponse.json(
         {
-          error: "Only facilitators can perform this action.",
+          error:
+            "Only facilitators can perform this action.",
         },
         {
           status: 403,
@@ -65,19 +73,38 @@ async function requireFacilitator() {
 
 function escapeHtml(value = "") {
   return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
 }
 
 // =========================================================
 // SEND STUDENT APPROVAL EMAIL
 // =========================================================
 
-async function sendApprovalEmail({ name, email }) {
-  const apiKey = process.env.RESEND_API_KEY;
+async function sendApprovalEmail({
+  name,
+  email,
+}) {
+  const apiKey =
+    process.env.RESEND_API_KEY;
 
   const fromEmail =
     process.env.EMAIL_FROM ||
@@ -110,7 +137,8 @@ async function sendApprovalEmail({ name, email }) {
   // -------------------------------------------------------
 
   const studentName =
-    name?.trim() || "Student";
+    name?.trim() ||
+    "Student";
 
   const safeStudentName =
     escapeHtml(studentName);
@@ -394,30 +422,34 @@ Student Success & Impact Platform`;
     }
   );
 
-  const response = await fetch(
-    "https://api.resend.com/emails",
-    {
-      method: "POST",
+  const response =
+    await fetch(
+      "https://api.resend.com/emails",
+      {
+        method: "POST",
 
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+        headers: {
+          Authorization:
+            `Bearer ${apiKey}`,
 
-      body: JSON.stringify({
-        from: fromEmail,
+          "Content-Type":
+            "application/json",
+        },
 
-        to: [email],
+        body: JSON.stringify({
+          from: fromEmail,
 
-        subject:
-          "Your Dodoo Coding Club Application Has Been Approved",
+          to: [email],
 
-        text,
+          subject:
+            "Your Dodoo Coding Club Application Has Been Approved",
 
-        html,
-      }),
-    }
-  );
+          text,
+
+          html,
+        }),
+      }
+    );
 
   // -------------------------------------------------------
   // Read Resend response
@@ -426,7 +458,8 @@ Student Success & Impact Platform`;
   let data = {};
 
   try {
-    data = await response.json();
+    data =
+      await response.json();
   } catch (jsonError) {
     console.error(
       "RESEND RESPONSE JSON ERROR:",
@@ -437,8 +470,12 @@ Student Success & Impact Platform`;
   console.log(
     "RESEND APPROVAL EMAIL RESPONSE:",
     {
-      status: response.status,
-      ok: response.ok,
+      status:
+        response.status,
+
+      ok:
+        response.ok,
+
       data,
     }
   );
@@ -451,9 +488,13 @@ Student Success & Impact Platform`;
     console.error(
       "RESEND APPROVAL EMAIL ERROR:",
       {
-        status: response.status,
+        status:
+          response.status,
+
         data,
-        recipient: email,
+
+        recipient:
+          email,
       }
     );
 
@@ -471,12 +512,77 @@ Student Success & Impact Platform`;
   console.log(
     "RESEND APPROVAL EMAIL SUCCESS:",
     {
-      id: data?.id || null,
-      recipient: email,
+      id:
+        data?.id ||
+        null,
+
+      recipient:
+        email,
     }
   );
 
   return data;
+}
+
+// =========================================================
+// CREATE NOTIFICATION FOR STUDENT REQUEST
+// =========================================================
+
+async function notifyStudentRequest({
+  user,
+  action,
+}) {
+  if (!user?._id) {
+    return;
+  }
+
+  try {
+    let title =
+      "Student Request Updated";
+
+    let message =
+      "Your student platform request has been updated.";
+
+    if (action === "accept") {
+      title =
+        "Application Approved";
+
+      message =
+        "Your request to join the Dodoo Coding Club Student Platform has been approved. Your student account is now active.";
+    }
+
+    if (action === "reject") {
+      title =
+        "Application Not Approved";
+
+      message =
+        "Your request to join the Dodoo Coding Club Student Platform was not approved.";
+    }
+
+    await createNotification({
+      userId:
+        user._id.toString(),
+
+      title,
+
+      message,
+
+      type:
+        "student-request",
+
+      link:
+        action === "accept"
+          ? "/dashboard"
+          : "/login",
+    });
+  } catch (notificationError) {
+    // A notification failure must never
+    // undo the request decision.
+    console.error(
+      "STUDENT REQUEST NOTIFICATION ERROR:",
+      notificationError
+    );
+  }
 }
 
 // =========================================================
@@ -516,28 +622,32 @@ export async function GET() {
         .toArray();
 
     const formattedRequests =
-      requests.map((user) => ({
-        id:
-          user._id.toString(),
+      requests.map(
+        (user) => ({
+          id:
+            user._id.toString(),
 
-        name:
-          user.name || "",
+          name:
+            user.name || "",
 
-        email:
-          user.email || "",
+          email:
+            user.email || "",
 
-        program:
-          user.program || "",
+          program:
+            user.program || "",
 
-        status:
-          user.status,
+          status:
+            user.status,
 
-        emailVerified:
-          user.emailVerified === true,
+          emailVerified:
+            user.emailVerified ===
+            true,
 
-        createdAt:
-          user.createdAt || null,
-      }));
+          createdAt:
+            user.createdAt ||
+            null,
+        })
+      );
 
     return NextResponse.json({
       requests:
@@ -565,7 +675,9 @@ export async function GET() {
 // ACCEPT / REJECT STUDENT REQUEST
 // =========================================================
 
-export async function POST(request) {
+export async function POST(
+  request
+) {
   try {
     const auth =
       await requireFacilitator();
@@ -587,7 +699,10 @@ export async function POST(request) {
     // Validate request
     // -------------------------------------------------------
 
-    if (!userId || !action) {
+    if (
+      !userId ||
+      !action
+    ) {
       return NextResponse.json(
         {
           error:
@@ -600,9 +715,10 @@ export async function POST(request) {
     }
 
     if (
-      !["accept", "reject"].includes(
-        action
-      )
+      ![
+        "accept",
+        "reject",
+      ].includes(action)
     ) {
       return NextResponse.json(
         {
@@ -615,7 +731,11 @@ export async function POST(request) {
       );
     }
 
-    if (!ObjectId.isValid(userId)) {
+    if (
+      !ObjectId.isValid(
+        userId
+      )
+    ) {
       return NextResponse.json(
         {
           error:
@@ -650,13 +770,18 @@ export async function POST(request) {
         .collection("users")
         .findOne({
           _id:
-            new ObjectId(userId),
+            new ObjectId(
+              userId
+            ),
 
-          role: "student",
+          role:
+            "student",
 
-          status: "pending",
+          status:
+            "pending",
 
-          emailVerified: true,
+          emailVerified:
+            true,
         });
 
     if (!user) {
@@ -675,12 +800,15 @@ export async function POST(request) {
     // REJECT
     // =======================================================
 
-    if (action === "reject") {
+    if (
+      action === "reject"
+    ) {
       await db
         .collection("users")
         .updateOne(
           {
-            _id: user._id,
+            _id:
+              user._id,
           },
           {
             $set: {
@@ -692,6 +820,16 @@ export async function POST(request) {
             },
           }
         );
+
+      // -----------------------------------------------------
+      // CREATE NOTIFICATION
+      // -----------------------------------------------------
+
+      await notifyStudentRequest({
+        user,
+        action:
+          "reject",
+      });
 
       return NextResponse.json({
         message:
@@ -717,7 +855,9 @@ export async function POST(request) {
     // Existing student
     // -------------------------------------------------------
 
-    if (existingStudent) {
+    if (
+      existingStudent
+    ) {
       studentId =
         existingStudent._id;
 
@@ -869,6 +1009,16 @@ export async function POST(request) {
       );
 
     // =======================================================
+    // CREATE APPROVAL NOTIFICATION
+    // =======================================================
+
+    await notifyStudentRequest({
+      user,
+      action:
+        "accept",
+    });
+
+    // =======================================================
     // SEND APPROVAL EMAIL
     // =======================================================
 
@@ -894,7 +1044,8 @@ export async function POST(request) {
             user.email,
         });
 
-      emailSent = true;
+      emailSent =
+        true;
 
       emailResponseId =
         emailResult?.id ||

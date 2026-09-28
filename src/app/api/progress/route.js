@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 
 // =====================================================
 // DATABASE
@@ -64,14 +65,6 @@ async function getCurrentUser(db, session) {
 // =====================================================
 // RESOLVE STUDENT
 // =====================================================
-//
-// users._id
-//     |
-//     | users.studentId
-//     v
-// students._id
-//
-// =====================================================
 
 async function resolveStudent(db, session) {
   if (!session || session.role !== "student") {
@@ -84,7 +77,6 @@ async function resolveStudent(db, session) {
     return null;
   }
 
-  // Prefer database user.studentId
   let studentId =
     user.studentId ||
     session.studentId ||
@@ -144,14 +136,6 @@ async function resolveStudent(db, session) {
 // =====================================================
 // STUDENT ID QUERY
 // =====================================================
-//
-// Attendance and projects may contain studentId as:
-// - ObjectId
-// - string ObjectId
-//
-// Support both.
-//
-// =====================================================
 
 function buildStudentIdQuery(studentId) {
   const values = [];
@@ -195,17 +179,6 @@ function normalizePercentage(value) {
 
 // =====================================================
 // TIMELINE PROGRESS
-// =====================================================
-//
-// Program Timeline = 20%
-//
-// Uses:
-// enrollmentDate
-// expectedCompletionDate
-//
-// If expectedCompletionDate does not exist,
-// the program is assumed to be 24 months.
-//
 // =====================================================
 
 function calculateTimelineProgress(student) {
@@ -271,14 +244,6 @@ function calculateTimelineProgress(student) {
 // =====================================================
 // ATTENDANCE PROGRESS
 // =====================================================
-//
-// Present = 100
-// Late    = 50
-// Absent  = 0
-//
-// Attendance = 30%
-//
-// =====================================================
 
 function calculateAttendanceProgress(
   attendance
@@ -317,13 +282,6 @@ function calculateAttendanceProgress(
 // =====================================================
 // PROJECT PROGRESS
 // =====================================================
-//
-// Project progress is the average progress
-// of all projects belonging to the student.
-//
-// Projects = 50%
-//
-// =====================================================
 
 function calculateProjectProgress(
   projects
@@ -350,12 +308,6 @@ function calculateProjectProgress(
 
 // =====================================================
 // OVERALL PROGRESS
-// =====================================================
-//
-// Timeline = 20%
-// Attendance = 30%
-// Projects = 50%
-//
 // =====================================================
 
 function calculateOverallProgress({
@@ -384,6 +336,100 @@ function calculateOverallProgress({
     projects * 0.5;
 
   return normalizePercentage(result);
+}
+
+// =====================================================
+// PROGRESS NOTIFICATION
+// =====================================================
+
+async function notifyProgressChange({
+  db,
+  student,
+  previousProgress,
+  currentProgress,
+}) {
+  try {
+    const previous = normalizePercentage(
+      previousProgress
+    );
+
+    const current = normalizePercentage(
+      currentProgress
+    );
+
+    // Do nothing if progress has not changed.
+    if (previous === current) {
+      return;
+    }
+
+    // Find the student's platform user.
+    let user = null;
+
+    // Try studentId as ObjectId
+    if (ObjectId.isValid(String(student._id))) {
+      user = await db.collection("users").findOne({
+        studentId: new ObjectId(
+          String(student._id)
+        ),
+      });
+    }
+
+    // Try studentId as string
+    if (!user) {
+      user = await db.collection("users").findOne({
+        studentId: String(student._id),
+      });
+    }
+
+    // Fallback to email
+    if (!user && student.email) {
+      user = await db.collection("users").findOne({
+        email: student.email
+          .trim()
+          .toLowerCase(),
+      });
+    }
+
+    if (!user?._id) {
+      console.warn(
+        "PROGRESS NOTIFICATION: Student user not found.",
+        student._id
+      );
+
+      return;
+    }
+
+    const direction =
+      current > previous
+        ? "increased"
+        : "changed";
+
+    await createNotification({
+      userId: String(user._id),
+      title: "Progress Updated",
+      message:
+        `Your overall progress has ${direction} from ${previous}% to ${current}%.`,
+      type: "progress",
+      link: "/progress",
+    });
+
+    console.log(
+      "PROGRESS NOTIFICATION CREATED:",
+      {
+        student:
+          `${student.firstName || ""} ${student.lastName || ""}`.trim(),
+        previous,
+        current,
+      }
+    );
+  } catch (error) {
+    // Notification failure must never break
+    // the progress API.
+    console.error(
+      "PROGRESS NOTIFICATION ERROR:",
+      error
+    );
+  }
 }
 
 // =====================================================
@@ -471,23 +517,6 @@ function formatStudent(
       );
     }).length;
 
-  // ---------------------------------------------------
-  // IMPORTANT
-  // ---------------------------------------------------
-  //
-  // The progress page expects:
-  //
-  // student.progress
-  //
-  // and:
-  //
-  // student.progressDetails
-  //
-  // So we provide BOTH the new names and
-  // the detailed values.
-  //
-  // ---------------------------------------------------
-
   return {
     _id: student._id
       ? student._id.toString()
@@ -542,8 +571,6 @@ function formatStudent(
 
     overallProgress,
 
-    // IMPORTANT:
-    // progress page uses student.progress
     progress: overallProgress,
 
     // -------------------------------------------------
@@ -748,6 +775,19 @@ export async function GET() {
         }
       );
 
+      // ------------------------------------------------
+      // IMPORTANT
+      //
+      // We DO NOT create progress notifications here.
+      //
+      // This endpoint is called whenever the progress
+      // page/dashboard loads. Creating notifications
+      // here would cause duplicates.
+      //
+      // Progress notifications should be triggered by
+      // the attendance/project mutation APIs.
+      // ------------------------------------------------
+
       return NextResponse.json({
         students: [
           formatted,
@@ -758,7 +798,6 @@ export async function GET() {
 
         totalStudents: 1,
 
-        // Useful for the student progress page
         progress:
           formatted.overallProgress,
 

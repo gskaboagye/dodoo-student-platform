@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
+import { createNotifications } from "@/lib/notifications";
 
 // =========================================================
 // GET ANNOUNCEMENTS
@@ -121,6 +122,10 @@ export async function POST(request) {
     const dbName = process.env.DB_NAME || "DCCPlatform";
     const db = client.db(dbName);
 
+    // -------------------------------------------------------
+    // CREATE ANNOUNCEMENT
+    // -------------------------------------------------------
+
     const announcement = {
       title,
       message,
@@ -132,6 +137,41 @@ export async function POST(request) {
     const result = await db
       .collection("announcements")
       .insertOne(announcement);
+
+    // -------------------------------------------------------
+    // CREATE NOTIFICATIONS FOR ACTIVE STUDENTS
+    // -------------------------------------------------------
+
+    try {
+      const students = await db
+        .collection("users")
+        .find({
+          role: "student",
+          status: "active",
+        })
+        .project({
+          _id: 1,
+        })
+        .toArray();
+
+      if (students.length > 0) {
+        await createNotifications(
+          students.map((student) => ({
+            userId: student._id.toString(),
+            title: "New Announcement",
+            message: title,
+            type: "announcement",
+            link: "/announcements",
+          }))
+        );
+      }
+    } catch (notificationError) {
+      // Do not fail the announcement if notification creation fails.
+      console.error(
+        "ANNOUNCEMENT NOTIFICATION ERROR:",
+        notificationError
+      );
+    }
 
     return NextResponse.json(
       {
