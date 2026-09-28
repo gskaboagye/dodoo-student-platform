@@ -1,8 +1,59 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Notifications from "./Notifications";
 
 export default function Navbar() {
+  const [user, setUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadUser() {
+      try {
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          if (mounted) {
+            setUser(null);
+          }
+
+          return;
+        }
+
+        const data = await response.json();
+
+        if (mounted) {
+          setUser(data?.user || null);
+        }
+      } catch (error) {
+        console.error(
+          "NAVBAR AUTH CHECK ERROR:",
+          error
+        );
+
+        if (mounted) {
+          setUser(null);
+        }
+      } finally {
+        if (mounted) {
+          setCheckingAuth(false);
+        }
+      }
+    }
+
+    loadUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <header className="sticky top-0 z-50 border-b bg-white">
       <div className="flex h-20 items-center justify-between px-6 md:px-8">
@@ -65,25 +116,40 @@ export default function Navbar() {
         {/* Right side */}
         <div className="hidden items-center gap-4 md:flex">
 
-          {/* Notifications */}
-          <Notifications />
+          {/* Only show authenticated-user controls */}
+          {!checkingAuth && user && (
+            <>
+              {/* Notification Bell */}
+              <Notifications />
 
-          {/* Profile */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 font-bold text-white">
-              G
-            </div>
+              {/* Profile */}
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 font-bold text-white">
+                  {(
+                    user.name ||
+                    user.firstName ||
+                    "U"
+                  )
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
 
-            <div className="hidden lg:block">
-              <p className="text-sm font-bold text-gray-900">
-                Facilitator
-              </p>
+                <div className="hidden lg:block">
+                  <p className="text-sm font-bold text-gray-900">
+                    {user.name ||
+                      `${user.firstName || ""} ${
+                        user.lastName || ""
+                      }`.trim() ||
+                      "User"}
+                  </p>
 
-              <p className="text-xs text-gray-500">
-                Admin
-              </p>
-            </div>
-          </div>
+                  <p className="text-xs capitalize text-gray-500">
+                    {user.role || "User"}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
 
         </div>
 
