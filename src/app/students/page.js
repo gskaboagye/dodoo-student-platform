@@ -2,6 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  ArrowRight,
+  GraduationCap,
+  RefreshCw,
+  TrendingUp,
+  UserCheck,
+  Users,
+  UserRound,
+} from "lucide-react";
 
 const EMPTY_EDIT_FORM = {
   firstName: "",
@@ -38,17 +48,11 @@ export default function StudentsPage() {
   const [refreshing, setRefreshing] = useState(false);
 
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState(
-    EMPTY_EDIT_FORM
-  );
+  const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
   const [saving, setSaving] = useState(false);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  // =====================================================
-  // ACCESS CHECK
-  // =====================================================
 
   useEffect(() => {
     checkAccess();
@@ -88,15 +92,9 @@ export default function StudentsPage() {
     }
   }
 
-  // =====================================================
-  // LOAD STUDENTS
-  // =====================================================
-
-  async function loadStudents(options = {}) {
-    const isRefresh = options.refresh === true;
-
+  async function loadStudents({ refresh = false } = {}) {
     try {
-      if (isRefresh) {
+      if (refresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
@@ -109,38 +107,27 @@ export default function StudentsPage() {
         return;
       }
 
-      const studentsResponse = await fetch(
-        "/api/students",
-        {
-          cache: "no-store",
-        }
-      );
+      const studentsResponse = await fetch("/api/students", {
+        cache: "no-store",
+      });
 
-      const studentsData =
-        await studentsResponse.json();
+      const studentsData = await studentsResponse.json();
 
       if (!studentsResponse.ok) {
         throw new Error(
-          studentsData.message ||
-            "Failed to load students."
+          studentsData.message || "Failed to load students."
         );
       }
 
-      const studentList = Array.isArray(
-        studentsData
-      )
+      const studentList = Array.isArray(studentsData)
         ? studentsData
         : studentsData.students || [];
 
-      const progressResponse = await fetch(
-        "/api/progress",
-        {
-          cache: "no-store",
-        }
-      );
+      const progressResponse = await fetch("/api/progress", {
+        cache: "no-store",
+      });
 
-      const progressData =
-        await progressResponse.json();
+      const progressData = await progressResponse.json();
 
       if (!progressResponse.ok) {
         throw new Error(
@@ -149,111 +136,76 @@ export default function StudentsPage() {
         );
       }
 
-      const progressList = Array.isArray(
-        progressData.students
-      )
+      const progressList = Array.isArray(progressData.students)
         ? progressData.students
         : [];
 
-      const studentsWithProgress =
-        studentList.map((student) => {
-          const progressStudent =
-            progressList.find(
-              (item) =>
-                String(item._id) ===
-                String(student._id)
-            );
+      const studentsWithProgress = studentList.map((student) => {
+        const progressStudent = progressList.find(
+          (item) =>
+            String(item._id) === String(student._id)
+        );
 
-          return {
-            ...student,
+        const overallProgress = safePercentage(
+          progressStudent?.progress ??
+            progressStudent?.overallProgress ??
+            progressStudent?.progressDetails?.overallProgress ??
+            0
+        );
 
-            progress: safePercentage(
-              progressStudent?.progress ??
-                progressStudent?.overallProgress ??
-                progressStudent
-                  ?.progressDetails
-                  ?.overallProgress ??
-                0
-            ),
+        const projectProgress = safePercentage(
+          progressStudent?.projectProgress ??
+            progressStudent?.progressDetails?.projectProgress ??
+            0
+        );
 
-            overallProgress:
-              safePercentage(
-                progressStudent?.progress ??
-                  progressStudent?.overallProgress ??
-                  progressStudent
-                    ?.progressDetails
-                    ?.overallProgress ??
-                  0
-              ),
+        const attendanceProgress = safePercentage(
+          progressStudent?.attendanceProgress ??
+            progressStudent?.progressDetails?.attendanceProgress ??
+            0
+        );
 
-            projectProgress:
-              safePercentage(
-                progressStudent?.projectProgress ??
-                  progressStudent
-                    ?.progressDetails
-                    ?.projectProgress ??
-                  0
-              ),
+        const timelineProgress = safePercentage(
+          progressStudent?.timelineProgress ??
+            progressStudent?.progressDetails?.timelineProgress ??
+            0
+        );
 
-            attendanceProgress:
-              safePercentage(
-                progressStudent?.attendanceProgress ??
-                  progressStudent
-                    ?.progressDetails
-                    ?.attendanceProgress ??
-                  0
-              ),
-
-            timelineProgress:
-              safePercentage(
-                progressStudent?.timelineProgress ??
-                  progressStudent
-                    ?.progressDetails
-                    ?.timelineProgress ??
-                  0
-              ),
-
-            progressDetails:
-              progressStudent?.progressDetails ||
-              {},
-
-            projectCount:
-              Number(
-                progressStudent?.projectCount ??
-                  0
-              ),
-
-            completedProjects:
-              Number(
-                progressStudent?.completedProjects ??
-                  0
-              ),
-
-            attendanceCount:
-              Number(
-                progressStudent?.attendanceCount ??
-                  0
-              ),
-          };
-        });
+        return {
+          ...student,
+          progress: overallProgress,
+          overallProgress,
+          projectProgress,
+          attendanceProgress,
+          timelineProgress,
+          progressDetails:
+            progressStudent?.progressDetails || {},
+          projectCount: Number(
+            progressStudent?.projectCount ?? 0
+          ),
+          completedProjects: Number(
+            progressStudent?.completedProjects ?? 0
+          ),
+          attendanceCount: Number(
+            progressStudent?.attendanceCount ?? 0
+          ),
+        };
+      });
 
       setStudents(studentsWithProgress);
 
       setSelectedStudent((current) => {
-        if (!current) {
-          return null;
-        }
+        if (!current) return null;
 
         return (
           studentsWithProgress.find(
             (student) =>
-              String(student._id) ===
-              String(current._id)
+              String(student._id) === String(current._id)
           ) || null
         );
       });
 
-      if (isRefresh) {
+      if (refresh) {
         setMessage(
           "Student records refreshed successfully."
         );
@@ -273,7 +225,7 @@ export default function StudentsPage() {
           "Failed to load students and progress."
       );
     } finally {
-      if (isRefresh) {
+      if (refresh) {
         setRefreshing(false);
       } else {
         setLoading(false);
@@ -289,10 +241,6 @@ export default function StudentsPage() {
       loadStudents();
     }
   }, [checkingAccess, user]);
-
-  // =====================================================
-  // HELPERS
-  // =====================================================
 
   function safePercentage(value) {
     const number = Number(value);
@@ -324,9 +272,7 @@ export default function StudentsPage() {
   }
 
   function formatDate(date) {
-    if (!date) {
-      return "Not available";
-    }
+    if (!date) return "Not available";
 
     const parsedDate = new Date(date);
 
@@ -334,20 +280,15 @@ export default function StudentsPage() {
       return "Not available";
     }
 
-    return parsedDate.toLocaleDateString(
-      "en-GH",
-      {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      }
-    );
+    return parsedDate.toLocaleDateString("en-GH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   }
 
   function formatDateInput(date) {
-    if (!date) {
-      return "";
-    }
+    if (!date) return "";
 
     const parsedDate = new Date(date);
 
@@ -393,10 +334,6 @@ export default function StudentsPage() {
     return "bg-slate-100 text-slate-600";
   }
 
-  // =====================================================
-  // SEARCH + FILTER
-  // =====================================================
-
   const filteredStudents = useMemo(() => {
     const searchValue =
       search.toLowerCase().trim();
@@ -432,23 +369,11 @@ export default function StudentsPage() {
 
       const matchesStatus =
         statusFilter === "all" ||
-        status ===
-          statusFilter.toLowerCase();
+        status === statusFilter.toLowerCase();
 
-      return (
-        matchesSearch &&
-        matchesStatus
-      );
+      return matchesSearch && matchesStatus;
     });
-  }, [
-    students,
-    search,
-    statusFilter,
-  ]);
-
-  // =====================================================
-  // STATISTICS
-  // =====================================================
+  }, [students, search, statusFilter]);
 
   const statistics = useMemo(() => {
     const total = students.length;
@@ -489,26 +414,20 @@ export default function StudentsPage() {
           )
         : 0;
 
-    const totalProjects =
-      students.reduce(
-        (sum, student) =>
-          sum +
-          Number(
-            student.projectCount || 0
-          ),
-        0
-      );
+    const totalProjects = students.reduce(
+      (sum, student) =>
+        sum + Number(student.projectCount || 0),
+      0
+    );
 
-    const completedProjects =
-      students.reduce(
-        (sum, student) =>
-          sum +
-          Number(
-            student.completedProjects ||
-              0
-          ),
-        0
-      );
+    const completedProjects = students.reduce(
+      (sum, student) =>
+        sum +
+        Number(
+          student.completedProjects || 0
+        ),
+      0
+    );
 
     return {
       total,
@@ -520,10 +439,6 @@ export default function StudentsPage() {
       completedProjects,
     };
   }, [students]);
-
-  // =====================================================
-  // OPEN PROFILE
-  // =====================================================
 
   function handleStudentClick(student) {
     setMessage("");
@@ -537,10 +452,6 @@ export default function StudentsPage() {
     });
   }
 
-  // =====================================================
-  // BACK
-  // =====================================================
-
   function handleBackToStudents() {
     setMessage("");
     setError("");
@@ -553,80 +464,50 @@ export default function StudentsPage() {
     });
   }
 
-  // =====================================================
-  // START EDITING
-  // =====================================================
-
   function startEditing() {
-    if (!selectedStudent) {
-      return;
-    }
+    if (!selectedStudent) return;
 
     setError("");
     setMessage("");
 
     setEditForm({
-      firstName:
-        selectedStudent.firstName || "",
+      firstName: selectedStudent.firstName || "",
+      lastName: selectedStudent.lastName || "",
+      email: selectedStudent.email || "",
+      phone: selectedStudent.phone || "",
 
-      lastName:
-        selectedStudent.lastName || "",
+      dateOfBirth: formatDateInput(
+        selectedStudent.dateOfBirth
+      ),
 
-      email:
-        selectedStudent.email || "",
-
-      phone:
-        selectedStudent.phone || "",
-
-      dateOfBirth:
-        formatDateInput(
-          selectedStudent.dateOfBirth
-        ),
-
-      gender:
-        selectedStudent.gender || "",
-
-      program:
-        selectedStudent.program || "",
-
+      gender: selectedStudent.gender || "",
+      program: selectedStudent.program || "",
       educationLevel:
         selectedStudent.educationLevel || "",
-
-      school:
-        selectedStudent.school || "",
-
-      address:
-        selectedStudent.address || "",
+      school: selectedStudent.school || "",
+      address: selectedStudent.address || "",
 
       emergencyContactName:
-        selectedStudent.emergencyContactName ||
-        "",
+        selectedStudent.emergencyContactName || "",
 
       emergencyContactPhone:
-        selectedStudent.emergencyContactPhone ||
-        "",
+        selectedStudent.emergencyContactPhone || "",
 
-      status:
-        String(
-          selectedStudent.status ||
-            "active"
-        ).toLowerCase(),
+      status: String(
+        selectedStudent.status || "active"
+      ).toLowerCase(),
 
-      enrollmentDate:
-        formatDateInput(
-          selectedStudent.enrollmentDate
-        ),
+      enrollmentDate: formatDateInput(
+        selectedStudent.enrollmentDate
+      ),
 
-      expectedCompletionDate:
-        formatDateInput(
-          selectedStudent.expectedCompletionDate
-        ),
+      expectedCompletionDate: formatDateInput(
+        selectedStudent.expectedCompletionDate
+      ),
 
-      programDurationMonths:
-        String(
-          selectedStudent.programDurationMonths ||
-            24
-        ),
+      programDurationMonths: String(
+        selectedStudent.programDurationMonths || 24
+      ),
 
       profileImage:
         selectedStudent.profileImage || "",
@@ -635,13 +516,8 @@ export default function StudentsPage() {
     setEditing(true);
   }
 
-  // =====================================================
-  // EDIT FORM CHANGE
-  // =====================================================
-
   function handleEditChange(event) {
-    const { name, value } =
-      event.target;
+    const { name, value } = event.target;
 
     setEditForm((current) => ({
       ...current,
@@ -649,17 +525,11 @@ export default function StudentsPage() {
     }));
   }
 
-  // =====================================================
-  // SAVE STUDENT
-  // =====================================================
-
   async function handleSaveStudent(event) {
     event.preventDefault();
 
     if (!selectedStudent?._id) {
-      setError(
-        "No student is selected."
-      );
+      setError("No student is selected.");
       return;
     }
 
@@ -701,9 +571,6 @@ export default function StudentsPage() {
         phone:
           editForm.phone.trim(),
 
-        dateOfBirth:
-          editForm.dateOfBirth || "",
-
         gender:
           editForm.gender,
 
@@ -728,22 +595,29 @@ export default function StudentsPage() {
         status:
           editForm.status,
 
-        enrollmentDate:
-          editForm.enrollmentDate || "",
-
-        expectedCompletionDate:
-          editForm.expectedCompletionDate ||
-          "",
-
         programDurationMonths:
           Number(
-            editForm.programDurationMonths ||
-              24
+            editForm.programDurationMonths || 24
           ),
 
         profileImage:
           editForm.profileImage.trim(),
       };
+
+      if (editForm.dateOfBirth) {
+        payload.dateOfBirth =
+          editForm.dateOfBirth;
+      }
+
+      if (editForm.enrollmentDate) {
+        payload.enrollmentDate =
+          editForm.enrollmentDate;
+      }
+
+      if (editForm.expectedCompletionDate) {
+        payload.expectedCompletionDate =
+          editForm.expectedCompletionDate;
+      }
 
       const response = await fetch(
         "/api/students",
@@ -770,12 +644,10 @@ export default function StudentsPage() {
       const updatedStudent =
         data.student;
 
-      setSelectedStudent(
-        (current) => ({
-          ...current,
-          ...updatedStudent,
-        })
-      );
+      setSelectedStudent((current) => ({
+        ...current,
+        ...updatedStudent,
+      }));
 
       setStudents((current) =>
         current.map((student) =>
@@ -800,8 +672,6 @@ export default function StudentsPage() {
         behavior: "smooth",
       });
 
-      // Reload calculated progress and
-      // synchronize all student data.
       await loadStudents({
         refresh: true,
       });
@@ -820,19 +690,11 @@ export default function StudentsPage() {
     }
   }
 
-  // =====================================================
-  // CANCEL EDITING
-  // =====================================================
-
   function cancelEditing() {
     setEditing(false);
     setError("");
     setMessage("");
   }
-
-  // =====================================================
-  // DELETE STUDENT
-  // =====================================================
 
   async function handleDelete(id) {
     setMessage("");
@@ -842,9 +704,7 @@ export default function StudentsPage() {
       "Are you sure you want to delete this student? This will also remove the student's login account."
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const response = await fetch(
@@ -887,10 +747,6 @@ export default function StudentsPage() {
     }
   }
 
-  // =====================================================
-  // ACCESS SCREEN
-  // =====================================================
-
   if (checkingAccess) {
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -911,10 +767,6 @@ export default function StudentsPage() {
     return null;
   }
 
-  // =====================================================
-  // STUDENT PROFILE
-  // =====================================================
-
   if (selectedStudent) {
     const fullName =
       getFullName(selectedStudent);
@@ -922,12 +774,10 @@ export default function StudentsPage() {
     const initials =
       getInitials(selectedStudent);
 
-    const progress =
-      safePercentage(
-        selectedStudent.progress ??
-          selectedStudent.overallProgress ??
-          0
-      );
+    const progress = safePercentage(
+      selectedStudent.overallProgress ??
+        selectedStudent.progress
+    );
 
     const projectProgress =
       safePercentage(
@@ -944,10 +794,6 @@ export default function StudentsPage() {
         selectedStudent.timelineProgress
       );
 
-    // ===================================================
-    // EDIT MODE
-    // ===================================================
-
     if (editing) {
       return (
         <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
@@ -956,9 +802,10 @@ export default function StudentsPage() {
             <button
               type="button"
               onClick={cancelEditing}
-              className="mb-6 rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+              className="mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
             >
-              ← Cancel Editing
+              <ArrowLeft className="h-4 w-4" />
+              Cancel Editing
             </button>
 
             {error && (
@@ -968,12 +815,9 @@ export default function StudentsPage() {
             )}
 
             <form
-              onSubmit={
-                handleSaveStudent
-              }
+              onSubmit={handleSaveStudent}
               className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200"
             >
-
               <div className="bg-slate-900 px-6 py-8 md:px-8">
                 <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">
                   Facilitator
@@ -984,15 +828,12 @@ export default function StudentsPage() {
                 </h1>
 
                 <p className="mt-2 text-slate-300">
-                  Update the student's
-                  information and save the
-                  changes.
+                  Update the student's information
+                  and save the changes.
                 </p>
               </div>
 
               <div className="space-y-10 p-6 md:p-8">
-
-                {/* PERSONAL */}
 
                 <section>
                   <h2 className="text-xl font-bold text-slate-900">
@@ -1000,28 +841,19 @@ export default function StudentsPage() {
                   </h2>
 
                   <div className="mt-5 grid gap-5 md:grid-cols-2">
-
                     <FormField
                       label="First Name"
                       name="firstName"
-                      value={
-                        editForm.firstName
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.firstName}
+                      onChange={handleEditChange}
                       required
                     />
 
                     <FormField
                       label="Last Name"
                       name="lastName"
-                      value={
-                        editForm.lastName
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.lastName}
+                      onChange={handleEditChange}
                       required
                     />
 
@@ -1029,47 +861,31 @@ export default function StudentsPage() {
                       label="Email"
                       name="email"
                       type="email"
-                      value={
-                        editForm.email
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.email}
+                      onChange={handleEditChange}
                       required
                     />
 
                     <FormField
                       label="Phone"
                       name="phone"
-                      value={
-                        editForm.phone
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.phone}
+                      onChange={handleEditChange}
                     />
 
                     <FormField
                       label="Date of Birth"
                       name="dateOfBirth"
                       type="date"
-                      value={
-                        editForm.dateOfBirth
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.dateOfBirth}
+                      onChange={handleEditChange}
                     />
 
                     <SelectField
                       label="Gender"
                       name="gender"
-                      value={
-                        editForm.gender
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.gender}
+                      onChange={handleEditChange}
                       options={[
                         "",
                         "Male",
@@ -1083,11 +899,8 @@ export default function StudentsPage() {
                         "Other",
                       ]}
                     />
-
                   </div>
                 </section>
-
-                {/* EDUCATION */}
 
                 <section className="border-t border-slate-200 pt-8">
                   <h2 className="text-xl font-bold text-slate-900">
@@ -1095,38 +908,25 @@ export default function StudentsPage() {
                   </h2>
 
                   <div className="mt-5 grid gap-5 md:grid-cols-2">
-
                     <FormField
                       label="Program"
                       name="program"
-                      value={
-                        editForm.program
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.program}
+                      onChange={handleEditChange}
                     />
 
                     <FormField
                       label="Education Level"
                       name="educationLevel"
-                      value={
-                        editForm.educationLevel
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.educationLevel}
+                      onChange={handleEditChange}
                     />
 
                     <FormField
                       label="School"
                       name="school"
-                      value={
-                        editForm.school
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.school}
+                      onChange={handleEditChange}
                     />
 
                     <FormField
@@ -1138,39 +938,26 @@ export default function StudentsPage() {
                       value={
                         editForm.programDurationMonths
                       }
-                      onChange={
-                        handleEditChange
-                      }
+                      onChange={handleEditChange}
                     />
-
                   </div>
                 </section>
-
-                {/* ADDRESS */}
 
                 <section className="border-t border-slate-200 pt-8">
                   <h2 className="text-xl font-bold text-slate-900">
                     Contact Information
                   </h2>
 
-                  <div className="mt-5 space-y-5">
-
+                  <div className="mt-5">
                     <FormField
                       label="Address"
                       name="address"
-                      value={
-                        editForm.address
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.address}
+                      onChange={handleEditChange}
                       textarea
                     />
-
                   </div>
                 </section>
-
-                {/* EMERGENCY */}
 
                 <section className="border-t border-slate-200 pt-8">
                   <h2 className="text-xl font-bold text-slate-900">
@@ -1178,16 +965,13 @@ export default function StudentsPage() {
                   </h2>
 
                   <div className="mt-5 grid gap-5 md:grid-cols-2">
-
                     <FormField
                       label="Contact Name"
                       name="emergencyContactName"
                       value={
                         editForm.emergencyContactName
                       }
-                      onChange={
-                        handleEditChange
-                      }
+                      onChange={handleEditChange}
                     />
 
                     <FormField
@@ -1196,15 +980,10 @@ export default function StudentsPage() {
                       value={
                         editForm.emergencyContactPhone
                       }
-                      onChange={
-                        handleEditChange
-                      }
+                      onChange={handleEditChange}
                     />
-
                   </div>
                 </section>
-
-                {/* PROGRAM STATUS */}
 
                 <section className="border-t border-slate-200 pt-8">
                   <h2 className="text-xl font-bold text-slate-900">
@@ -1212,16 +991,11 @@ export default function StudentsPage() {
                   </h2>
 
                   <div className="mt-5 grid gap-5 md:grid-cols-2">
-
                     <SelectField
                       label="Student Status"
                       name="status"
-                      value={
-                        editForm.status
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.status}
+                      onChange={handleEditChange}
                       options={[
                         "active",
                         "inactive",
@@ -1242,26 +1016,26 @@ export default function StudentsPage() {
                       label="Enrollment Date"
                       name="enrollmentDate"
                       type="date"
-                      value={
-                        editForm.enrollmentDate
-                      }
-                      onChange={
-                        handleEditChange
-                      }
+                      value={editForm.enrollmentDate}
+                      onChange={handleEditChange}
                     />
 
+                    <FormField
+                      label="Expected Completion Date"
+                      name="expectedCompletionDate"
+                      type="date"
+                      value={
+                        editForm.expectedCompletionDate
+                      }
+                      onChange={handleEditChange}
+                    />
                   </div>
                 </section>
 
-                {/* ACTIONS */}
-
                 <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-8 sm:flex-row sm:justify-end">
-
                   <button
                     type="button"
-                    onClick={
-                      cancelEditing
-                    }
+                    onClick={cancelEditing}
                     disabled={saving}
                     className="rounded-xl border border-slate-300 px-6 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                   >
@@ -1282,9 +1056,7 @@ export default function StudentsPage() {
                       "Save Changes"
                     )}
                   </button>
-
                 </div>
-
               </div>
             </form>
           </div>
@@ -1292,22 +1064,17 @@ export default function StudentsPage() {
       );
     }
 
-    // ===================================================
-    // READ-ONLY PROFILE
-    // ===================================================
-
     return (
       <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
         <div className="mx-auto max-w-7xl">
 
           <button
             type="button"
-            onClick={
-              handleBackToStudents
-            }
-            className="mb-6 rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm hover:bg-blue-50"
+            onClick={handleBackToStudents}
+            className="mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm hover:bg-blue-50"
           >
-            ← Back to Students
+            <ArrowLeft className="h-4 w-4" />
+            Back to Students
           </button>
 
           {message && (
@@ -1324,17 +1091,12 @@ export default function StudentsPage() {
 
           <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
 
-            {/* HEADER */}
-
             <div className="bg-slate-900 px-6 py-8 md:px-8">
-
               <div className="flex flex-col gap-6 md:flex-row md:items-center">
 
                 {selectedStudent.profileImage ? (
                   <img
-                    src={
-                      selectedStudent.profileImage
-                    }
+                    src={selectedStudent.profileImage}
                     alt={fullName}
                     className="h-28 w-28 rounded-full object-cover ring-4 ring-white/20"
                   />
@@ -1345,7 +1107,6 @@ export default function StudentsPage() {
                 )}
 
                 <div className="min-w-0 flex-1">
-
                   <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">
                     Student Profile
                   </p>
@@ -1363,13 +1124,10 @@ export default function StudentsPage() {
                     <p className="mt-2 text-sm text-slate-400">
                       Student ID:{" "}
                       <span className="font-semibold text-white">
-                        {
-                          selectedStudent.studentId
-                        }
+                        {selectedStudent.studentId}
                       </span>
                     </p>
                   )}
-
                 </div>
 
                 <span
@@ -1380,16 +1138,12 @@ export default function StudentsPage() {
                   {selectedStudent.status ||
                     "Active"}
                 </span>
-
               </div>
             </div>
 
             <div className="p-6 md:p-8">
 
-              {/* SUMMARY */}
-
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
                 <SummaryCard
                   label="Overall Progress"
                   value={`${progress}%`}
@@ -1399,16 +1153,21 @@ export default function StudentsPage() {
                 <SummaryCard
                   label="Projects"
                   value={
-                    selectedStudent.projectCount ||
-                    0
+                    selectedStudent.projectCount || 0
                   }
-                  description={`${selectedStudent.completedProjects || 0} completed`}
+                  description={`${
+                    selectedStudent.completedProjects ||
+                    0
+                  } completed`}
                 />
 
                 <SummaryCard
                   label="Attendance"
                   value={`${attendanceProgress}%`}
-                  description={`${selectedStudent.attendanceCount || 0} records`}
+                  description={`${
+                    selectedStudent.attendanceCount ||
+                    0
+                  } records`}
                 />
 
                 <SummaryCard
@@ -1416,45 +1175,32 @@ export default function StudentsPage() {
                   value={`${timelineProgress}%`}
                   description="Program timeline"
                 />
-
               </div>
 
-              {/* PERSONAL */}
-
               <section className="mt-10 border-t border-slate-200 pt-8">
-
                 <h2 className="text-xl font-bold text-slate-900">
                   Personal Information
                 </h2>
 
                 <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
                   <InfoItem
                     label="First Name"
-                    value={
-                      selectedStudent.firstName
-                    }
+                    value={selectedStudent.firstName}
                   />
 
                   <InfoItem
                     label="Last Name"
-                    value={
-                      selectedStudent.lastName
-                    }
+                    value={selectedStudent.lastName}
                   />
 
                   <InfoItem
                     label="Email"
-                    value={
-                      selectedStudent.email
-                    }
+                    value={selectedStudent.email}
                   />
 
                   <InfoItem
                     label="Phone"
-                    value={
-                      selectedStudent.phone
-                    }
+                    value={selectedStudent.phone}
                   />
 
                   <InfoItem
@@ -1466,16 +1212,12 @@ export default function StudentsPage() {
 
                   <InfoItem
                     label="Gender"
-                    value={
-                      selectedStudent.gender
-                    }
+                    value={selectedStudent.gender}
                   />
 
                   <InfoItem
                     label="Program"
-                    value={
-                      selectedStudent.program
-                    }
+                    value={selectedStudent.program}
                   />
 
                   <InfoItem
@@ -1487,32 +1229,23 @@ export default function StudentsPage() {
 
                   <InfoItem
                     label="School"
-                    value={
-                      selectedStudent.school
-                    }
+                    value={selectedStudent.school}
                   />
 
                   <InfoItem
                     label="Address"
-                    value={
-                      selectedStudent.address
-                    }
+                    value={selectedStudent.address}
                     wide
                   />
-
                 </div>
               </section>
 
-              {/* EMERGENCY */}
-
               <section className="mt-10 border-t border-slate-200 pt-8">
-
                 <h2 className="text-xl font-bold text-slate-900">
                   Emergency Contact
                 </h2>
 
                 <div className="mt-5 grid gap-5 sm:grid-cols-2">
-
                   <InfoItem
                     label="Contact Name"
                     value={
@@ -1526,25 +1259,18 @@ export default function StudentsPage() {
                       selectedStudent.emergencyContactPhone
                     }
                   />
-
                 </div>
               </section>
 
-              {/* PROGRAM */}
-
               <section className="mt-10 border-t border-slate-200 pt-8">
-
                 <h2 className="text-xl font-bold text-slate-900">
                   Program Information
                 </h2>
 
                 <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-
                   <InfoItem
                     label="Student ID"
-                    value={
-                      selectedStudent.studentId
-                    }
+                    value={selectedStudent.studentId}
                   />
 
                   <InfoItem
@@ -1569,16 +1295,11 @@ export default function StudentsPage() {
                         : "24 months"
                     }
                   />
-
                 </div>
               </section>
 
-              {/* PROGRESS */}
-
               <section className="mt-10 border-t border-slate-200 pt-8">
-
-                <div className="flex items-end justify-between">
-
+                <div className="flex items-end justify-between gap-4">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">
                       Overall Progress
@@ -1594,7 +1315,6 @@ export default function StudentsPage() {
                   <span className="text-4xl font-bold text-blue-600">
                     {progress}%
                   </span>
-
                 </div>
 
                 <div className="mt-5 h-4 overflow-hidden rounded-full bg-slate-200">
@@ -1607,57 +1327,43 @@ export default function StudentsPage() {
                 </div>
 
                 <div className="mt-6 grid gap-4 md:grid-cols-3">
-
                   <ProgressItem
                     title="Projects"
-                    progress={
-                      projectProgress
-                    }
+                    progress={projectProgress}
                     description="50% of overall progress"
                   />
 
                   <ProgressItem
                     title="Attendance"
-                    progress={
-                      attendanceProgress
-                    }
+                    progress={attendanceProgress}
                     description="30% of overall progress"
                   />
 
                   <ProgressItem
                     title="Program Timeline"
-                    progress={
-                      timelineProgress
-                    }
+                    progress={timelineProgress}
                     description="20% of overall progress"
                   />
-
                 </div>
               </section>
 
-              {/* MANAGEMENT */}
-
               <section className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row sm:justify-between">
-
                 <button
                   type="button"
-                  onClick={
-                    handleBackToStudents
-                  }
-                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                  onClick={handleBackToStudents}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  ← Back to Students
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Students
                 </button>
 
                 <div className="flex flex-col gap-3 sm:flex-row">
-
                   <button
                     type="button"
-                    onClick={
-                      startEditing
-                    }
-                    className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
+                    onClick={startEditing}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
                   >
+                    <UserRound className="h-4 w-4" />
                     Edit Student
                   </button>
 
@@ -1672,11 +1378,8 @@ export default function StudentsPage() {
                   >
                     Delete Student
                   </button>
-
                 </div>
-
               </section>
-
             </div>
           </section>
         </div>
@@ -1684,16 +1387,11 @@ export default function StudentsPage() {
     );
   }
 
-  // =====================================================
-  // STUDENT LIST
-  // =====================================================
-
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
       <div className="mx-auto max-w-7xl">
 
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
               Facilitator Management
@@ -1704,8 +1402,8 @@ export default function StudentsPage() {
             </h1>
 
             <p className="mt-2 text-lg text-slate-600">
-              Manage registered students and monitor
-              their learning progress.
+              Manage registered students and
+              monitor their learning progress.
             </p>
           </div>
 
@@ -1716,16 +1414,19 @@ export default function StudentsPage() {
                 refresh: true,
               })
             }
-            disabled={
-              refreshing || loading
-            }
-            className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            disabled={refreshing || loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           >
+            <RefreshCw
+              className={`h-4 w-4 ${
+                refreshing ? "animate-spin" : ""
+              }`}
+            />
+
             {refreshing
               ? "Refreshing..."
-              : "↻ Refresh Students"}
+              : "Refresh Students"}
           </button>
-
         </div>
 
         {message && (
@@ -1740,46 +1441,46 @@ export default function StudentsPage() {
           </div>
         )}
 
-        {/* STATISTICS */}
-
         <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
           <StatCard
             label="Total Students"
             value={statistics.total}
             description="Registered students"
-            icon="👥"
+            icon={
+              <Users className="h-6 w-6" />
+            }
           />
 
           <StatCard
             label="Active Students"
             value={statistics.active}
             description="Currently active"
-            icon="✓"
+            icon={
+              <UserCheck className="h-6 w-6" />
+            }
           />
 
           <StatCard
             label="Completed"
             value={statistics.completed}
             description="Completed students"
-            icon="🎓"
+            icon={
+              <GraduationCap className="h-6 w-6" />
+            }
           />
 
           <StatCard
             label="Average Progress"
             value={`${statistics.averageProgress}%`}
             description="Across all students"
-            icon="📈"
+            icon={
+              <TrendingUp className="h-6 w-6" />
+            }
           />
-
         </section>
 
-        {/* OVERVIEW */}
-
         <section className="mb-8 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-
             <div>
               <h2 className="text-lg font-bold text-slate-900">
                 Program Overview
@@ -1791,12 +1492,9 @@ export default function StudentsPage() {
             </div>
 
             <div className="grid grid-cols-3 gap-5">
-
               <MiniStat
                 label="Projects"
-                value={
-                  statistics.totalProjects
-                }
+                value={statistics.totalProjects}
               />
 
               <MiniStat
@@ -1808,22 +1506,14 @@ export default function StudentsPage() {
 
               <MiniStat
                 label="Pending"
-                value={
-                  statistics.pending
-                }
+                value={statistics.pending}
               />
-
             </div>
-
           </div>
         </section>
 
-        {/* RECORDS */}
-
         <section className="rounded-2xl bg-white p-7 shadow-sm ring-1 ring-slate-200">
-
           <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-
             <div>
               <h2 className="text-2xl font-bold text-slate-900">
                 Student Records
@@ -1843,15 +1533,12 @@ export default function StudentsPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
-
               <input
                 type="search"
                 placeholder="Search students..."
                 value={search}
                 onChange={(event) =>
-                  setSearch(
-                    event.target.value
-                  )
+                  setSearch(event.target.value)
                 }
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:w-72"
               />
@@ -1868,23 +1555,27 @@ export default function StudentsPage() {
                 <option value="all">
                   All Statuses
                 </option>
+
                 <option value="active">
                   Active
                 </option>
+
                 <option value="completed">
                   Completed
                 </option>
+
                 <option value="pending">
                   Pending
                 </option>
+
                 <option value="inactive">
                   Inactive
                 </option>
+
                 <option value="suspended">
                   Suspended
                 </option>
               </select>
-
             </div>
           </div>
 
@@ -1898,9 +1589,8 @@ export default function StudentsPage() {
             </div>
           ) : filteredStudents.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 px-6 py-16 text-center">
-
-              <div className="text-3xl">
-                👥
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                <Users className="h-7 w-7" />
               </div>
 
               <h3 className="mt-4 font-bold text-slate-900">
@@ -1911,11 +1601,9 @@ export default function StudentsPage() {
                 Try changing your search or
                 status filter.
               </p>
-
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-
               {filteredStudents.map(
                 (student) => {
                   const fullName =
@@ -1944,7 +1632,6 @@ export default function StudentsPage() {
                       <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:border-blue-300 hover:shadow-md">
 
                         <div className="flex items-start gap-4">
-
                           {student.profileImage ? (
                             <img
                               src={
@@ -1960,9 +1647,7 @@ export default function StudentsPage() {
                           )}
 
                           <div className="min-w-0 flex-1">
-
                             <div className="flex items-start justify-between gap-2">
-
                               <h3 className="truncate text-lg font-bold text-slate-900 group-hover:text-blue-600">
                                 {fullName}
                               </h3>
@@ -1975,19 +1660,16 @@ export default function StudentsPage() {
                                 {student.status ||
                                   "Active"}
                               </span>
-
                             </div>
 
                             <p className="mt-1 truncate text-sm text-slate-500">
                               {student.email ||
                                 "No email"}
                             </p>
-
                           </div>
                         </div>
 
                         <div className="mt-5 space-y-3">
-
                           {student.studentId && (
                             <InfoRow
                               label="Student ID"
@@ -2014,13 +1696,10 @@ export default function StudentsPage() {
                               }
                             />
                           )}
-
                         </div>
 
                         <div className="mt-5 border-t border-slate-100 pt-5">
-
                           <div className="mb-2 flex justify-between">
-
                             <span className="text-sm text-slate-500">
                               Overall Progress
                             </span>
@@ -2028,27 +1707,25 @@ export default function StudentsPage() {
                             <span className="font-bold text-blue-600">
                               {progress}%
                             </span>
-
                           </div>
 
                           <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
                             <div
-                              className="h-full rounded-full bg-blue-600"
+                              className="h-full rounded-full bg-blue-600 transition-all"
                               style={{
                                 width: `${progress}%`,
                               }}
                             />
                           </div>
-
                         </div>
 
                         <div className="mt-5 grid grid-cols-3 border-t border-slate-100 pt-4 text-center">
-
                           <div>
                             <p className="font-bold text-slate-900">
                               {student.projectCount ||
                                 0}
                             </p>
+
                             <p className="text-xs text-slate-500">
                               Projects
                             </p>
@@ -2059,6 +1736,7 @@ export default function StudentsPage() {
                               {student.completedProjects ||
                                 0}
                             </p>
+
                             <p className="text-xs text-slate-500">
                               Completed
                             </p>
@@ -2069,35 +1747,29 @@ export default function StudentsPage() {
                               {student.attendanceCount ||
                                 0}
                             </p>
+
                             <p className="text-xs text-slate-500">
                               Attendance
                             </p>
                           </div>
-
                         </div>
 
-                        <div className="mt-5 border-t border-slate-100 pt-4 text-right text-sm font-semibold text-blue-600">
-                          View Full Profile →
+                        <div className="mt-5 flex items-center justify-end gap-1 border-t border-slate-100 pt-4 text-sm font-semibold text-blue-600">
+                          View Full Profile
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                         </div>
-
                       </article>
                     </button>
                   );
                 }
               )}
-
             </div>
           )}
-
         </section>
       </div>
     </main>
   );
 }
-
-// =====================================================
-// FORM FIELD
-// =====================================================
 
 function FormField({
   label,
@@ -2120,6 +1792,7 @@ function FormField({
         className="mb-2 block text-sm font-semibold text-slate-700"
       >
         {label}
+
         {required && (
           <span className="ml-1 text-red-500">
             *
@@ -2154,10 +1827,6 @@ function FormField({
   );
 }
 
-// =====================================================
-// SELECT FIELD
-// =====================================================
-
 function SelectField({
   label,
   name,
@@ -2182,25 +1851,18 @@ function SelectField({
         onChange={onChange}
         className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       >
-        {options.map(
-          (option, index) => (
-            <option
-              key={option}
-              value={option}
-            >
-              {labels?.[index] ||
-                option}
-            </option>
-          )
-        )}
+        {options.map((option, index) => (
+          <option
+            key={option}
+            value={option}
+          >
+            {labels?.[index] || option}
+          </option>
+        ))}
       </select>
     </div>
   );
 }
-
-// =====================================================
-// SUMMARY CARD
-// =====================================================
 
 function SummaryCard({
   label,
@@ -2224,10 +1886,6 @@ function SummaryCard({
   );
 }
 
-// =====================================================
-// STAT CARD
-// =====================================================
-
 function StatCard({
   label,
   value,
@@ -2236,9 +1894,7 @@ function StatCard({
 }) {
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
-
       <div className="flex items-start justify-between gap-4">
-
         <div>
           <p className="text-sm font-medium text-slate-500">
             {label}
@@ -2253,19 +1909,13 @@ function StatCard({
           </p>
         </div>
 
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-lg">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
           {icon}
         </div>
-
       </div>
-
     </div>
   );
 }
-
-// =====================================================
-// MINI STAT
-// =====================================================
 
 function MiniStat({
   label,
@@ -2284,10 +1934,6 @@ function MiniStat({
   );
 }
 
-// =====================================================
-// PROGRESS ITEM
-// =====================================================
-
 function ProgressItem({
   title,
   progress,
@@ -2295,9 +1941,7 @@ function ProgressItem({
 }) {
   const value = Math.min(
     Math.max(
-      Math.round(
-        Number(progress) || 0
-      ),
+      Math.round(Number(progress) || 0),
       0
     ),
     100
@@ -2305,9 +1949,7 @@ function ProgressItem({
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-
       <div className="flex items-center justify-between gap-3">
-
         <p className="font-semibold text-slate-800">
           {title}
         </p>
@@ -2315,7 +1957,6 @@ function ProgressItem({
         <span className="font-bold text-blue-600">
           {value}%
         </span>
-
       </div>
 
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
@@ -2330,14 +1971,9 @@ function ProgressItem({
       <p className="mt-2 text-xs text-slate-500">
         {description}
       </p>
-
     </div>
   );
 }
-
-// =====================================================
-// INFO ROW
-// =====================================================
 
 function InfoRow({
   label,
@@ -2345,7 +1981,6 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 text-sm">
-
       <span className="shrink-0 text-slate-500">
         {label}
       </span>
@@ -2353,14 +1988,9 @@ function InfoRow({
       <span className="truncate text-right font-medium text-slate-900">
         {value}
       </span>
-
     </div>
   );
 }
-
-// =====================================================
-// INFO ITEM
-// =====================================================
 
 function InfoItem({
   label,
