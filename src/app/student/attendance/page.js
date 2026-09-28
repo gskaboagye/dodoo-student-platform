@@ -275,6 +275,7 @@ export default function StudentAttendancePage() {
     if (!response.ok) {
       throw new Error(
         data?.message ||
+          data?.error ||
           "Failed to load attendance."
       );
     }
@@ -368,6 +369,77 @@ export default function StudentAttendancePage() {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // =====================================================
+  // AUTOMATIC ATTENDANCE REFRESH
+  // =====================================================
+
+  /*
+   * Keep the student's attendance synchronized
+   * with the database.
+   *
+   * When a facilitator marks attendance, the student
+   * page will automatically retrieve the latest records
+   * every 15 seconds.
+   */
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      loadAttendance().catch((error) => {
+        console.error(
+          "AUTOMATIC ATTENDANCE REFRESH ERROR:",
+          error
+        );
+      });
+    }, 15000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [user]);
+
+  // =====================================================
+  // REFRESH WHEN PAGE BECOMES VISIBLE
+  // =====================================================
+
+  /*
+   * If the student switches to another browser tab
+   * and then comes back, immediately fetch the latest
+   * attendance from the server.
+   */
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (
+        document.visibilityState ===
+          "visible" &&
+        user
+      ) {
+        loadAttendance().catch((error) => {
+          console.error(
+            "VISIBILITY ATTENDANCE REFRESH ERROR:",
+            error
+          );
+        });
+      }
+    }
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, [user]);
 
   // =====================================================
   // REFRESH
