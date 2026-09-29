@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import {
   LayoutDashboard,
   Users,
@@ -122,7 +123,7 @@ export default function Sidebar() {
     // Close mobile navigation.
     setMobileMenuOpen(false);
 
-    // Tell the AppShell that authentication is no longer active.
+    // Tell AppShell that logout has started.
     window.dispatchEvent(new Event("dcc-auth-logout"));
 
     try {
@@ -138,11 +139,6 @@ export default function Sidebar() {
     } catch (error) {
       console.error("Logout request failed:", error);
     } finally {
-      /*
-       * Replace the current page instead of pushing a new
-       * history entry. The login page is handled separately
-       * by layout.js, so the dashboard shell will not render.
-       */
       window.location.replace("/login");
     }
   }
@@ -244,8 +240,8 @@ export default function Sidebar() {
     user?.role === "facilitator"
       ? facilitatorLinks
       : user?.role === "student"
-      ? studentLinks
-      : [];
+        ? studentLinks
+        : [];
 
   // =========================================================
   // ACTIVE LINK
@@ -380,6 +376,7 @@ export default function Sidebar() {
 
             <div className="min-w-0 flex-1">
               <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
+
               <div className="mt-2 h-2.5 w-16 animate-pulse rounded bg-slate-100" />
             </div>
           </div>
@@ -467,19 +464,10 @@ export default function Sidebar() {
   // RENDER
   // =========================================================
 
-  /*
-   * Do not render the Sidebar once logout has started.
-   * This removes the navigation immediately while the
-   * logout request is being completed.
-   */
   if (loggingOut) {
     return null;
   }
 
-  /*
-   * If there is no authenticated user and authentication
-   * loading has finished, don't render the dashboard sidebar.
-   */
   if (!loading && !user) {
     return null;
   }
@@ -518,6 +506,7 @@ export default function Sidebar() {
       ====================================================== */}
 
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+
         {/* BRAND */}
 
         <div className="border-b border-slate-200 px-5 py-5">
@@ -530,7 +519,7 @@ export default function Sidebar() {
 
         {/* NAVIGATION */}
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="overflow-y-auto">
           {renderNavigation()}
         </div>
 
@@ -552,6 +541,7 @@ export default function Sidebar() {
             : "-translate-x-full"
         }`}
       >
+
         {/* MOBILE HEADER */}
 
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5">
@@ -573,7 +563,7 @@ export default function Sidebar() {
 
         {/* NAVIGATION */}
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="overflow-y-auto">
           {renderNavigation()}
         </div>
 
