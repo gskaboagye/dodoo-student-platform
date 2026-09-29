@@ -157,11 +157,20 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-md">
+
+        {/* Main Login Card */}
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+
           {/* Header */}
           <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-bold text-white">
-              DCC
+
+            {/* Dodoo Coding Club Logo */}
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center">
+              <img
+                src="/images/dcc-logo.png"
+                alt="Dodoo Coding Club"
+                className="h-full w-full object-contain"
+              />
             </div>
 
             <h1 className="text-2xl font-bold text-slate-900">
@@ -191,6 +200,7 @@ export default function LoginPage() {
               </label>
 
               <div className="grid grid-cols-2 gap-3">
+
                 {/* Student */}
                 <button
                   type="button"
@@ -240,6 +250,7 @@ export default function LoginPage() {
             {/* Login Fields */}
             {form.role && (
               <div className="space-y-5">
+
                 {/* Email */}
                 <div>
                   <label
