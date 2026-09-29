@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -10,98 +10,141 @@ import {
   Loader2,
 } from "lucide-react";
 
-export default function ResetPasswordPage() {
-  const searchParams =
-    useSearchParams();
+function ResetPasswordForm() {
+  const searchParams = useSearchParams();
 
-  const token =
-    searchParams.get("token") || "";
+  const token = searchParams.get("token") || "";
+  const email = searchParams.get("email") || "";
 
-  const email =
-    searchParams.get("email") || "";
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [password, setPassword] =
-    useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  const [confirmPassword, setConfirmPassword] =
-    useState("");
+  async function handleSubmit(e) {
+    e.preventDefault();
 
-  const [error, setError] =
-    useState("");
-
-  const [success, setSuccess] =
-    useState(false);
-
-  const [loading, setLoading] =
-    useState(false);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-
+    setMessage("");
     setError("");
 
     if (!token || !email) {
       setError(
-        "This password reset link is invalid or incomplete."
+        "This password reset link is invalid or incomplete. Please request a new password reset link."
       );
+      return;
+    }
 
+    if (!password || !confirmPassword) {
+      setError("Please enter and confirm your new password.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      setError(
+        "Password must contain at least one uppercase letter."
+      );
+      return;
+    }
+
+    if (!/[a-z]/.test(password)) {
+      setError(
+        "Password must contain at least one lowercase letter."
+      );
+      return;
+    }
+
+    if (!/[0-9]/.test(password)) {
+      setError(
+        "Password must contain at least one number."
+      );
+      return;
+    }
+
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      setError(
+        "Password must contain at least one special character."
+      );
       return;
     }
 
     if (password !== confirmPassword) {
-      setError(
-        "Passwords do not match."
-      );
-
+      setError("The passwords do not match.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response =
-        await fetch(
-          "/api/auth/reset-password",
-          {
-            method: "POST",
+      const response = await fetch(
+        "/api/auth/reset-password",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            token,
+            email,
+            password,
+            confirmPassword,
+          }),
+        }
+      );
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+      const responseText = await response.text();
 
-            body: JSON.stringify({
-              token,
-              email,
-              password,
-              confirmPassword,
-            }),
-          }
-        );
+      let data = {};
 
-      const data =
-        await response.json();
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error(
+            "Invalid JSON response:",
+            responseText
+          );
+
+          setError(
+            `The server returned an invalid response (HTTP ${response.status}).`
+          );
+
+          setLoading(false);
+          return;
+        }
+      }
 
       if (!response.ok) {
         setError(
-          data?.error ||
+          data.error ||
+            data.message ||
             "Unable to reset your password."
         );
 
+        setLoading(false);
         return;
       }
 
       setSuccess(true);
-      setPassword("");
-      setConfirmPassword("");
+      setMessage(
+        data.message ||
+          "Your password has been reset successfully."
+      );
     } catch (requestError) {
       console.error(
-        "RESET PASSWORD REQUEST ERROR:",
+        "Password reset error:",
         requestError
       );
 
       setError(
-        "Something went wrong. Please try again."
+        "Unable to connect to the server. Please try again."
       );
     } finally {
       setLoading(false);
@@ -110,353 +153,176 @@ export default function ResetPasswordPage() {
 
   if (success) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "24px",
-          background: "#f8fafc",
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: "440px",
-            background: "#ffffff",
-            padding: "40px",
-            borderRadius: "16px",
-            border:
-              "1px solid #e2e8f0",
-            textAlign: "center",
-            boxShadow:
-              "0 10px 30px rgba(15, 23, 42, 0.08)",
-          }}
-        >
-          <div
-            style={{
-              width: "58px",
-              height: "58px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 20px",
-              background: "#f0fdf4",
-              color: "#16a34a",
-              borderRadius: "50%",
-            }}
-          >
-            <CheckCircle size={30} />
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+        <div className="w-full max-w-md">
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-lg">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle className="h-9 w-9 text-green-600" />
+            </div>
+
+            <h1 className="text-2xl font-bold text-slate-900">
+              Password Reset Successful
+            </h1>
+
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              {message}
+            </p>
+
+            <Link
+              href="/login"
+              className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700"
+            >
+              Go to Login
+            </Link>
           </div>
 
-          <h1
-            style={{
-              margin: "0 0 12px",
-              color: "#0f172a",
-              fontSize: "27px",
-            }}
-          >
-            Password Reset Successful
-          </h1>
-
-          <p
-            style={{
-              margin: "0 0 28px",
-              color: "#64748b",
-              lineHeight: 1.6,
-            }}
-          >
-            Your password has been updated.
-            You can now log in using your
-            new password.
+          <p className="mt-6 text-center text-xs text-slate-400">
+            Dodoo Coding Club · Student Success & Impact Platform
           </p>
-
-          <Link
-            href="/login"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-              padding: "13px 24px",
-              borderRadius: "10px",
-              background: "#2563eb",
-              color: "#ffffff",
-              textDecoration: "none",
-              fontWeight: 600,
-            }}
-          >
-            Go to Login
-          </Link>
         </div>
       </main>
     );
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        background: "#f8fafc",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "440px",
-          background: "#ffffff",
-          padding: "36px",
-          borderRadius: "16px",
-          border:
-            "1px solid #e2e8f0",
-          boxShadow:
-            "0 10px 30px rgba(15, 23, 42, 0.08)",
-        }}
-      >
-        <div
-          style={{
-            width: "52px",
-            height: "52px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "#eff6ff",
-            color: "#2563eb",
-            borderRadius: "12px",
-            marginBottom: "20px",
-          }}
-        >
-          <LockKeyhole size={24} />
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+      <div className="w-full max-w-md">
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 text-white">
+              <LockKeyhole className="h-8 w-8" />
+            </div>
+
+            <h1 className="text-2xl font-bold text-slate-900">
+              Reset Password
+            </h1>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Create a new password for your account.
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-700">
+              {error}
+            </div>
+          )}
+
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                New Password
+              </label>
+
+              <div className="relative">
+                <LockKeyhole className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) =>
+                    setPassword(e.target.value)
+                  }
+                  placeholder="Enter new password"
+                  autoComplete="new-password"
+                  required
+                  className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="confirmPassword"
+                className="mb-2 block text-sm font-medium text-slate-700"
+              >
+                Confirm New Password
+              </label>
+
+              <div className="relative">
+                <LockKeyhole className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) =>
+                    setConfirmPassword(e.target.value)
+                  }
+                  placeholder="Confirm new password"
+                  autoComplete="new-password"
+                  required
+                  className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-4 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-600">
+              Your password must contain at least 8 characters,
+              including an uppercase letter, lowercase letter,
+              number, and special character.
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Resetting Password...
+                </>
+              ) : (
+                "Reset Password"
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Login
+            </Link>
+          </div>
         </div>
 
-        <h1
-          style={{
-            margin: "0 0 10px",
-            color: "#0f172a",
-            fontSize: "28px",
-          }}
-        >
-          Create a new password
-        </h1>
-
-        <p
-          style={{
-            margin: "0 0 28px",
-            color: "#64748b",
-            lineHeight: 1.6,
-          }}
-        >
-          Choose a strong password for your
-          Dodoo Coding Club account.
+        <p className="mt-6 text-center text-xs text-slate-400">
+          Dodoo Coding Club · Student Success & Impact Platform
         </p>
-
-        {error && (
-          <div
-            style={{
-              marginBottom: "20px",
-              padding: "14px 16px",
-              borderRadius: "10px",
-              background: "#fef2f2",
-              border:
-                "1px solid #fecaca",
-              color: "#b91c1c",
-              lineHeight: 1.5,
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        <form
-          onSubmit={handleSubmit}
-        >
-          <label
-            htmlFor="password"
-            style={{
-              display: "block",
-              marginBottom: "8px",
-              fontWeight: 600,
-              color: "#334155",
-            }}
-          >
-            New password
-          </label>
-
-          <div
-            style={{
-              position: "relative",
-              marginBottom: "18px",
-            }}
-          >
-            <LockKeyhole
-              size={18}
-              style={{
-                position: "absolute",
-                left: "14px",
-                top: "50%",
-                transform:
-                  "translateY(-50%)",
-                color: "#94a3b8",
-              }}
-            />
-
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(event) =>
-                setPassword(
-                  event.target.value
-                )
-              }
-              required
-              minLength={8}
-              autoComplete="new-password"
-              placeholder="Enter new password"
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding:
-                  "13px 14px 13px 44px",
-                border:
-                  "1px solid #cbd5e1",
-                borderRadius: "10px",
-                fontSize: "15px",
-                outline: "none",
-              }}
-            />
-          </div>
-
-          <p
-            style={{
-              margin:
-                "-6px 0 20px",
-              color: "#64748b",
-              fontSize: "13px",
-              lineHeight: 1.5,
-            }}
-          >
-            At least 8 characters with an
-            uppercase letter, lowercase letter,
-            number, and special character.
-          </p>
-
-          <label
-            htmlFor="confirmPassword"
-            style={{
-              display: "block",
-              marginBottom: "8px",
-              fontWeight: 600,
-              color: "#334155",
-            }}
-          >
-            Confirm new password
-          </label>
-
-          <div
-            style={{
-              position: "relative",
-              marginBottom: "22px",
-            }}
-          >
-            <LockKeyhole
-              size={18}
-              style={{
-                position: "absolute",
-                left: "14px",
-                top: "50%",
-                transform:
-                  "translateY(-50%)",
-                color: "#94a3b8",
-              }}
-            />
-
-            <input
-              id="confirmPassword"
-              type="password"
-              value={confirmPassword}
-              onChange={(event) =>
-                setConfirmPassword(
-                  event.target.value
-                )
-              }
-              required
-              minLength={8}
-              autoComplete="new-password"
-              placeholder="Confirm new password"
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding:
-                  "13px 14px 13px 44px",
-                border:
-                  "1px solid #cbd5e1",
-                borderRadius: "10px",
-                fontSize: "15px",
-                outline: "none",
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%",
-              border: "none",
-              borderRadius: "10px",
-              padding: "14px",
-              background: loading
-                ? "#93c5fd"
-                : "#2563eb",
-              color: "#ffffff",
-              fontSize: "15px",
-              fontWeight: 600,
-              cursor: loading
-                ? "not-allowed"
-                : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "8px",
-            }}
-          >
-            {loading ? (
-              <>
-                <Loader2
-                  size={18}
-                  className="animate-spin"
-                />
-                Updating Password...
-              </>
-            ) : (
-              "Reset Password"
-            )}
-          </button>
-        </form>
-
-        <Link
-          href="/login"
-          style={{
-            marginTop: "24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "7px",
-            color: "#475569",
-            textDecoration: "none",
-            fontSize: "14px",
-          }}
-        >
-          <ArrowLeft size={16} />
-          Back to Login
-        </Link>
       </div>
     </main>
+  );
+}
+
+function ResetPasswordLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
+      <div className="text-center">
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
+
+        <p className="mt-3 text-sm text-slate-500">
+          Loading password reset...
+        </p>
+      </div>
+    </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<ResetPasswordLoading />}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
