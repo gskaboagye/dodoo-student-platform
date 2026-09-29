@@ -20,3 +20,169 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* =========================================================
+   DCC DASHBOARD MOTION
+========================================================= */
+
+@keyframes dcc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dcc-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dcc-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dcc-progress {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes dcc-pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes dcc-grid-move {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(34px, 34px, 0);
+  }
+}
+
+.dcc-fade-up {
+  animation: dcc-fade-up 0.6s ease-out both;
+}
+
+.dcc-fade-in {
+  animation: dcc-fade-in 0.7s ease-out both;
+}
+
+.dcc-scale-in {
+  animation: dcc-scale-in 0.5s ease-out both;
+}
+
+.dcc-progress {
+  animation: dcc-progress 1.1s ease-out both;
+}
+
+.dcc-pulse-soft {
+  animation: dcc-pulse-soft 2.2s ease-in-out infinite;
+}
+
+.dcc-grid-motion {
+  animation: dcc-grid-move 18s linear infinite alternate;
+}
+
+.dcc-delay-1 {
+  animation-delay: 80ms;
+}
+
+.dcc-delay-2 {
+  animation-delay: 160ms;
+}
+
+.dcc-delay-3 {
+  animation-delay: 240ms;
+}
+
+.dcc-delay-4 {
+  animation-delay: 320ms;
+}
+
+.dcc-delay-5 {
+  animation-delay: 400ms;
+}
+
+.dcc-delay-6 {
+  animation-delay: 480ms;
+}
+
+/* Better dashboard hover motion */
+
+.dcc-card-motion {
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+.dcc-card-motion:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 18px 35px -20px rgba(15, 23, 42, 0.35);
+}
+
+.dcc-icon-motion {
+  transition:
+    transform 220ms ease,
+    background-color 220ms ease;
+}
+
+.dcc-card-motion:hover .dcc-icon-motion {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.dcc-arrow-motion {
+  transition:
+    transform 220ms ease;
+}
+
+.dcc-card-motion:hover .dcc-arrow-motion {
+  transform: translateX(4px);
+}
+
+/* Respect reduced-motion preferences */
+
+@media (prefers-reduced-motion: reduce) {
+  .dcc-fade-up,
+  .dcc-fade-in,
+  .dcc-scale-in,
+  .dcc-progress,
+  .dcc-pulse-soft,
+  .dcc-grid-motion {
+    animation: none !important;
+  }
+
+  .dcc-card-motion,
+  .dcc-icon-motion,
+  .dcc-arrow-motion {
+    transition: none !important;
+  }
+}
