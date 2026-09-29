@@ -1,9 +1,74 @@
 @import "tailwindcss";
 
+/* =========================================================
+   DCC STUDENT SUCCESS & IMPACT PLATFORM
+   GLOBAL DESIGN SYSTEM
+   ========================================================= */
+
 :root {
+  /* -------------------------------------------------------
+     DCC BRAND COLORS
+     ------------------------------------------------------- */
+
+  --dcc-blue: #1961d6;
+  --dcc-blue-dark: #1554b8;
+  --dcc-blue-light: #eaf1ff;
+
+  --dcc-yellow: #f4b400;
+  --dcc-yellow-dark: #d99d00;
+  --dcc-yellow-light: #fff7d6;
+
+  --dcc-white: #ffffff;
+  --dcc-light-gray: #f3f4f6;
+  --dcc-gray: #e5e7eb;
+  --dcc-gray-dark: #64748b;
+
+  --dcc-dark: #111111;
+  --dcc-dark-blue: #123b78;
+
+  /* -------------------------------------------------------
+     GLOBAL COLORS
+     ------------------------------------------------------- */
+
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111111;
+
+  /* -------------------------------------------------------
+     DASHBOARD COLORS
+     ------------------------------------------------------- */
+
+  --dashboard-background: #f3f4f6;
+  --dashboard-card: #ffffff;
+  --dashboard-border: #e5e7eb;
+
+  --dashboard-primary: #1961d6;
+  --dashboard-primary-dark: #1554b8;
+  --dashboard-primary-soft: #eaf1ff;
+
+  --dashboard-accent: #f4b400;
+  --dashboard-accent-soft: #fff7d6;
+
+  --dashboard-heading: #111111;
+  --dashboard-text: #475569;
+  --dashboard-muted: #64748b;
+
+  /* -------------------------------------------------------
+     SHADOWS
+     ------------------------------------------------------- */
+
+  --dcc-shadow-sm:
+    0 4px 14px -8px rgba(15, 23, 42, 0.18);
+
+  --dcc-shadow-md:
+    0 12px 28px -16px rgba(15, 23, 42, 0.25);
+
+  --dcc-shadow-lg:
+    0 24px 50px -25px rgba(15, 23, 42, 0.3);
 }
+
+/* =========================================================
+   GLOBAL RESET
+   ========================================================= */
 
 * {
   box-sizing: border-box;
@@ -15,10 +80,66 @@ body {
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+}
+
+/* =========================================================
+   SELECTION
+   ========================================================= */
+
+::selection {
+  background: var(--dcc-blue);
+  color: var(--dcc-white);
+}
+
+/* =========================================================
+   DCC BRAND UTILITY CLASSES
+   ========================================================= */
+
+.dcc-blue {
+  color: var(--dcc-blue);
+}
+
+.dcc-blue-dark {
+  color: var(--dcc-blue-dark);
+}
+
+.dcc-yellow {
+  color: var(--dcc-yellow);
+}
+
+.dcc-dark {
+  color: var(--dcc-dark);
+}
+
+.dcc-bg-blue {
+  background-color: var(--dcc-blue);
+}
+
+.dcc-bg-blue-dark {
+  background-color: var(--dcc-blue-dark);
+}
+
+.dcc-bg-blue-light {
+  background-color: var(--dcc-blue-light);
+}
+
+.dcc-bg-yellow {
+  background-color: var(--dcc-yellow);
+}
+
+.dcc-bg-yellow-light {
+  background-color: var(--dcc-yellow-light);
 }
 
 /* =========================================================
@@ -75,9 +196,9 @@ body {
   }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    HERO ANIMATIONS
-   --------------------------------------------------------- */
+   ========================================================= */
 
 @keyframes dcc-hero-enter {
   0% {
@@ -103,9 +224,9 @@ body {
   }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    GRID / BACKGROUND MOVEMENT
-   --------------------------------------------------------- */
+   ========================================================= */
 
 @keyframes dcc-grid-move {
   0% {
@@ -117,9 +238,9 @@ body {
   }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    FLOATING ELEMENTS
-   --------------------------------------------------------- */
+   ========================================================= */
 
 @keyframes dcc-float {
   0%,
@@ -143,9 +264,9 @@ body {
   }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    STATUS / PULSE
-   --------------------------------------------------------- */
+   ========================================================= */
 
 @keyframes dcc-pulse-soft {
   0%,
@@ -163,11 +284,13 @@ body {
 @keyframes dcc-status-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.25);
+    box-shadow:
+      0 0 0 0 rgba(25, 97, 214, 0.2);
   }
 
   50% {
-    box-shadow: 0 0 0 7px rgba(34, 197, 94, 0);
+    box-shadow:
+      0 0 0 7px rgba(25, 97, 214, 0);
   }
 }
 
@@ -182,9 +305,9 @@ body {
   }
 }
 
-/* ---------------------------------------------------------
-   PROGRESS
-   --------------------------------------------------------- */
+/* =========================================================
+   PROGRESS ANIMATION
+   ========================================================= */
 
 @keyframes dcc-progress {
   from {
@@ -206,9 +329,9 @@ body {
   }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    SHIMMER / LIGHT SWEEP
-   --------------------------------------------------------- */
+   ========================================================= */
 
 @keyframes dcc-shimmer {
   0% {
@@ -230,9 +353,9 @@ body {
   }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    STAT ANIMATION
-   --------------------------------------------------------- */
+   ========================================================= */
 
 @keyframes dcc-stat-pop {
   0% {
@@ -250,24 +373,26 @@ body {
   }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    CARD BREATHING
-   --------------------------------------------------------- */
+   ========================================================= */
 
 @keyframes dcc-card-breathe {
   0%,
   100% {
-    box-shadow: 0 8px 24px -18px rgba(15, 23, 42, 0.25);
+    box-shadow:
+      0 8px 24px -18px rgba(15, 23, 42, 0.2);
   }
 
   50% {
-    box-shadow: 0 14px 32px -20px rgba(15, 23, 42, 0.38);
+    box-shadow:
+      0 14px 32px -20px rgba(25, 97, 214, 0.22);
   }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    PAGE REVEAL
-   --------------------------------------------------------- */
+   ========================================================= */
 
 @keyframes dcc-page-reveal {
   0% {
@@ -317,6 +442,10 @@ body {
     both;
 }
 
+/* =========================================================
+   GRID MOTION
+   ========================================================= */
+
 .dcc-grid-motion {
   animation:
     dcc-grid-move
@@ -325,6 +454,10 @@ body {
     infinite
     alternate;
 }
+
+/* =========================================================
+   FLOATING MOTION
+   ========================================================= */
 
 .dcc-float {
   animation:
@@ -341,6 +474,10 @@ body {
     ease-in-out
     infinite;
 }
+
+/* =========================================================
+   PROGRESS
+   ========================================================= */
 
 .dcc-progress {
   transform-origin: left center;
@@ -381,7 +518,7 @@ body {
 }
 
 /* =========================================================
-   ENHANCED MOTION CLASSES
+   ENHANCED MOTION
    ========================================================= */
 
 .dcc-page-reveal {
@@ -451,14 +588,6 @@ body {
     both;
 }
 
-.dcc-card-breathe {
-  animation:
-    dcc-card-breathe
-    4s
-    ease-in-out
-    infinite;
-}
-
 /* =========================================================
    HERO LIGHT SWEEP
    ========================================================= */
@@ -474,7 +603,7 @@ body {
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.1),
     transparent
   );
 
@@ -502,7 +631,9 @@ body {
     transform: translateY(-5px);
 
     box-shadow:
-      0 20px 40px -22px rgba(15, 23, 42, 0.45);
+      0 20px 40px -22px rgba(15, 23, 42, 0.4);
+
+    border-color: rgba(25, 97, 214, 0.22);
   }
 }
 
@@ -523,7 +654,9 @@ body {
     transform: translateY(-6px);
 
     box-shadow:
-      0 24px 45px -25px rgba(15, 23, 42, 0.5);
+      0 24px 45px -25px rgba(25, 97, 214, 0.35);
+
+    border-color: rgba(25, 97, 214, 0.28);
   }
 
   .dcc-interactive:hover .dcc-icon-motion {
@@ -539,7 +672,9 @@ body {
 }
 
 .dcc-interactive:active {
-  transform: translateY(-1px) scale(0.99);
+  transform:
+    translateY(-1px)
+    scale(0.99);
 }
 
 /* =========================================================
@@ -549,7 +684,8 @@ body {
 .dcc-icon-motion {
   transition:
     transform 250ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 250ms ease;
+    background-color 250ms ease,
+    color 250ms ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -584,7 +720,8 @@ body {
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
-    background-color 180ms ease;
+    background-color 180ms ease,
+    border-color 180ms ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -592,7 +729,7 @@ body {
     transform: translateY(-2px);
 
     box-shadow:
-      0 8px 18px -10px rgba(15, 23, 42, 0.45);
+      0 8px 18px -10px rgba(25, 97, 214, 0.5);
   }
 }
 
@@ -603,7 +740,214 @@ body {
 }
 
 /* =========================================================
-   SHIMMER
+   DCC BLUE BUTTON
+   ========================================================= */
+
+.dcc-primary-button {
+  background-color: var(--dcc-blue);
+  color: var(--dcc-white);
+
+  transition:
+    background-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.dcc-primary-button:hover {
+  background-color: var(--dcc-blue-dark);
+
+  box-shadow:
+    0 10px 22px -12px rgba(25, 97, 214, 0.65);
+
+  transform: translateY(-2px);
+}
+
+.dcc-primary-button:active {
+  transform: scale(0.98);
+}
+
+/* =========================================================
+   DCC YELLOW ACCENT BUTTON
+   ========================================================= */
+
+.dcc-accent-button {
+  background-color: var(--dcc-yellow);
+  color: var(--dcc-dark);
+
+  transition:
+    background-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.dcc-accent-button:hover {
+  background-color: var(--dcc-yellow-dark);
+
+  box-shadow:
+    0 10px 22px -12px rgba(244, 180, 0, 0.6);
+
+  transform: translateY(-2px);
+}
+
+.dcc-accent-button:active {
+  transform: scale(0.98);
+}
+
+/* =========================================================
+   DCC HERO
+   ========================================================= */
+
+.dcc-hero {
+  position: relative;
+  overflow: hidden;
+
+  background:
+    linear-gradient(
+      135deg,
+      var(--dcc-blue) 0%,
+      var(--dcc-blue-dark) 100%
+    );
+
+  color: var(--dcc-white);
+}
+
+.dcc-hero::before {
+  content: "";
+
+  position: absolute;
+  inset: 0;
+
+  pointer-events: none;
+
+  background:
+    radial-gradient(
+      circle at 15% 20%,
+      rgba(255, 255, 255, 0.12),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 85% 80%,
+      rgba(244, 180, 0, 0.1),
+      transparent 25%
+    );
+}
+
+/* =========================================================
+   DCC GRID OVERLAY
+   ========================================================= */
+
+.dcc-grid {
+  background-image:
+    linear-gradient(
+      rgba(255, 255, 255, 0.08) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.08) 1px,
+      transparent 1px
+    );
+
+  background-size:
+    36px 36px;
+}
+
+/* =========================================================
+   DCC SOFT CARD
+   ========================================================= */
+
+.dcc-soft-card {
+  border: 1px solid var(--dcc-gray);
+
+  background-color: var(--dcc-white);
+
+  box-shadow:
+    var(--dcc-shadow-sm);
+
+  transition:
+    transform 250ms ease,
+    box-shadow 250ms ease,
+    border-color 250ms ease;
+}
+
+.dcc-soft-card:hover {
+  border-color:
+    rgba(25, 97, 214, 0.25);
+
+  box-shadow:
+    var(--dcc-shadow-md);
+
+  transform:
+    translateY(-3px);
+}
+
+/* =========================================================
+   DCC SOFT BLUE PANEL
+   ========================================================= */
+
+.dcc-soft-blue-panel {
+  border:
+    1px solid rgba(25, 97, 214, 0.12);
+
+  background:
+    var(--dcc-blue-light);
+
+  color:
+    var(--dcc-blue-dark);
+}
+
+/* =========================================================
+   DCC ACCENT INDICATOR
+   ========================================================= */
+
+.dcc-accent-indicator {
+  position: relative;
+}
+
+.dcc-accent-indicator::before {
+  content: "";
+
+  position: absolute;
+
+  left: 0;
+  top: 0;
+  bottom: 0;
+
+  width: 4px;
+
+  border-radius: 999px;
+
+  background-color:
+    var(--dcc-yellow);
+}
+
+/* =========================================================
+   DCC BLUE INDICATOR
+   ========================================================= */
+
+.dcc-blue-indicator {
+  position: relative;
+}
+
+.dcc-blue-indicator::before {
+  content: "";
+
+  position: absolute;
+
+  left: 0;
+  top: 0;
+  bottom: 0;
+
+  width: 4px;
+
+  border-radius: 999px;
+
+  background-color:
+    var(--dcc-blue);
+}
+
+/* =========================================================
+   DCC SHIMMER
    ========================================================= */
 
 .dcc-shimmer {
@@ -611,11 +955,12 @@ body {
     linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.1),
       transparent
     );
 
-  background-size: 500px 100%;
+  background-size:
+    500px 100%;
 
   animation:
     dcc-shimmer
@@ -661,12 +1006,16 @@ body {
 }
 
 /* =========================================================
-   MOBILE OPTIMIZATION
+   RESPONSIVE OPTIMIZATION
    ========================================================= */
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .dcc-grid-motion {
     animation-duration: 24s;
+  }
+
+  .dcc-gentle-float {
+    animation-duration: 5.5s;
   }
 
   .dcc-card-motion {
@@ -676,9 +1025,20 @@ body {
   .dcc-interactive {
     transition-duration: 220ms;
   }
+}
 
-  .dcc-gentle-float {
-    animation-duration: 5.5s;
+/* =========================================================
+   SMALL MOBILE DEVICES
+   ========================================================= */
+
+@media (max-width: 480px) {
+  .dcc-grid {
+    background-size:
+      28px 28px;
+  }
+
+  .dcc-hero-shine {
+    width: 45%;
   }
 }
 
@@ -687,6 +1047,10 @@ body {
    ========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   .dcc-fade-up,
   .dcc-fade-in,
   .dcc-scale-in,
@@ -713,7 +1077,10 @@ body {
   .dcc-interactive,
   .dcc-icon-motion,
   .dcc-arrow-motion,
-  .dcc-button-motion {
+  .dcc-button-motion,
+  .dcc-primary-button,
+  .dcc-accent-button,
+  .dcc-soft-card {
     transition: none !important;
   }
 }
