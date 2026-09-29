@@ -16,7 +16,7 @@ const STANDALONE_ROUTES = [
 export default function AppShell({ children }) {
   const pathname = usePathname();
 
-  const [authenticated, setAuthenticated] = useState(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const isStandaloneRoute = STANDALONE_ROUTES.some(
     (route) =>
@@ -25,61 +25,25 @@ export default function AppShell({ children }) {
   );
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function checkAuthentication() {
-      if (isStandaloneRoute) {
-        if (!cancelled) {
-          setAuthenticated(false);
-        }
-
-        return;
-      }
-
-      try {
-        const response = await fetch("/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
-        });
-
-        if (!response.ok) {
-          if (!cancelled) {
-            setAuthenticated(false);
-          }
-
-          return;
-        }
-
-        const data = await response.json();
-
-        if (!cancelled) {
-          setAuthenticated(Boolean(data?.user));
-        }
-      } catch (error) {
-        console.error(
-          "Authentication check failed:",
-          error
-        );
-
-        if (!cancelled) {
-          setAuthenticated(false);
-        }
-      }
+    function handleLogout() {
+      setLoggingOut(true);
     }
 
-    checkAuthentication();
+    window.addEventListener(
+      "dcc-auth-logout",
+      handleLogout
+    );
 
     return () => {
-      cancelled = true;
+      window.removeEventListener(
+        "dcc-auth-logout",
+        handleLogout
+      );
     };
-  }, [pathname, isStandaloneRoute]);
+  }, []);
 
   // =========================================================
-  // LOGIN / AUTHENTICATION PAGES
+  // STANDALONE AUTHENTICATION PAGES
   // =========================================================
 
   if (isStandaloneRoute) {
@@ -87,27 +51,15 @@ export default function AppShell({ children }) {
   }
 
   // =========================================================
-  // AUTHENTICATION CHECK
+  // LOGGING OUT
   // =========================================================
 
-  if (authenticated === null) {
-    return (
-      <div className="min-h-screen bg-white">
-        <div className="h-screen w-full" />
-      </div>
-    );
-  }
-
-  // =========================================================
-  // NOT AUTHENTICATED
-  // =========================================================
-
-  if (!authenticated) {
+  if (loggingOut) {
     return null;
   }
 
   // =========================================================
-  // AUTHENTICATED DASHBOARD
+  // DASHBOARD SHELL
   // =========================================================
 
   return (
