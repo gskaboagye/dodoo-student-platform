@@ -26,8 +26,7 @@ export default function Sidebar() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] =
-    useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // =========================================================
   // LOAD CURRENT USER
@@ -40,17 +39,14 @@ export default function Sidebar() {
       try {
         setLoading(true);
 
-        const response = await fetch(
-          "/api/auth/me",
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              "Cache-Control": "no-cache",
-            },
-          }
-        );
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+          },
+        });
 
         if (!response.ok) {
           if (!cancelled) {
@@ -60,19 +56,13 @@ export default function Sidebar() {
           return;
         }
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
         if (!cancelled) {
-          setUser(
-            data?.user || null
-          );
+          setUser(data?.user || null);
         }
       } catch (error) {
-        console.error(
-          "Failed to load user:",
-          error
-        );
+        console.error("Failed to load user:", error);
 
         if (!cancelled) {
           setUser(null);
@@ -105,16 +95,13 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (mobileMenuOpen) {
-      document.body.style.overflow =
-        "hidden";
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow =
-        "";
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow =
-        "";
+      document.body.style.overflow = "";
     };
   }, [mobileMenuOpen]);
 
@@ -129,50 +116,34 @@ export default function Sidebar() {
 
     setLoggingOut(true);
 
-    /*
-     * Immediately remove the authenticated user
-     * from the Sidebar.
-     */
+    // Immediately remove authenticated state.
     setUser(null);
 
-    /*
-     * Close mobile navigation.
-     */
+    // Close mobile navigation.
     setMobileMenuOpen(false);
 
+    // Tell the AppShell that authentication is no longer active.
+    window.dispatchEvent(new Event("dcc-auth-logout"));
+
     try {
-      /*
-       * Clear the server-side authentication cookie/session.
-       */
-      await fetch(
-        "/api/auth/logout",
-        {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
-        }
-      );
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+        keepalive: true,
+      });
     } catch (error) {
-      console.error(
-        "Logout request failed:",
-        error
-      );
+      console.error("Logout request failed:", error);
     } finally {
       /*
-       * IMPORTANT:
-       *
-       * replace() removes the protected dashboard
-       * from the current browser history entry.
-       *
-       * This means pressing Back will not simply
-       * restore the dashboard as an active page.
+       * Replace the current page instead of pushing a new
+       * history entry. The login page is handled separately
+       * by layout.js, so the dashboard shell will not render.
        */
-      window.location.replace(
-        "/login"
-      );
+      window.location.replace("/login");
     }
   }
 
@@ -287,9 +258,7 @@ export default function Sidebar() {
 
     return (
       pathname === href ||
-      pathname.startsWith(
-        `${href}/`
-      )
+      pathname.startsWith(`${href}/`)
     );
   }
 
@@ -305,26 +274,18 @@ export default function Sidebar() {
   // DCC BRAND
   // =========================================================
 
-  function renderBrand({
-    mobile = false,
-  } = {}) {
+  function renderBrand({ mobile = false } = {}) {
     return (
       <Link
         href="/"
-        onClick={
-          mobile
-            ? closeMobileMenu
-            : undefined
-        }
+        onClick={mobile ? closeMobileMenu : undefined}
         className="group flex items-center gap-3"
       >
-
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-blue-600 text-lg font-bold text-blue-600 transition group-hover:bg-blue-50">
           &lt;/&gt;
         </div>
 
         <div className="min-w-0">
-
           <h1 className="truncate text-base font-extrabold tracking-tight text-blue-700">
             DODOO
           </h1>
@@ -336,9 +297,7 @@ export default function Sidebar() {
           <p className="mt-0.5 truncate text-[10px] text-slate-500">
             Student Success Platform
           </p>
-
         </div>
-
       </Link>
     );
   }
@@ -351,48 +310,38 @@ export default function Sidebar() {
     if (loading) {
       return (
         <div className="space-y-2 px-3 py-5">
-
-          {Array.from({
-            length: 7,
-          }).map((_, index) => (
+          {Array.from({ length: 7 }).map((_, index) => (
             <div
               key={index}
               className="h-11 animate-pulse rounded-xl bg-slate-100"
             />
           ))}
-
         </div>
       );
     }
 
+    if (!user) {
+      return null;
+    }
+
     return (
       <nav className="px-3 py-5">
-
         {links.map((link) => {
-          const Icon =
-            link.icon;
-
-          const isActive =
-            isActiveLink(
-              link.href
-            );
+          const Icon = link.icon;
+          const isActive = isActiveLink(link.href);
 
           return (
             <Link
               key={link.href}
               href={link.href}
-              onClick={
-                closeMobileMenu
-              }
+              onClick={closeMobileMenu}
               className={`group mb-1 flex min-h-[44px] items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition ${
                 isActive
                   ? "bg-blue-50 text-blue-700 shadow-sm"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
-
               <span className="flex items-center gap-3">
-
                 <Icon
                   size={19}
                   className={`shrink-0 transition ${
@@ -402,10 +351,7 @@ export default function Sidebar() {
                   }`}
                 />
 
-                <span>
-                  {link.name}
-                </span>
-
+                <span>{link.name}</span>
               </span>
 
               {isActive && (
@@ -414,11 +360,9 @@ export default function Sidebar() {
                   className="text-blue-500"
                 />
               )}
-
             </Link>
           );
         })}
-
       </nav>
     );
   }
@@ -431,21 +375,14 @@ export default function Sidebar() {
     if (loading) {
       return (
         <div className="border-b border-slate-200 px-5 py-4">
-
           <div className="flex items-center gap-3">
-
             <div className="h-10 w-10 animate-pulse rounded-full bg-slate-200" />
 
             <div className="min-w-0 flex-1">
-
               <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
-
               <div className="mt-2 h-2.5 w-16 animate-pulse rounded bg-slate-100" />
-
             </div>
-
           </div>
-
         </div>
       );
     }
@@ -454,35 +391,25 @@ export default function Sidebar() {
       return null;
     }
 
-    const initials =
-      getUserInitials(
-        user
-      );
+    const initials = getUserInitials(user);
 
     return (
       <div className="border-b border-slate-200 px-5 py-4">
-
         <div className="flex items-center gap-3">
-
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
             {initials}
           </div>
 
           <div className="min-w-0">
-
             <p className="truncate text-sm font-semibold text-slate-800">
-              {user.name ||
-                "User"}
+              {user.name || "User"}
             </p>
 
             <p className="truncate text-xs capitalize text-slate-500">
               {user.role}
             </p>
-
           </div>
-
         </div>
-
       </div>
     );
   }
@@ -500,26 +427,18 @@ export default function Sidebar() {
       return (
         <button
           type="button"
-          onClick={
-            handleLogout
-          }
-          disabled={
-            loggingOut
-          }
+          onClick={handleLogout}
+          disabled={loggingOut}
           className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-
           <LogOut
             size={19}
             className="shrink-0"
           />
 
           <span>
-            {loggingOut
-              ? "Logging out..."
-              : "Logout"}
+            {loggingOut ? "Logging out..." : "Logout"}
           </span>
-
         </button>
       );
     }
@@ -527,25 +446,19 @@ export default function Sidebar() {
     return (
       <Link
         href="/login"
-        onClick={
-          closeMobileMenu
-        }
+        onClick={closeMobileMenu}
         className={`flex min-h-[44px] items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
           pathname === "/login"
             ? "bg-blue-50 text-blue-700"
             : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
         }`}
       >
-
         <LogIn
           size={19}
           className="shrink-0"
         />
 
-        <span>
-          Login
-        </span>
-
+        <span>Login</span>
       </Link>
     );
   }
@@ -553,6 +466,23 @@ export default function Sidebar() {
   // =========================================================
   // RENDER
   // =========================================================
+
+  /*
+   * Do not render the Sidebar once logout has started.
+   * This removes the navigation immediately while the
+   * logout request is being completed.
+   */
+  if (loggingOut) {
+    return null;
+  }
+
+  /*
+   * If there is no authenticated user and authentication
+   * loading has finished, don't render the dashboard sidebar.
+   */
+  if (!loading && !user) {
+    return null;
+  }
 
   return (
     <>
@@ -563,14 +493,8 @@ export default function Sidebar() {
       <button
         type="button"
         aria-label="Open navigation menu"
-        aria-expanded={
-          mobileMenuOpen
-        }
-        onClick={() =>
-          setMobileMenuOpen(
-            true
-          )
-        }
+        aria-expanded={mobileMenuOpen}
+        onClick={() => setMobileMenuOpen(true)}
         className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 md:hidden"
       >
         <Menu size={22} />
@@ -584,9 +508,7 @@ export default function Sidebar() {
         <button
           type="button"
           aria-label="Close navigation menu"
-          onClick={
-            closeMobileMenu
-          }
+          onClick={closeMobileMenu}
           className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[1px] md:hidden"
         />
       )}
@@ -596,7 +518,6 @@ export default function Sidebar() {
       ====================================================== */}
 
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-
         {/* BRAND */}
 
         <div className="border-b border-slate-200 px-5 py-5">
@@ -618,7 +539,6 @@ export default function Sidebar() {
         <div className="border-t border-slate-200 px-3 py-3">
           {renderAuthButton()}
         </div>
-
       </aside>
 
       {/* =====================================================
@@ -632,26 +552,19 @@ export default function Sidebar() {
             : "-translate-x-full"
         }`}
       >
-
         {/* MOBILE HEADER */}
 
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5">
-
-          {renderBrand({
-            mobile: true,
-          })}
+          {renderBrand({ mobile: true })}
 
           <button
             type="button"
             aria-label="Close navigation menu"
-            onClick={
-              closeMobileMenu
-            }
+            onClick={closeMobileMenu}
             className="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
           >
             <X size={22} />
           </button>
-
         </div>
 
         {/* USER */}
@@ -669,7 +582,6 @@ export default function Sidebar() {
         <div className="border-t border-slate-200 px-3 py-3">
           {renderAuthButton()}
         </div>
-
       </aside>
     </>
   );
@@ -685,11 +597,10 @@ function getUserInitials(user) {
   }
 
   if (user.name) {
-    const parts =
-      user.name
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean);
+    const parts = user.name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
 
     if (parts.length >= 2) {
       return (

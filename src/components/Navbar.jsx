@@ -18,32 +18,50 @@ export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] =
     useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // =========================================================
+  // LOAD CURRENT USER
+  // =========================================================
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadUser() {
       try {
+        setLoading(true);
+
         const response = await fetch("/api/auth/me", {
           method: "GET",
           credentials: "include",
           cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+          },
         });
 
         if (!response.ok) {
+          if (!cancelled) {
+            setUser(null);
+          }
+
           return;
         }
 
         const data = await response.json();
 
         if (!cancelled) {
-          setUser(data.user || null);
+          setUser(data?.user || null);
         }
       } catch (error) {
         console.error(
           "Navbar user load error:",
           error
         );
+
+        if (!cancelled) {
+          setUser(null);
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -58,6 +76,35 @@ export default function Navbar() {
     };
   }, []);
 
+  // =========================================================
+  // LISTEN FOR GLOBAL LOGOUT
+  // =========================================================
+
+  useEffect(() => {
+    function handleGlobalLogout() {
+      setUser(null);
+      setProfileOpen(false);
+      setNotificationsOpen(false);
+      setLoggingOut(true);
+    }
+
+    window.addEventListener(
+      "dcc-auth-logout",
+      handleGlobalLogout
+    );
+
+    return () => {
+      window.removeEventListener(
+        "dcc-auth-logout",
+        handleGlobalLogout
+      );
+    };
+  }, []);
+
+  // =========================================================
+  // DISPLAY NAME
+  // =========================================================
+
   function getDisplayName() {
     if (!user) {
       return "User";
@@ -71,6 +118,10 @@ export default function Navbar() {
     );
   }
 
+  // =========================================================
+  // INITIALS
+  // =========================================================
+
   function getInitials() {
     const name = getDisplayName();
 
@@ -80,30 +131,70 @@ export default function Navbar() {
       .filter(Boolean);
 
     if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+      return `${parts[0][0]}${
+        parts[parts.length - 1][0]
+      }`.toUpperCase();
     }
 
     return name.slice(0, 2).toUpperCase();
   }
 
+  // =========================================================
+  // LOGOUT
+  // =========================================================
+
   async function handleLogout() {
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+    setUser(null);
+    setProfileOpen(false);
+    setNotificationsOpen(false);
+
+    /*
+     * Tell Sidebar and AppShell that logout has started.
+     * This immediately removes authenticated dashboard UI.
+     */
+    window.dispatchEvent(
+      new Event("dcc-auth-logout")
+    );
+
     try {
       await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
         cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+        keepalive: true,
       });
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      window.location.href = "/login";
+      /*
+       * Replace the dashboard with the standalone
+       * login page.
+       */
+      window.location.replace("/login");
     }
+  }
+
+  // =========================================================
+  // HIDE NAVBAR DURING LOGOUT
+  // =========================================================
+
+  if (loggingOut) {
+    return null;
   }
 
   return (
     <header className="sticky top-0 z-30 hidden h-[72px] border-b border-slate-200 bg-white/95 backdrop-blur lg:block">
       <div className="flex h-full items-center justify-between px-6">
         {/* LEFT */}
+
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
             Dodoo Coding Club
@@ -115,8 +206,10 @@ export default function Navbar() {
         </div>
 
         {/* RIGHT */}
+
         <div className="flex items-center gap-3">
           {/* SEARCH */}
+
           <div className="hidden xl:flex">
             <div className="flex h-10 w-64 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-slate-400 transition focus-within:border-blue-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100">
               <Search size={17} />
@@ -130,6 +223,7 @@ export default function Navbar() {
           </div>
 
           {/* NOTIFICATIONS */}
+
           <div className="relative">
             <button
               type="button"
@@ -196,6 +290,7 @@ export default function Navbar() {
           </div>
 
           {/* PROFILE */}
+
           <div className="relative">
             <button
               type="button"
@@ -227,7 +322,9 @@ export default function Navbar() {
               <ChevronDown
                 size={15}
                 className={`text-slate-400 transition-transform ${
-                  profileOpen ? "rotate-180" : ""
+                  profileOpen
+                    ? "rotate-180"
+                    : ""
                 }`}
               />
             </button>
@@ -259,7 +356,9 @@ export default function Navbar() {
                         ? "/student/profile"
                         : "/"
                     }
-                    onClick={() => setProfileOpen(false)}
+                    onClick={() =>
+                      setProfileOpen(false)
+                    }
                     className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
                   >
                     <UserRound size={17} />
@@ -268,7 +367,9 @@ export default function Navbar() {
 
                   <Link
                     href="/"
-                    onClick={() => setProfileOpen(false)}
+                    onClick={() =>
+                      setProfileOpen(false)
+                    }
                     className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
                   >
                     <Settings size={17} />
@@ -278,10 +379,14 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-red-50 hover:text-red-600"
+                    disabled={loggingOut}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <LogOut size={17} />
-                    Sign Out
+
+                    {loggingOut
+                      ? "Signing Out..."
+                      : "Sign Out"}
                   </button>
                 </div>
               </div>
