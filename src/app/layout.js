@@ -1,32 +1,16 @@
-"use client";
-
-import { usePathname } from "next/navigation";
 import "./globals.css";
-import AppShell from "@/components/AppShell";
+
+export const metadata = {
+  title: "DCC Student Success & Impact Platform",
+  description:
+    "Dodoo Coding Club Student Success and Impact Platform",
+};
 
 export default function RootLayout({ children }) {
-  const pathname = usePathname();
-
-  const standaloneRoutes = [
-    "/login",
-    "/forgot-password",
-    "/reset-password",
-  ];
-
-  const isStandaloneRoute = standaloneRoutes.some(
-    (route) =>
-      pathname === route ||
-      pathname.startsWith(`${route}/`)
-  );
-
   return (
     <html lang="en">
       <body className="min-h-screen bg-slate-50">
-        {isStandaloneRoute ? (
-          children
-        ) : (
-          <AppShell>{children}</AppShell>
-        )}
+        {children}
       </body>
     </html>
   );

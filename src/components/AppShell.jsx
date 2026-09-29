@@ -1,40 +1,71 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+
 import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
+const STANDALONE_ROUTES = [
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+];
+
 export default function AppShell({ children }) {
+  const pathname = usePathname();
+
   const [authenticated, setAuthenticated] = useState(null);
 
+  const isStandaloneRoute = STANDALONE_ROUTES.some(
+    (route) =>
+      pathname === route ||
+      pathname.startsWith(`${route}/`)
+  );
+
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
 
     async function checkAuthentication() {
+      if (isStandaloneRoute) {
+        if (!cancelled) {
+          setAuthenticated(false);
+        }
+
+        return;
+      }
+
       try {
         const response = await fetch("/api/auth/me", {
           method: "GET",
           credentials: "include",
           cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+          },
         });
 
         if (!response.ok) {
-          if (mounted) {
+          if (!cancelled) {
             setAuthenticated(false);
           }
+
           return;
         }
 
-        const result = await response.json();
+        const data = await response.json();
 
-        if (mounted) {
-          setAuthenticated(Boolean(result?.user));
+        if (!cancelled) {
+          setAuthenticated(Boolean(data?.user));
         }
       } catch (error) {
-        console.error("Authentication check failed:", error);
+        console.error(
+          "Authentication check failed:",
+          error
+        );
 
-        if (mounted) {
+        if (!cancelled) {
           setAuthenticated(false);
         }
       }
@@ -43,31 +74,41 @@ export default function AppShell({ children }) {
     checkAuthentication();
 
     return () => {
-      mounted = false;
+      cancelled = true;
     };
-  }, []);
+  }, [pathname, isStandaloneRoute]);
 
-  /*
-   * While authentication is being checked, don't render
-   * the dashboard structure. This prevents the Footer,
-   * Sidebar, Navbar, and dashboard content from briefly
-   * appearing after logout.
-   */
+  // =========================================================
+  // LOGIN / AUTHENTICATION PAGES
+  // =========================================================
+
+  if (isStandaloneRoute) {
+    return children;
+  }
+
+  // =========================================================
+  // AUTHENTICATION CHECK
+  // =========================================================
+
   if (authenticated === null) {
     return (
-      <div className="min-h-screen bg-white" aria-hidden="true">
+      <div className="min-h-screen bg-white">
         <div className="h-screen w-full" />
       </div>
     );
   }
 
-  /*
-   * If the user is logged out, do not render the dashboard
-   * shell at all.
-   */
+  // =========================================================
+  // NOT AUTHENTICATED
+  // =========================================================
+
   if (!authenticated) {
     return null;
   }
+
+  // =========================================================
+  // AUTHENTICATED DASHBOARD
+  // =========================================================
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] text-slate-900">
