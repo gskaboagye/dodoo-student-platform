@@ -1,39 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
-
-const PUBLIC_ROUTES = [
-  "/login",
-  "/register",
-  "/verify-email",
-];
+import Link from "next/link";
+import {
+  Bell,
+  Search,
+  UserRound,
+  ChevronDown,
+  Settings,
+  LogOut,
+  X,
+} from "lucide-react";
 
 export default function Navbar() {
-  const pathname = usePathname();
-
   const [user, setUser] = useState(null);
-  const [checkingAuth, setCheckingAuth] = useState(true);
-
-  const isPublicRoute = PUBLIC_ROUTES.some(
-    (route) =>
-      pathname === route ||
-      pathname?.startsWith(`${route}/`)
-  );
+  const [loading, setLoading] = useState(true);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] =
+    useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    let cancelled = false;
 
     async function loadUser() {
-      if (isPublicRoute) {
-        if (mounted) {
-          setUser(null);
-          setCheckingAuth(false);
-        }
-
-        return;
-      }
-
       try {
         const response = await fetch("/api/auth/me", {
           method: "GET",
@@ -42,30 +31,22 @@ export default function Navbar() {
         });
 
         if (!response.ok) {
-          if (mounted) {
-            setUser(null);
-          }
-
           return;
         }
 
         const data = await response.json();
 
-        if (mounted) {
-          setUser(data?.user || null);
+        if (!cancelled) {
+          setUser(data.user || null);
         }
       } catch (error) {
         console.error(
-          "NAVBAR AUTH CHECK ERROR:",
+          "Navbar user load error:",
           error
         );
-
-        if (mounted) {
-          setUser(null);
-        }
       } finally {
-        if (mounted) {
-          setCheckingAuth(false);
+        if (!cancelled) {
+          setLoading(false);
         }
       }
     }
@@ -73,111 +54,240 @@ export default function Navbar() {
     loadUser();
 
     return () => {
-      mounted = false;
+      cancelled = true;
     };
-  }, [pathname, isPublicRoute]);
+  }, []);
 
-  // Don't render authenticated navbar on public pages.
-  if (isPublicRoute) {
-    return null;
+  function getDisplayName() {
+    if (!user) {
+      return "User";
+    }
+
+    return (
+      user.name ||
+      `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+      user.email?.split("@")[0] ||
+      "User"
+    );
   }
 
-  // Don't render the navbar while checking authentication.
-  if (checkingAuth) {
-    return null;
+  function getInitials() {
+    const name = getDisplayName();
+
+    const parts = name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+
+    return name.slice(0, 2).toUpperCase();
   }
 
-  // Don't render it for logged-out users.
-  if (!user) {
-    return null;
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      window.location.href = "/login";
+    }
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-white">
-      <div className="flex h-20 items-center justify-between px-6 md:px-8">
+    <header className="sticky top-0 z-30 hidden h-[72px] border-b border-slate-200 bg-white/95 backdrop-blur lg:block">
+      <div className="flex h-full items-center justify-between px-6">
+        {/* LEFT */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
+            Dodoo Coding Club
+          </p>
 
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg border-2 border-blue-700 text-2xl font-bold text-blue-700">
-            &lt;/&gt;
-          </div>
-
-          <div>
-            <h1 className="text-lg font-extrabold leading-tight text-blue-700">
-              DODOO
-            </h1>
-
-            <p className="text-sm font-bold leading-tight text-blue-700">
-              CODING CLUB
-            </p>
-          </div>
+          <p className="mt-0.5 text-sm font-medium text-slate-500">
+            Student Success Platform
+          </p>
         </div>
 
-        {/* Navigation */}
-        <nav className="hidden items-center gap-8 md:flex">
-          <a
-            href="/"
-            className="font-semibold text-gray-900 hover:text-blue-700"
-          >
-            Dashboard
-          </a>
-
-          <a
-            href="/students"
-            className="font-semibold text-gray-900 hover:text-blue-700"
-          >
-            Students
-          </a>
-
-          <a
-            href="/attendance"
-            className="font-semibold text-gray-900 hover:text-blue-700"
-          >
-            Attendance
-          </a>
-
-          <a
-            href="/projects"
-            className="font-semibold text-gray-900 hover:text-blue-700"
-          >
-            Projects
-          </a>
-
-          <a
-            href="/resources"
-            className="font-semibold text-gray-900 hover:text-blue-700"
-          >
-            Resources
-          </a>
-        </nav>
-
-        {/* User */}
+        {/* RIGHT */}
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-700 font-bold text-white">
-            {(
-              user?.name ||
-              user?.firstName ||
-              "U"
-            )
-              .charAt(0)
-              .toUpperCase()}
+          {/* SEARCH */}
+          <div className="hidden xl:flex">
+            <div className="flex h-10 w-64 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-slate-400 transition focus-within:border-blue-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100">
+              <Search size={17} />
+
+              <input
+                type="search"
+                placeholder="Search..."
+                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              />
+            </div>
           </div>
 
-          <div className="hidden lg:block">
-            <p className="text-sm font-bold text-gray-900">
-              {user?.name ||
-                `${user?.firstName || ""} ${
-                  user?.lastName || ""
-                }`.trim() ||
-                "User"}
-            </p>
+          {/* NOTIFICATIONS */}
+          <div className="relative">
+            <button
+              type="button"
+              aria-label="Notifications"
+              onClick={() =>
+                setNotificationsOpen(
+                  (previous) => !previous
+                )
+              }
+              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+            >
+              <Bell size={18} />
 
-            <p className="text-xs capitalize text-gray-500">
-              {user?.role || "User"}
-            </p>
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-yellow-400 ring-2 ring-white" />
+            </button>
+
+            {notificationsOpen && (
+              <div className="absolute right-0 top-12 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      Notifications
+                    </p>
+
+                    <p className="text-xs text-slate-500">
+                      Stay updated with your platform activity.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setNotificationsOpen(false)
+                    }
+                    className="text-slate-400 hover:text-slate-600"
+                    aria-label="Close notifications"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="px-4 py-8 text-center">
+                  <Bell
+                    size={28}
+                    className="mx-auto text-slate-300"
+                  />
+
+                  <p className="mt-3 text-sm font-medium text-slate-600">
+                    Open Notifications
+                  </p>
+
+                  <Link
+                    href="/"
+                    onClick={() =>
+                      setNotificationsOpen(false)
+                    }
+                    className="mt-3 inline-flex text-xs font-semibold text-blue-600 hover:text-blue-700"
+                  >
+                    View platform updates
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* PROFILE */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() =>
+                setProfileOpen(
+                  (previous) => !previous
+                )
+              }
+              className="flex items-center gap-3 rounded-xl border border-transparent px-2 py-1.5 transition hover:border-slate-200 hover:bg-slate-50"
+            >
+              {loading ? (
+                <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
+              ) : (
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+                  {getInitials()}
+                </div>
+              )}
+
+              <div className="hidden text-left xl:block">
+                <p className="max-w-[140px] truncate text-sm font-semibold text-slate-800">
+                  {getDisplayName()}
+                </p>
+
+                <p className="text-[11px] capitalize text-slate-500">
+                  {user?.role || "User"}
+                </p>
+              </div>
+
+              <ChevronDown
+                size={15}
+                className={`text-slate-400 transition-transform ${
+                  profileOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {profileOpen && (
+              <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                <div className="border-b border-slate-100 px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                      {getInitials()}
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {getDisplayName()}
+                      </p>
+
+                      <p className="truncate text-xs text-slate-500">
+                        {user?.email || ""}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2">
+                  <Link
+                    href={
+                      user?.role === "student"
+                        ? "/student/profile"
+                        : "/"
+                    }
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
+                  >
+                    <UserRound size={17} />
+                    Profile
+                  </Link>
+
+                  <Link
+                    href="/"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
+                  >
+                    <Settings size={17} />
+                    Platform
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-red-50 hover:text-red-600"
+                  >
+                    <LogOut size={17} />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
       </div>
     </header>
   );

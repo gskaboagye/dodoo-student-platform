@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -11,25 +11,22 @@ import {
   ChartNoAxesCombined,
   BookOpen,
   FolderKanban,
-  AlertCircle,
   UserRound,
   LogIn,
   LogOut,
   Menu,
   X,
+  ChevronRight,
 } from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // ==========================================
-  // LOAD CURRENT USER
-  // ==========================================
 
   useEffect(() => {
     let cancelled = false;
@@ -38,36 +35,26 @@ export default function Sidebar() {
       try {
         setLoading(true);
 
-        const response = await fetch(
-          "/api/auth/me",
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-          }
-        );
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
 
         if (!response.ok) {
           if (!cancelled) {
             setUser(null);
           }
-
           return;
         }
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
         if (!cancelled) {
-          setUser(
-            data.user || null
-          );
+          setUser(data.user || null);
         }
       } catch (error) {
-        console.error(
-          "Failed to load user:",
-          error
-        );
+        console.error("Failed to load user:", error);
 
         if (!cancelled) {
           setUser(null);
@@ -86,72 +73,45 @@ export default function Sidebar() {
     };
   }, [pathname]);
 
-  // ==========================================
-  // CLOSE MOBILE MENU WHEN ROUTE CHANGES
-  // ==========================================
-
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // ==========================================
-  // PREVENT BACKGROUND SCROLL
-  // ==========================================
-
   useEffect(() => {
     if (mobileMenuOpen) {
-      document.body.style.overflow =
-        "hidden";
+      document.body.style.overflow = "hidden";
     } else {
-      document.body.style.overflow =
-        "";
+      document.body.style.overflow = "";
     }
 
     return () => {
-      document.body.style.overflow =
-        "";
+      document.body.style.overflow = "";
     };
   }, [mobileMenuOpen]);
 
-  // ==========================================
-  // LOGOUT
-  // ==========================================
-
-  function handleLogout() {
+  async function handleLogout() {
     if (loggingOut) {
       return;
     }
 
-    setLoggingOut(true);
+    try {
+      setLoggingOut(true);
+      setUser(null);
+      setMobileMenuOpen(false);
 
-    // Immediately clear local user state.
-    setUser(null);
-
-    // Close mobile menu.
-    setMobileMenuOpen(false);
-
-    // Clear server session in background.
-    fetch("/api/auth/logout", {
-      method: "POST",
-      credentials: "include",
-      cache: "no-store",
-      keepalive: true,
-    }).catch((error) => {
-      console.error(
-        "Logout request failed:",
-        error
-      );
-    });
-
-    // Leave protected page immediately.
-    window.location.replace(
-      "/login"
-    );
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        keepalive: true,
+      });
+    } catch (error) {
+      console.error("Logout failed:", error);
+    } finally {
+      router.replace("/login");
+      router.refresh();
+    }
   }
-
-  // ==========================================
-  // FACILITATOR LINKS
-  // ==========================================
 
   const facilitatorLinks = [
     {
@@ -180,25 +140,16 @@ export default function Sidebar() {
       icon: ChartNoAxesCombined,
     },
     {
-      name: "Resources",
-      href: "/resources",
-      icon: BookOpen,
-    },
-    {
       name: "Projects",
       href: "/projects",
       icon: FolderKanban,
     },
     {
-      name: "Student Reports",
-      href: "/reports",
-      icon: AlertCircle,
+      name: "Resources",
+      href: "/resources",
+      icon: BookOpen,
     },
   ];
-
-  // ==========================================
-  // STUDENT LINKS
-  // ==========================================
 
   const studentLinks = [
     {
@@ -211,22 +162,18 @@ export default function Sidebar() {
       href: "/student/profile",
       icon: UserRound,
     },
-
-    // IMPORTANT:
-    // Students use the student attendance page.
     {
-      name: "My Attendance",
+      name: "Attendance",
       href: "/student/attendance",
       icon: CalendarCheck,
     },
-
     {
-      name: "My Progress",
+      name: "Progress",
       href: "/progress",
       icon: ChartNoAxesCombined,
     },
     {
-      name: "My Projects",
+      name: "Projects",
       href: "/projects",
       icon: FolderKanban,
     },
@@ -235,328 +182,245 @@ export default function Sidebar() {
       href: "/resources",
       icon: BookOpen,
     },
-    {
-      name: "Report an Issue",
-      href: "/student/reports",
-      icon: AlertCircle,
-    },
   ];
-
-  // ==========================================
-  // SELECT LINKS BASED ON ROLE
-  // ==========================================
 
   const links =
     user?.role === "facilitator"
       ? facilitatorLinks
-      : user?.role === "student"
-        ? studentLinks
-        : [];
+      : studentLinks;
 
-  // ==========================================
-  // ACTIVE LINK
-  // ==========================================
-
-  function isActiveLink(href) {
+  const isActive = (href) => {
     if (href === "/") {
       return pathname === "/";
     }
 
-    return (
-      pathname === href ||
-      pathname.startsWith(
-        `${href}/`
-      )
-    );
-  }
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
 
-  // ==========================================
-  // CLOSE MOBILE MENU
-  // ==========================================
-
-  function closeMobileMenu() {
-    setMobileMenuOpen(false);
-  }
-
-  // ==========================================
-  // NAVIGATION
-  // ==========================================
-
-  function renderNavigation() {
-    return (
-      <nav className="px-3 py-5">
-        {links.map((link) => {
-          const Icon = link.icon;
-
-          const isActive =
-            isActiveLink(
-              link.href
-            );
-
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={
-                closeMobileMenu
-              }
-              className={`mb-1 flex min-h-[44px] items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
-                isActive
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              <Icon
-                size={19}
-                className="shrink-0"
-              />
-
-              <span>
-                {link.name}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
-    );
-  }
-
-  // ==========================================
-  // USER INFORMATION
-  // ==========================================
-
-  function renderUserInformation() {
-    if (loading || !user) {
-      return null;
+  function getDisplayName() {
+    if (!user) {
+      return "User";
     }
 
     return (
-      <div className="border-b border-slate-200 px-5 py-4">
-        <div className="flex items-center gap-3">
+      user.name ||
+      `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+      user.email?.split("@")[0] ||
+      "User"
+    );
+  }
 
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-            <UserRound size={19} />
+  function getInitials() {
+    const name = getDisplayName();
+
+    const parts = name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+
+    return name.slice(0, 2).toUpperCase();
+  }
+
+  const sidebarContent = (
+    <div className="flex h-full flex-col">
+      {/* BRAND */}
+      <div className="border-b border-slate-200 px-5 py-5">
+        <Link
+          href="/"
+          className="group flex items-center gap-3"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-blue-700 bg-white text-lg font-bold text-blue-700 transition duration-300 group-hover:scale-105 group-hover:bg-blue-50">
+            &lt;/&gt;
           </div>
 
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-800">
-              {user.name ||
-                "User"}
+          <div>
+            <p className="text-sm font-extrabold tracking-wide text-blue-700">
+              DODOO
             </p>
 
-            <p className="text-xs capitalize text-slate-500">
-              {user.role}
+            <p className="text-xs font-bold tracking-wide text-blue-700">
+              CODING CLUB
+            </p>
+
+            <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+              Student Platform
             </p>
           </div>
-
-        </div>
+        </Link>
       </div>
-    );
-  }
 
-  // ==========================================
-  // LOGIN / LOGOUT BUTTON
-  // ==========================================
+      {/* USER */}
+      <div className="border-b border-slate-200 px-5 py-4">
+        {loading ? (
+          <div className="flex animate-pulse items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-slate-200" />
 
-  function renderAuthButton() {
-    if (loading) {
-      return null;
-    }
+            <div className="flex-1">
+              <div className="h-3 w-24 rounded bg-slate-200" />
+              <div className="mt-2 h-2.5 w-32 rounded bg-slate-100" />
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white shadow-sm">
+              {getInitials()}
+            </div>
 
-    if (user) {
-      return (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-slate-900">
+                {getDisplayName()}
+              </p>
+
+              <p className="truncate text-xs capitalize text-slate-500">
+                {user?.role || "student"}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* NAVIGATION */}
+      <nav className="flex-1 overflow-y-auto px-3 py-5">
+        <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+          Main Menu
+        </p>
+
+        <div className="space-y-1.5">
+          {links.map((link) => {
+            const Icon = link.icon;
+            const active = isActive(link.href);
+
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`group flex items-center justify-between rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200 ${
+                  active
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                    : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <span
+                    className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
+                      active
+                        ? "bg-white/15 text-white"
+                        : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600"
+                    }`}
+                  >
+                    <Icon size={17} />
+                  </span>
+
+                  <span>{link.name}</span>
+                </span>
+
+                <ChevronRight
+                  size={15}
+                  className={`transition-transform duration-200 ${
+                    active
+                      ? "translate-x-0 text-white/80"
+                      : "text-slate-300 group-hover:translate-x-0.5 group-hover:text-blue-500"
+                  }`}
+                />
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* FOOTER */}
+      <div className="border-t border-slate-200 p-3">
         <button
           type="button"
-          onClick={
-            handleLogout
-          }
-          disabled={
-            loggingOut
-          }
-          className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-600 transition-all duration-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <LogOut
-            size={19}
-            className="shrink-0"
-          />
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-red-100 group-hover:text-red-600">
+            {loggingOut ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : (
+              <LogOut size={17} />
+            )}
+          </span>
 
           <span>
-            {loggingOut
-              ? "Logging out..."
-              : "Logout"}
+            {loggingOut ? "Signing out..." : "Sign Out"}
           </span>
         </button>
-      );
-    }
-
-    return (
-      <Link
-        href="/login"
-        onClick={
-          closeMobileMenu
-        }
-        className={`flex min-h-[44px] items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
-          pathname === "/login"
-            ? "bg-blue-50 text-blue-700"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-        }`}
-      >
-        <LogIn
-          size={19}
-          className="shrink-0"
-        />
-
-        <span>Login</span>
-      </Link>
-    );
-  }
-
-  // ==========================================
-  // RENDER
-  // ==========================================
+      </div>
+    </div>
+  );
 
   return (
     <>
-      {/* =====================================
-          MOBILE MENU BUTTON
-      ====================================== */}
+      {/* MOBILE TOP BAR */}
+      <div className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm lg:hidden">
+        <Link
+          href="/"
+          className="flex items-center gap-2"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-blue-700 text-sm font-bold text-blue-700">
+            &lt;/&gt;
+          </div>
 
-      <button
-        type="button"
-        aria-label="Open navigation menu"
-        aria-expanded={
-          mobileMenuOpen
-        }
-        onClick={() =>
-          setMobileMenuOpen(
-            true
-          )
-        }
-        className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 md:hidden"
-      >
-        <Menu size={22} />
-      </button>
+          <div>
+            <p className="text-xs font-extrabold text-blue-700">
+              DODOO
+            </p>
 
-      {/* =====================================
-          MOBILE OVERLAY
-      ====================================== */}
+            <p className="text-[9px] font-bold text-blue-700">
+              CODING CLUB
+            </p>
+          </div>
+        </Link>
 
-      {mobileMenuOpen && (
         <button
           type="button"
-          aria-label="Close navigation menu"
-          onClick={
-            closeMobileMenu
+          aria-label={
+            mobileMenuOpen
+              ? "Close navigation"
+              : "Open navigation"
           }
-          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[1px] md:hidden"
-        />
-      )}
+          onClick={() =>
+            setMobileMenuOpen((previous) => !previous)
+          }
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+        >
+          {mobileMenuOpen ? (
+            <X size={21} />
+          ) : (
+            <Menu size={21} />
+          )}
+        </button>
+      </div>
 
-      {/* =====================================
-          DESKTOP SIDEBAR
-      ====================================== */}
-
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-
-        {/* Logo */}
-
-        <div className="border-b border-slate-200 px-6 py-6">
-          <Link
-            href="/"
-            className="block"
-          >
-            <h1 className="text-lg font-bold text-slate-900">
-              Dodoo Coding Club
-            </h1>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Student Success Platform
-            </p>
-          </Link>
-        </div>
-
-        {/* User Information */}
-
-        {renderUserInformation()}
-
-        {/* Navigation */}
-
-        <div className="flex-1 overflow-y-auto">
-          {renderNavigation()}
-        </div>
-
-        {/* Login / Logout */}
-
-        <div className="border-t border-slate-200 px-3 py-3">
-          {renderAuthButton()}
-        </div>
-
+      {/* DESKTOP SIDEBAR */}
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-slate-200 bg-white lg:block">
+        {sidebarContent}
       </aside>
 
-      {/* =====================================
-          MOBILE SIDEBAR
-      ====================================== */}
-
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,320px)] flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
-          mobileMenuOpen
-            ? "translate-x-0"
-            : "-translate-x-full"
-        }`}
-      >
-
-        {/* Mobile Header */}
-
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5">
-
-          <Link
-            href="/"
-            onClick={
-              closeMobileMenu
-            }
-            className="min-w-0"
-          >
-            <h1 className="truncate text-base font-bold text-slate-900">
-              Dodoo Coding Club
-            </h1>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Student Success Platform
-            </p>
-          </Link>
-
+      {/* MOBILE SIDEBAR */}
+      {mobileMenuOpen && (
+        <>
           <button
             type="button"
-            aria-label="Close navigation menu"
-            onClick={
-              closeMobileMenu
-            }
-            className="ml-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-          >
-            <X size={22} />
-          </button>
+            aria-label="Close navigation overlay"
+            onClick={() => setMobileMenuOpen(false)}
+            className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm lg:hidden"
+          />
 
-        </div>
-
-        {/* User Information */}
-
-        {renderUserInformation()}
-
-        {/* Navigation */}
-
-        <div className="flex-1 overflow-y-auto">
-          {renderNavigation()}
-        </div>
-
-        {/* Login / Logout */}
-
-        <div className="border-t border-slate-200 px-3 py-3">
-          {renderAuthButton()}
-        </div>
-
-      </aside>
+          <aside className="fixed inset-y-0 left-0 z-50 w-[280px] bg-white shadow-2xl lg:hidden">
+            {sidebarContent}
+          </aside>
+        </>
+      )}
     </>
   );
 }
-
-// Reports navigation enabled
