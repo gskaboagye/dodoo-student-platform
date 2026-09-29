@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowRight,
-  Plus,
   GraduationCap,
   ClipboardCheck,
   Target,
@@ -95,11 +94,6 @@ export default function Dashboard() {
         // ---------------------------------------------------
         // LOAD PENDING STUDENT APPLICATIONS
         // ---------------------------------------------------
-        //
-        // This uses the existing student-requests endpoint.
-        // The response is normalized so the dashboard can
-        // handle common response property names safely.
-        //
 
         try {
           const applicationsResponse = await fetch(
@@ -140,7 +134,6 @@ export default function Dashboard() {
             applicationError
           );
 
-          // Do not prevent the main dashboard from loading.
           setPendingApplications([]);
         }
 
@@ -480,57 +473,204 @@ export default function Dashboard() {
       <div className="p-4 sm:p-6">
 
         {/* =================================================
-            TECH FACILITATOR WELCOME
+            FACILITATOR WELCOME
         ================================================= */}
 
-        <section className="relative mb-8 overflow-hidden rounded-2xl bg-slate-950 p-6 text-white shadow-lg sm:p-8">
+        <section className="relative mb-8 overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-950 to-blue-950 px-6 py-7 text-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.65)] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
 
-          <div className="absolute -right-8 -top-8 opacity-10">
-            <Code2 className="h-56 w-56" />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(148,163,184,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.07) 1px, transparent 1px)",
+              backgroundSize: "34px 34px",
+              maskImage:
+                "linear-gradient(to right, black, transparent 75%)",
+              WebkitMaskImage:
+                "linear-gradient(to right, black, transparent 75%)",
+            }}
+          />
+
+          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-500/15 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
+
+          <div className="pointer-events-none absolute right-6 top-6 hidden h-28 w-28 items-center justify-center rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-sm lg:flex">
+            <Code2 className="h-14 w-14 text-blue-400/70" />
           </div>
 
-          <div className="relative z-10">
+          <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
 
-            <div className="mb-4 flex items-center gap-2 text-blue-400">
-              <Terminal className="h-5 w-5" />
+            <div className="min-w-0">
 
-              <span className="font-mono text-sm font-semibold">
-                DCC_CODE_LAB
-              </span>
+              <div className="flex flex-wrap items-center gap-2.5">
+
+                <div className="flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1.5 text-xs font-semibold text-blue-300">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/15">
+                    <Terminal className="h-3.5 w-3.5" />
+                  </span>
+
+                  DCC_CODE_LAB
+                </div>
+
+                <span className="h-1 w-1 rounded-full bg-slate-600" />
+
+                <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+                  Facilitator Workspace
+                </span>
+
+              </div>
+
+              <p className="mt-6 text-sm font-semibold text-blue-400">
+                Tech Facilitator Dashboard
+              </p>
+
+              <h1 className="mt-2 max-w-3xl text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-[2.7rem] lg:leading-tight">
+                Welcome back, {user.name || "Facilitator"}.
+              </h1>
+
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+                Guide students from their first line of code to real-world projects.
+                Manage learning, track progress, review applications, and keep the
+                Code Lab moving forward.
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+
+                <Link
+                  href="/student-requests"
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-500 hover:shadow-blue-900/40"
+                >
+                  <FileCheck2 className="h-4 w-4" />
+                  Review Applications
+
+                  {pendingCount > 0 && (
+                    <span className="rounded-full bg-white/15 px-2 py-0.5 text-xs">
+                      {pendingCount}
+                    </span>
+                  )}
+                </Link>
+
+                <Link
+                  href="/students"
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-slate-600 hover:bg-white/[0.08]"
+                >
+                  <Users className="h-4 w-4" />
+                  Manage Students
+                </Link>
+
+              </div>
+
+              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400">
+
+                <span className="inline-flex items-center gap-2">
+                  <GitBranch className="h-3.5 w-3.5 text-blue-400" />
+                  Real-world development
+                </span>
+
+                <span className="inline-flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                  Student-focused learning
+                </span>
+
+              </div>
+
             </div>
 
-            <p className="text-sm font-medium text-blue-400">
-              Tech Facilitator Dashboard
-            </p>
+            {/* AT A GLANCE */}
 
-            <h1 className="mt-2 text-2xl font-bold sm:text-3xl">
-              Welcome to the Code Lab,{" "}
-              {user.name || "Facilitator"}
-            </h1>
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05] p-4 shadow-xl backdrop-blur-md">
 
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-300">
-              Guide. Teach. Build. Inspire. Empower
-              the next generation of developers by
-              creating a practical learning
-              environment where students can turn
-              ideas into code, build real projects,
-              and develop skills for the future.
-            </p>
+              <div className="mb-4 flex items-center justify-between">
 
-            <div className="mt-5 flex flex-wrap gap-3 text-xs font-medium">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    At a glance
+                  </p>
 
-              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-slate-300">
-                &lt; Teach / Mentor / Build / Inspire / &gt;
-              </span>
+                  <p className="mt-1 text-sm font-medium text-slate-200">
+                    Code Lab activity
+                  </p>
+                </div>
 
-              <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-slate-300">
-                <GitBranch className="mr-1 inline h-3.5 w-3.5" />
-                Real-World Development
-              </span>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <Users className="h-3.5 w-3.5" />
+                    <span className="text-[11px]">
+                      Students
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-xl font-bold text-white">
+                    {data?.totalStudents ?? 0}
+                  </p>
+
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <FileCheck2 className="h-3.5 w-3.5" />
+                    <span className="text-[11px]">
+                      Pending
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-xl font-bold text-white">
+                    {pendingCount}
+                  </p>
+
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <FolderKanban className="h-3.5 w-3.5" />
+                    <span className="text-[11px]">
+                      Projects
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-xl font-bold text-white">
+                    {data?.activeProjects ?? 0}
+                  </p>
+
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <CalendarCheck className="h-3.5 w-3.5" />
+                    <span className="text-[11px]">
+                      Present
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-xl font-bold text-white">
+                    {data?.presentToday ?? 0}
+                  </p>
+
+                </div>
+
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-blue-400/10 bg-blue-400/5 px-3 py-2.5 text-xs text-slate-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]" />
+                Platform services are available
+              </div>
 
             </div>
 
           </div>
+
         </section>
 
         {/* =================================================
@@ -585,7 +725,9 @@ export default function Dashboard() {
               </div>
 
               <div>
+
                 <div className="flex flex-wrap items-center gap-2">
+
                   <h2 className="font-semibold text-slate-900">
                     Pending Student Applications
                   </h2>
@@ -595,12 +737,14 @@ export default function Dashboard() {
                       {pendingCount}
                     </span>
                   )}
+
                 </div>
 
                 <p className="mt-1 text-xs text-slate-500">
                   Review students waiting for
                   facilitator approval.
                 </p>
+
               </div>
 
             </div>
@@ -633,6 +777,7 @@ export default function Dashboard() {
               </Link>
 
             </div>
+
           </div>
 
           {pendingApplications.length > 0 ? (
@@ -677,6 +822,7 @@ export default function Dashboard() {
                         </div>
 
                         <div className="min-w-0">
+
                           <p className="truncate text-sm font-semibold text-slate-900">
                             {applicationName}
                           </p>
@@ -686,6 +832,7 @@ export default function Dashboard() {
                           </p>
 
                           <div className="mt-1 flex flex-wrap items-center gap-2">
+
                             <span className="text-xs text-slate-500">
                               {applicationProgram}
                             </span>
@@ -693,7 +840,9 @@ export default function Dashboard() {
                             <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-yellow-700">
                               Pending
                             </span>
+
                           </div>
+
                         </div>
 
                       </div>
@@ -712,12 +861,14 @@ export default function Dashboard() {
 
               {pendingApplications.length > 5 && (
                 <div className="pt-2 text-center">
+
                   <Link
                     href="/student-requests"
                     className="text-sm font-semibold text-blue-600 hover:text-blue-700"
                   >
                     View all {pendingApplications.length} applications
                   </Link>
+
                 </div>
               )}
 
@@ -748,8 +899,6 @@ export default function Dashboard() {
         ================================================= */}
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
-
-          {/* TODAY'S ATTENDANCE */}
 
           <DashboardCard
             title="Today's Attendance"
@@ -788,8 +937,6 @@ export default function Dashboard() {
             </Link>
 
           </DashboardCard>
-
-          {/* QUICK ACTIONS */}
 
           <DashboardCard
             title="Quick Actions"
@@ -833,8 +980,6 @@ export default function Dashboard() {
 
           </DashboardCard>
 
-          {/* RECENT STUDENTS */}
-
           <DashboardCard
             title="Recent Students"
             description="Recently registered students"
@@ -856,6 +1001,7 @@ export default function Dashboard() {
                       </div>
 
                       <div className="min-w-0">
+
                         <p className="truncate text-sm font-semibold text-slate-800">
                           {student.firstName}{" "}
                           {student.lastName}
@@ -864,6 +1010,7 @@ export default function Dashboard() {
                         <p className="truncate text-xs text-slate-500">
                           {student.email}
                         </p>
+
                       </div>
 
                     </div>
@@ -934,7 +1081,9 @@ export default function Dashboard() {
             <div className="rounded-xl bg-slate-50 p-4">
 
               <div className="flex items-center justify-between gap-4">
+
                 <div>
+
                   <p className="text-sm font-semibold text-slate-800">
                     Applications awaiting review
                   </p>
@@ -943,11 +1092,13 @@ export default function Dashboard() {
                     Review applications and approve
                     eligible students.
                   </p>
+
                 </div>
 
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700">
                   {pendingCount}
                 </div>
+
               </div>
 
               <Link
@@ -986,6 +1137,7 @@ export default function Dashboard() {
   ) {
     return (
       <div className="p-4 sm:p-6">
+
         <div className="flex min-h-[70vh] items-center justify-center">
 
           <div className="w-full max-w-2xl rounded-2xl border border-blue-200 bg-blue-50 p-6 shadow-sm sm:p-8">
@@ -1061,9 +1213,11 @@ export default function Dashboard() {
             <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4 text-center">
 
               <p className="text-sm text-slate-500">
+
                 <strong className="text-slate-700">
                   Status: Pending Review
                 </strong>
+
               </p>
 
               <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -1077,6 +1231,7 @@ export default function Dashboard() {
           </div>
 
         </div>
+
       </div>
     );
   }
@@ -1100,113 +1255,290 @@ export default function Dashboard() {
           STUDENT WELCOME
       ================================================= */}
 
-      <section className="relative mb-8 overflow-hidden rounded-2xl bg-slate-950 p-6 text-white shadow-lg sm:p-8">
+      <section className="relative mb-8 overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-blue-700 via-indigo-700 to-slate-950 p-6 text-white shadow-[0_20px_60px_-25px_rgba(30,64,175,0.45)] sm:p-8 lg:p-9">
 
-        <div className="absolute -right-8 -top-8 opacity-10">
-          <Code2 className="h-56 w-56" />
-        </div>
+        {/* Subtle portal grid */}
 
-        <div className="relative z-10">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-25"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+            maskImage:
+              "linear-gradient(to right, black, transparent 85%)",
+            WebkitMaskImage:
+              "linear-gradient(to right, black, transparent 85%)",
+          }}
+        />
 
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-cyan-400/15 blur-3xl" />
 
-            {/* STUDENT PROFILE PICTURE */}
+        <div className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-blue-300/10 blur-3xl" />
 
-            <div className="relative shrink-0">
+        <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
 
-              <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-blue-500 bg-slate-800 shadow-xl sm:h-32 sm:w-32">
+          {/* STUDENT IDENTITY */}
 
-                {profile?.profileImage ? (
-                  <img
-                    src={profile.profileImage}
-                    alt={`${profile?.firstName || "Student"} ${
-                      profile?.lastName || ""
-                    }`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <UserRound className="h-16 w-16 text-slate-500" />
-                )}
+          <div className="min-w-0">
+
+            <div className="flex flex-wrap items-center gap-2.5">
+
+              <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-100 backdrop-blur-sm">
+
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/10">
+                  <GraduationCap className="h-3.5 w-3.5" />
+                </span>
+
+                DCC Student Portal
 
               </div>
 
-              <div className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full border-2 border-slate-950 bg-green-500">
-                <span className="h-2.5 w-2.5 rounded-full bg-white" />
-              </div>
+              <span className="h-1 w-1 rounded-full bg-white/40" />
+
+              <span className="text-xs font-medium uppercase tracking-[0.16em] text-blue-100/70">
+                Learning Workspace
+              </span>
 
             </div>
 
-            {/* WELCOME CONTENT */}
+            <div className="mt-7 flex flex-col gap-5 sm:flex-row sm:items-center">
 
-            <div className="min-w-0">
+              {/* PROFILE IMAGE */}
 
-              <div className="mb-3 flex items-center gap-2 font-mono text-sm text-blue-400">
+              <div className="relative shrink-0">
 
-                <span className="text-slate-500">
-                  &gt;
-                </span>
+                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-xl backdrop-blur-sm sm:h-28 sm:w-28">
 
-                <span>
-                  welcome_to_dcc()
-                </span>
+                  {profile?.profileImage ? (
+                    <img
+                      src={profile.profileImage}
+                      alt={`${profile?.firstName || "Student"} ${
+                        profile?.lastName || ""
+                      }`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <UserRound className="h-12 w-12 text-blue-100/60" />
+                  )}
 
-                <span className="animate-pulse">
-                  _
-                </span>
-
-              </div>
-
-              <p className="text-sm font-medium text-blue-400">
-                Student Developer Dashboard
-              </p>
-
-              <h1 className="mt-2 text-2xl font-bold sm:text-3xl">
-                Welcome to the Code Lab,{" "}
-                {profile?.firstName ||
-                  user?.name ||
-                  "Student"}
-              </h1>
-
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Where ideas become code and code
-                becomes impact. Build projects,
-                sharpen your programming skills,
-                track your progress, and turn your
-                ideas into real-world solutions.
-              </p>
-
-              {profile?.program && (
-                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-sm text-blue-300">
-                  <GraduationCap className="h-4 w-4" />
-                  {profile.program}
                 </div>
-              )}
+
+                <div className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full border-4 border-indigo-700 bg-emerald-500">
+                  <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                </div>
+
+              </div>
+
+              <div className="min-w-0">
+
+                <p className="text-sm font-semibold text-blue-100">
+                  Student Developer Dashboard
+                </p>
+
+                <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl lg:text-[2.65rem]">
+                  Welcome back,{" "}
+                  {profile?.firstName ||
+                    user?.name ||
+                    "Student"}.
+                </h1>
+
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-blue-50/80 sm:text-base">
+                  Stay on top of your learning journey,
+                  track your progress, manage projects,
+                  and build the skills you need to turn
+                  ideas into practical solutions.
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-2.5">
+
+                  {profile?.program && (
+                    <span className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-blue-50 backdrop-blur-sm">
+
+                      <GraduationCap className="h-4 w-4" />
+
+                      {profile.program}
+
+                    </span>
+                  )}
+
+                  {user?.studentId && (
+                    <span className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-blue-50 backdrop-blur-sm">
+
+                      <UserRound className="h-4 w-4" />
+
+                      Student ID: {user.studentId}
+
+                    </span>
+                  )}
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="mt-7 flex flex-wrap gap-3">
+
+              <Link
+                href="/progress"
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow-lg transition hover:bg-blue-50"
+              >
+                <ChartNoAxesCombined className="h-4 w-4" />
+
+                View My Progress
+
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+
+              <Link
+                href="/projects"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/15"
+              >
+                <FolderKanban className="h-4 w-4" />
+
+                My Projects
+
+              </Link>
 
             </div>
 
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+          {/* LEARNING SNAPSHOT */}
 
-            <span className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-green-400">
-              $ learn
-            </span>
+          <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-slate-950/25 p-4 shadow-xl backdrop-blur-md sm:p-5">
 
-            <span className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-blue-400">
-              $ build
-            </span>
+            <div className="mb-4 flex items-center justify-between">
 
-            <span className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-purple-400">
-              $ create
-            </span>
+              <div>
 
-            <span className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-yellow-400">
-              $ impact
-            </span>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-100/60">
+                  Learning snapshot
+                </p>
+
+                <p className="mt-1 text-sm font-medium text-white">
+                  Your current activity
+                </p>
+
+              </div>
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-300/20 bg-emerald-400/10 text-emerald-300">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+
+            </div>
+
+            <div className="space-y-4">
+
+              <div>
+
+                <div className="mb-2 flex items-center justify-between text-xs">
+
+                  <span className="text-blue-100/70">
+                    Overall progress
+                  </span>
+
+                  <span className="font-semibold text-white">
+                    {overallProgress}%
+                  </span>
+
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-white/10">
+
+                  <div
+                    className="h-full rounded-full bg-white transition-all"
+                    style={{
+                      width: `${overallProgress}%`,
+                    }}
+                  />
+
+                </div>
+
+              </div>
+
+              <div>
+
+                <div className="mb-2 flex items-center justify-between text-xs">
+
+                  <span className="text-blue-100/70">
+                    Attendance
+                  </span>
+
+                  <span className="font-semibold text-white">
+                    {studentData?.attendanceRate ?? 0}%
+                  </span>
+
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-white/10">
+
+                  <div
+                    className="h-full rounded-full bg-cyan-300 transition-all"
+                    style={{
+                      width: `${studentData?.attendanceRate ?? 0}%`,
+                    }}
+                  />
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+
+                <div className="flex items-center gap-2 text-blue-100/60">
+
+                  <FolderKanban className="h-3.5 w-3.5" />
+
+                  <span className="text-[11px]">
+                    Projects
+                  </span>
+
+                </div>
+
+                <p className="mt-2 text-xl font-bold text-white">
+                  {studentData?.projects?.length ?? 0}
+                </p>
+
+              </div>
+
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+
+                <div className="flex items-center gap-2 text-blue-100/60">
+
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+
+                  <span className="text-[11px]">
+                    Present
+                  </span>
+
+                </div>
+
+                <p className="mt-2 text-xl font-bold text-white">
+                  {studentData?.present ?? 0}
+                </p>
+
+              </div>
+
+            </div>
+
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-300/10 bg-emerald-300/5 px-3 py-2.5 text-xs text-blue-50/75">
+
+              <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]" />
+
+              Your student workspace is active
+
+            </div>
 
           </div>
 
         </div>
+
       </section>
 
       {/* =================================================
