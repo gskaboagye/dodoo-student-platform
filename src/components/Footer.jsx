@@ -13,63 +13,103 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-slate-800 bg-slate-950 text-slate-300">
+    <footer className="border-t border-gray-300 bg-white">
 
       {/* =====================================================
           MAIN FOOTER
           ===================================================== */}
       <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
 
-        <div className="grid gap-12 lg:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
+        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
 
           {/* =================================================
-              BRAND
+              DODOO CODING CLUB
               ================================================= */}
-          <div>
+          <div className="lg:col-span-1">
+
             <Link
               href="/"
               className="group inline-flex items-center gap-3"
             >
-              {/* DCC MARK */}
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-blue-500/40 bg-blue-500/10 text-lg font-bold text-blue-400 transition duration-300 group-hover:border-blue-400 group-hover:bg-blue-500/20 group-hover:text-blue-300">
+              {/* DCC LOGO MARK */}
+              <div
+                className="
+                  flex
+                  h-14
+                  w-14
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-lg
+                  border-2
+                  border-blue-700
+                  bg-white
+                  text-2xl
+                  font-bold
+                  text-blue-700
+                  transition
+                  duration-300
+                  group-hover:bg-blue-700
+                  group-hover:text-white
+                "
+              >
                 &lt;/&gt;
               </div>
 
-              {/* BRAND NAME */}
+              {/* DCC NAME */}
               <div>
-                <h2 className="text-lg font-extrabold tracking-wide text-white">
+                <h2 className="text-xl font-extrabold leading-tight text-blue-700">
                   DODOO
                 </h2>
 
-                <p className="text-sm font-bold tracking-[0.18em] text-blue-400">
+                <p className="font-bold leading-tight text-blue-700">
                   CODING CLUB
                 </p>
               </div>
             </Link>
 
-            <p className="mt-6 max-w-md text-sm leading-7 text-slate-400">
+            <p className="mt-6 max-w-sm text-sm leading-7 text-gray-600">
               Supporting students in developing practical technology
               and software-development skills through learning,
               projects, mentorship, and real-world experience.
             </p>
 
-            {/* WEBSITE LINK */}
+            {/* VISIT DCC */}
             <a
               href="https://dodoocodingclub.com/"
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-blue-400 transition hover:text-blue-300"
+              className="
+                mt-6
+                inline-flex
+                items-center
+                gap-2
+                rounded-lg
+                bg-blue-700
+                px-5
+                py-2.5
+                text-sm
+                font-bold
+                text-white
+                shadow-sm
+                transition
+                duration-200
+                hover:bg-blue-800
+                hover:shadow-md
+              "
             >
-              Visit Dodoo Coding Club
+              Visit DCC
               <ArrowUpRight className="h-4 w-4" />
             </a>
+
           </div>
 
           {/* =================================================
               PLATFORM
               ================================================= */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-white">
+
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-900">
               Platform
             </h3>
 
@@ -78,7 +118,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/"
-                  className="transition hover:text-white"
+                  className="text-gray-600 transition hover:text-blue-700"
                 >
                   Dashboard
                 </Link>
@@ -87,7 +127,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/resources"
-                  className="transition hover:text-white"
+                  className="text-gray-600 transition hover:text-blue-700"
                 >
                   Learning Resources
                 </Link>
@@ -96,7 +136,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/projects"
-                  className="transition hover:text-white"
+                  className="text-gray-600 transition hover:text-blue-700"
                 >
                   Student Projects
                 </Link>
@@ -105,20 +145,31 @@ export default function Footer() {
               <li>
                 <Link
                   href="/progress"
-                  className="transition hover:text-white"
+                  className="text-gray-600 transition hover:text-blue-700"
                 >
                   Progress Tracking
                 </Link>
               </li>
 
+              <li>
+                <Link
+                  href="/reports"
+                  className="text-gray-600 transition hover:text-blue-700"
+                >
+                  Reports
+                </Link>
+              </li>
+
             </ul>
+
           </div>
 
           {/* =================================================
-              ORGANIZATION
+              DCC
               ================================================= */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-white">
+
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-900">
               Dodoo Coding Club
             </h3>
 
@@ -129,7 +180,7 @@ export default function Footer() {
                   href="https://dodoocodingclub.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="transition hover:text-white"
+                  className="text-gray-600 transition hover:text-blue-700"
                 >
                   About DCC
                 </a>
@@ -140,9 +191,9 @@ export default function Footer() {
                   href="https://dodoocodingclub.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="transition hover:text-white"
+                  className="text-gray-600 transition hover:text-blue-700"
                 >
-                  Our Website
+                  Official Website
                 </a>
               </li>
 
@@ -151,7 +202,7 @@ export default function Footer() {
                   href="https://dodoocodingclub.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="transition hover:text-white"
+                  className="text-gray-600 transition hover:text-blue-700"
                 >
                   Support DCC
                 </a>
@@ -160,91 +211,140 @@ export default function Footer() {
               <li>
                 <Link
                   href="/register"
-                  className="transition hover:text-white"
+                  className="text-gray-600 transition hover:text-blue-700"
                 >
                   Join the Platform
                 </Link>
               </li>
 
             </ul>
+
           </div>
 
           {/* =================================================
               CONTACT
               ================================================= */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-white">
+
+            <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-900">
               Contact
             </h3>
 
-            <div className="mt-5 space-y-4">
+            <div className="mt-5 space-y-5">
 
               {/* LOCATION */}
-              <div className="flex gap-3">
-                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
+              <div className="flex items-start gap-3">
 
-                <p className="text-sm leading-6 text-slate-400">
-                  Pokuase Community Library,
-                  <br />
-                  Pokuase, Ghana
-                  <br />
-                  Ghana Post GPS: GW-0080-2132
-                </p>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                  <MapPin className="h-5 w-5 text-blue-700" />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    Ghana
+                  </p>
+
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    Pokuase Community Library,
+                    <br />
+                    Pokuase, Ghana
+                    <br />
+                    Ghana Post GPS:
+                    <br />
+                    GW-0080-2132
+                  </p>
+                </div>
+
               </div>
 
               {/* PHONE */}
               <a
                 href="tel:+233558446017"
-                className="flex items-center gap-3 text-sm text-slate-400 transition hover:text-white"
+                className="group flex items-center gap-3"
               >
-                <Phone className="h-5 w-5 shrink-0 text-blue-400" />
-                +233 55 844 6017
+
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                  <Phone className="h-4 w-4 text-blue-700" />
+                </div>
+
+                <span className="text-sm text-gray-600 transition group-hover:text-blue-700">
+                  +233 55 844 6017
+                </span>
+
               </a>
 
               {/* EMAIL */}
               <a
                 href="mailto:info@dodoocodingclub.com"
-                className="flex items-center gap-3 text-sm text-slate-400 transition hover:text-white"
+                className="group flex items-center gap-3"
               >
-                <Mail className="h-5 w-5 shrink-0 text-blue-400" />
-                info@dodoocodingclub.com
+
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
+                  <Mail className="h-4 w-4 text-blue-700" />
+                </div>
+
+                <span className="break-all text-sm text-gray-600 transition group-hover:text-blue-700">
+                  info@dodoocodingclub.com
+                </span>
+
+              </a>
+
+              {/* SUPPORT BUTTON */}
+              <a
+                href="https://dodoocodingclub.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="
+                  inline-flex
+                  items-center
+                  justify-center
+                  rounded-lg
+                  bg-yellow-400
+                  px-5
+                  py-2.5
+                  text-sm
+                  font-bold
+                  text-gray-900
+                  shadow-sm
+                  transition
+                  duration-200
+                  hover:bg-yellow-500
+                  hover:shadow-md
+                "
+              >
+                Support DCC
               </a>
 
             </div>
+
           </div>
 
         </div>
 
-        {/* ===================================================
+        {/* =====================================================
             DIVIDER
-            =================================================== */}
-        <div className="my-10 h-px bg-slate-800" />
+            ===================================================== */}
+        <div className="my-10 h-px bg-gray-200" />
 
-        {/* ===================================================
-            LOWER FOOTER
-            =================================================== */}
-        <div className="flex flex-col gap-5 text-sm md:flex-row md:items-center md:justify-between">
+        {/* =====================================================
+            PLATFORM INFORMATION
+            ===================================================== */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
-          {/* COPYRIGHT */}
-          <p className="text-slate-500">
-            © {currentYear} Dodoo Coding Club. All rights reserved.
-          </p>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
 
-          {/* PLATFORM NAME */}
-          <div className="flex items-center gap-2 text-slate-500">
-            <Code2 className="h-4 w-4 text-blue-400" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50">
+              <Code2 className="h-4 w-4 text-blue-700" />
+            </div>
 
             <span>
-              Student Success & Impact Platform
+              Student Success &amp; Impact Platform
             </span>
+
           </div>
 
-          {/* DEVELOPER */}
-          <p className="text-slate-500">
-            Developed by{" "}
-            <span className="font-semibold text-slate-300">
-              Godfred Sefa Aboagye
-            </span>
+          <p className="text-sm text-gray-500">
+            Built to support learning, growth, and impact.
           </p>
 
         </div>
@@ -252,19 +352,27 @@ export default function Footer() {
       </div>
 
       {/* =====================================================
-          BOTTOM BRAND BAR
+          BLUE COPYRIGHT BAR
+          Matches Official DCC Website
           ===================================================== */}
-      <div className="border-t border-slate-800 bg-slate-950/80">
+      <div className="bg-blue-700">
 
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-6 py-4 text-xs text-slate-600 sm:flex-row lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-5 text-center sm:flex-row sm:text-left lg:px-8">
 
-          <span>
-            Built for student growth, learning, and impact.
-          </span>
+          <p className="text-sm font-medium text-white">
+            © {currentYear} - Dodoo Coding Club
+          </p>
 
-          <span>
-            Dodoo Coding Club · Ghana
-          </span>
+          <p className="text-xs text-blue-100 sm:text-sm">
+            Student Success &amp; Impact Platform
+          </p>
+
+          <p className="text-xs text-blue-100 sm:text-sm">
+            Developed by{" "}
+            <span className="font-semibold text-white">
+              Godfred Sefa Aboagye
+            </span>
+          </p>
 
         </div>
 
