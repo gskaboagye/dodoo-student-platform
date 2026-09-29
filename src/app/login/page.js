@@ -36,9 +36,7 @@ export default function LoginPage() {
       ...form,
       role,
       facilitatorCode:
-        role === "facilitator"
-          ? form.facilitatorCode
-          : "",
+        role === "facilitator" ? form.facilitatorCode : "",
     });
 
     setMessage("");
@@ -270,12 +268,21 @@ export default function LoginPage() {
 
                 {/* Password */}
                 <div>
-                  <label
-                    htmlFor="password"
-                    className="mb-2 block text-sm font-medium text-slate-700"
-                  >
-                    Password
-                  </label>
+                  <div className="mb-2 flex items-center justify-between">
+                    <label
+                      htmlFor="password"
+                      className="block text-sm font-medium text-slate-700"
+                    >
+                      Password
+                    </label>
+
+                    <Link
+                      href="/forgot-password"
+                      className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      Forgot Password?
+                    </Link>
+                  </div>
 
                   <div className="relative">
                     <LockKeyhole className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
