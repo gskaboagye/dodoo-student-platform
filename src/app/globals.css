@@ -25,6 +25,10 @@ body {
    DCC DASHBOARD MOTION SYSTEM
    ========================================================= */
 
+/* ---------------------------------------------------------
+   BASIC ENTRANCE ANIMATIONS
+   --------------------------------------------------------- */
+
 @keyframes dcc-fade-up {
   0% {
     opacity: 0;
@@ -71,6 +75,38 @@ body {
   }
 }
 
+/* ---------------------------------------------------------
+   HERO ANIMATIONS
+   --------------------------------------------------------- */
+
+@keyframes dcc-hero-enter {
+  0% {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes dcc-panel-enter {
+  0% {
+    opacity: 0;
+    transform: translateX(28px) scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ---------------------------------------------------------
+   GRID / BACKGROUND MOVEMENT
+   --------------------------------------------------------- */
+
 @keyframes dcc-grid-move {
   0% {
     transform: translate3d(0, 0, 0);
@@ -80,6 +116,10 @@ body {
     transform: translate3d(34px, 34px, 0);
   }
 }
+
+/* ---------------------------------------------------------
+   FLOATING ELEMENTS
+   --------------------------------------------------------- */
 
 @keyframes dcc-float {
   0%,
@@ -91,6 +131,21 @@ body {
     transform: translateY(-8px);
   }
 }
+
+@keyframes dcc-gentle-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* ---------------------------------------------------------
+   STATUS / PULSE
+   --------------------------------------------------------- */
 
 @keyframes dcc-pulse-soft {
   0%,
@@ -105,11 +160,55 @@ body {
   }
 }
 
-@keyframes dcc-progress {
-  from {
-    width: 0;
+@keyframes dcc-status-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.25);
+  }
+
+  50% {
+    box-shadow: 0 0 0 7px rgba(34, 197, 94, 0);
   }
 }
+
+@keyframes dcc-notification-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+/* ---------------------------------------------------------
+   PROGRESS
+   --------------------------------------------------------- */
+
+@keyframes dcc-progress {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes dcc-progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* ---------------------------------------------------------
+   SHIMMER / LIGHT SWEEP
+   --------------------------------------------------------- */
 
 @keyframes dcc-shimmer {
   0% {
@@ -121,49 +220,141 @@ body {
   }
 }
 
-/* Page entrance */
+@keyframes dcc-hero-shine {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+
+  100% {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+/* ---------------------------------------------------------
+   STAT ANIMATION
+   --------------------------------------------------------- */
+
+@keyframes dcc-stat-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+
+  70% {
+    transform: translateY(-2px) scale(1.01);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ---------------------------------------------------------
+   CARD BREATHING
+   --------------------------------------------------------- */
+
+@keyframes dcc-card-breathe {
+  0%,
+  100% {
+    box-shadow: 0 8px 24px -18px rgba(15, 23, 42, 0.25);
+  }
+
+  50% {
+    box-shadow: 0 14px 32px -20px rgba(15, 23, 42, 0.38);
+  }
+}
+
+/* ---------------------------------------------------------
+   PAGE REVEAL
+   --------------------------------------------------------- */
+
+@keyframes dcc-page-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================================================
+   BASIC MOTION CLASSES
+   ========================================================= */
 
 .dcc-fade-up {
-  animation: dcc-fade-up 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation:
+    dcc-fade-up
+    700ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
 }
 
 .dcc-fade-in {
-  animation: dcc-fade-in 900ms ease-out both;
+  animation:
+    dcc-fade-in
+    900ms
+    ease-out
+    both;
 }
 
 .dcc-scale-in {
-  animation: dcc-scale-in 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation:
+    dcc-scale-in
+    600ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
 }
 
 .dcc-slide-right {
-  animation: dcc-slide-right 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation:
+    dcc-slide-right
+    650ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
 }
-
-/* Animated dashboard background */
 
 .dcc-grid-motion {
-  animation: dcc-grid-move 18s linear infinite alternate;
+  animation:
+    dcc-grid-move
+    18s
+    linear
+    infinite
+    alternate;
 }
-
-/* Floating elements */
 
 .dcc-float {
-  animation: dcc-float 4s ease-in-out infinite;
+  animation:
+    dcc-float
+    4s
+    ease-in-out
+    infinite;
 }
-
-/* Status indicators */
 
 .dcc-pulse-soft {
-  animation: dcc-pulse-soft 2s ease-in-out infinite;
+  animation:
+    dcc-pulse-soft
+    2s
+    ease-in-out
+    infinite;
 }
-
-/* Progress bars */
 
 .dcc-progress {
-  animation: dcc-progress 1200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: left center;
+
+  animation:
+    dcc-progress
+    1200ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
 }
 
-/* Staggered entrance */
+/* =========================================================
+   DELAY CLASSES
+   ========================================================= */
 
 .dcc-delay-1 {
   animation-delay: 80ms;
@@ -190,24 +381,170 @@ body {
 }
 
 /* =========================================================
-   INTERACTIVE CARDS
+   ENHANCED MOTION CLASSES
+   ========================================================= */
+
+.dcc-page-reveal {
+  animation:
+    dcc-page-reveal
+    700ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.dcc-hero-enter {
+  animation:
+    dcc-hero-enter
+    800ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.dcc-panel-enter {
+  animation:
+    dcc-panel-enter
+    850ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    120ms
+    both;
+}
+
+.dcc-gentle-float {
+  animation:
+    dcc-gentle-float
+    4.5s
+    ease-in-out
+    infinite;
+}
+
+.dcc-status-pulse {
+  animation:
+    dcc-status-pulse
+    2.2s
+    ease-in-out
+    infinite;
+}
+
+.dcc-notification-pulse {
+  animation:
+    dcc-notification-pulse
+    2.5s
+    ease-in-out
+    infinite;
+}
+
+.dcc-stat-pop {
+  animation:
+    dcc-stat-pop
+    650ms
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.dcc-progress-grow {
+  transform-origin: left center;
+
+  animation:
+    dcc-progress-grow
+    1.4s
+    cubic-bezier(0.22, 1, 0.36, 1)
+    both;
+}
+
+.dcc-card-breathe {
+  animation:
+    dcc-card-breathe
+    4s
+    ease-in-out
+    infinite;
+}
+
+/* =========================================================
+   HERO LIGHT SWEEP
+   ========================================================= */
+
+.dcc-hero-shine {
+  position: absolute;
+  inset: 0 auto 0 0;
+
+  width: 30%;
+
+  pointer-events: none;
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
+
+  animation:
+    dcc-hero-shine
+    5s
+    ease-in-out
+    infinite;
+}
+
+/* =========================================================
+   CARD MOTION
    ========================================================= */
 
 .dcc-card-motion {
   transition:
-    transform 250ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 250ms ease,
-    border-color 250ms ease,
-    background-color 250ms ease;
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 280ms ease,
+    border-color 280ms ease,
+    background-color 280ms ease;
 }
 
-.dcc-card-motion:hover {
-  transform: translateY(-5px);
-  box-shadow:
-    0 20px 40px -22px rgba(15, 23, 42, 0.45);
+@media (hover: hover) and (pointer: fine) {
+  .dcc-card-motion:hover {
+    transform: translateY(-5px);
+
+    box-shadow:
+      0 20px 40px -22px rgba(15, 23, 42, 0.45);
+  }
 }
 
-/* Icons react when cards are hovered */
+/* =========================================================
+   INTERACTIVE CARDS
+   ========================================================= */
+
+.dcc-interactive {
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 280ms ease,
+    border-color 280ms ease,
+    background-color 280ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dcc-interactive:hover {
+    transform: translateY(-6px);
+
+    box-shadow:
+      0 24px 45px -25px rgba(15, 23, 42, 0.5);
+  }
+
+  .dcc-interactive:hover .dcc-icon-motion {
+    transform:
+      translateY(-3px)
+      rotate(-3deg)
+      scale(1.08);
+  }
+
+  .dcc-interactive:hover .dcc-arrow-motion {
+    transform: translateX(7px);
+  }
+}
+
+.dcc-interactive:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+/* =========================================================
+   ICON MOTION
+   ========================================================= */
 
 .dcc-icon-motion {
   transition:
@@ -215,11 +552,17 @@ body {
     background-color 250ms ease;
 }
 
-.dcc-card-motion:hover .dcc-icon-motion {
-  transform: translateY(-3px) scale(1.08);
+@media (hover: hover) and (pointer: fine) {
+  .dcc-card-motion:hover .dcc-icon-motion {
+    transform:
+      translateY(-3px)
+      scale(1.08);
+  }
 }
 
-/* Arrow movement */
+/* =========================================================
+   ARROW MOTION
+   ========================================================= */
 
 .dcc-arrow-motion {
   transition:
@@ -227,12 +570,14 @@ body {
     opacity 220ms ease;
 }
 
-.dcc-card-motion:hover .dcc-arrow-motion {
-  transform: translateX(5px);
+@media (hover: hover) and (pointer: fine) {
+  .dcc-card-motion:hover .dcc-arrow-motion {
+    transform: translateX(5px);
+  }
 }
 
 /* =========================================================
-   DASHBOARD BUTTON EFFECT
+   BUTTON MOTION
    ========================================================= */
 
 .dcc-button-motion {
@@ -242,12 +587,19 @@ body {
     background-color 180ms ease;
 }
 
-.dcc-button-motion:hover {
-  transform: translateY(-2px);
+@media (hover: hover) and (pointer: fine) {
+  .dcc-button-motion:hover {
+    transform: translateY(-2px);
+
+    box-shadow:
+      0 8px 18px -10px rgba(15, 23, 42, 0.45);
+  }
 }
 
 .dcc-button-motion:active {
-  transform: translateY(0) scale(0.98);
+  transform:
+    translateY(0)
+    scale(0.98);
 }
 
 /* =========================================================
@@ -264,11 +616,74 @@ body {
     );
 
   background-size: 500px 100%;
-  animation: dcc-shimmer 3s linear infinite;
+
+  animation:
+    dcc-shimmer
+    3s
+    linear
+    infinite;
 }
 
 /* =========================================================
-   REDUCE MOTION FOR ACCESSIBILITY
+   STAGGERED ANIMATIONS
+   ========================================================= */
+
+.dcc-stagger-1 {
+  animation-delay: 80ms;
+}
+
+.dcc-stagger-2 {
+  animation-delay: 160ms;
+}
+
+.dcc-stagger-3 {
+  animation-delay: 240ms;
+}
+
+.dcc-stagger-4 {
+  animation-delay: 320ms;
+}
+
+.dcc-stagger-5 {
+  animation-delay: 400ms;
+}
+
+.dcc-stagger-6 {
+  animation-delay: 480ms;
+}
+
+.dcc-stagger-7 {
+  animation-delay: 560ms;
+}
+
+.dcc-stagger-8 {
+  animation-delay: 640ms;
+}
+
+/* =========================================================
+   MOBILE OPTIMIZATION
+   ========================================================= */
+
+@media (max-width: 640px) {
+  .dcc-grid-motion {
+    animation-duration: 24s;
+  }
+
+  .dcc-card-motion {
+    transition-duration: 220ms;
+  }
+
+  .dcc-interactive {
+    transition-duration: 220ms;
+  }
+
+  .dcc-gentle-float {
+    animation-duration: 5.5s;
+  }
+}
+
+/* =========================================================
+   ACCESSIBILITY
    ========================================================= */
 
 @media (prefers-reduced-motion: reduce) {
@@ -280,11 +695,22 @@ body {
   .dcc-float,
   .dcc-pulse-soft,
   .dcc-progress,
-  .dcc-shimmer {
+  .dcc-shimmer,
+  .dcc-page-reveal,
+  .dcc-hero-enter,
+  .dcc-panel-enter,
+  .dcc-gentle-float,
+  .dcc-status-pulse,
+  .dcc-notification-pulse,
+  .dcc-stat-pop,
+  .dcc-progress-grow,
+  .dcc-hero-shine,
+  .dcc-card-breathe {
     animation: none !important;
   }
 
   .dcc-card-motion,
+  .dcc-interactive,
   .dcc-icon-motion,
   .dcc-arrow-motion,
   .dcc-button-motion {
