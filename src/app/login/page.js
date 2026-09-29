@@ -36,7 +36,9 @@ export default function LoginPage() {
       ...form,
       role,
       facilitatorCode:
-        role === "facilitator" ? form.facilitatorCode : "",
+        role === "facilitator"
+          ? form.facilitatorCode
+          : "",
     });
 
     setMessage("");
@@ -94,9 +96,6 @@ export default function LoginPage() {
         }),
       });
 
-      // Read the response as text first.
-      // This prevents response.json() from crashing
-      // when the server returns an empty response.
       const responseText = await response.text();
 
       let data = {};
@@ -119,7 +118,6 @@ export default function LoginPage() {
         }
       }
 
-      // Handle unsuccessful login
       if (!response.ok) {
         setMessage(
           data.error ||
@@ -131,8 +129,11 @@ export default function LoginPage() {
         return;
       }
 
-      // Make sure the server actually returned success
-      if (!data.success && !data.message && !data.user) {
+      if (
+        !data.success &&
+        !data.message &&
+        !data.user
+      ) {
         setMessage(
           "Login response was incomplete. Please try again."
         );
@@ -141,7 +142,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Successful login
       router.replace("/");
     } catch (error) {
       console.error("Login error:", error);
@@ -158,21 +158,37 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
       <div className="w-full max-w-md">
 
-        {/* Main Login Card */}
+        {/* LOGIN CARD */}
         <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-lg">
 
-          {/* Header */}
-          <div className="mb-8 text-center">
+          {/* =================================================
+              DODOO CODING CLUB LOGO
+              Matches the footer branding
+              ================================================= */}
+          <div className="mb-6 flex flex-col items-center">
+            <div className="flex items-center gap-3">
 
-            {/* Dodoo Coding Club Logo */}
-            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center">
-              <img
-                src="/images/dcc-logo.png"
-                alt="Dodoo Coding Club"
-                className="h-full w-full object-contain"
-              />
+              {/* Code Icon */}
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-blue-700 text-2xl font-bold text-blue-700">
+                &lt;/&gt;
+              </div>
+
+              {/* Club Name */}
+              <div className="text-left">
+                <h2 className="text-xl font-extrabold text-blue-700">
+                  DODOO
+                </h2>
+
+                <p className="font-bold text-blue-700">
+                  CODING CLUB
+                </p>
+              </div>
+
             </div>
+          </div>
 
+          {/* HEADER */}
+          <div className="mb-8 text-center">
             <h1 className="text-2xl font-bold text-slate-900">
               Welcome Back
             </h1>
@@ -182,18 +198,20 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Error Message */}
+          {/* ERROR MESSAGE */}
           {message && (
             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {message}
             </div>
           )}
 
+          {/* LOGIN FORM */}
           <form
             onSubmit={handleSubmit}
             className="space-y-5"
           >
-            {/* Login Type */}
+
+            {/* LOGIN TYPE */}
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-700">
                 How are you logging in?
@@ -201,10 +219,12 @@ export default function LoginPage() {
 
               <div className="grid grid-cols-2 gap-3">
 
-                {/* Student */}
+                {/* STUDENT */}
                 <button
                   type="button"
-                  onClick={() => selectRole("student")}
+                  onClick={() =>
+                    selectRole("student")
+                  }
                   className={`flex flex-col items-center justify-center rounded-xl border-2 px-4 py-4 transition ${
                     form.role === "student"
                       ? "border-blue-600 bg-blue-50 text-blue-700"
@@ -222,7 +242,7 @@ export default function LoginPage() {
                   </span>
                 </button>
 
-                {/* Facilitator */}
+                {/* FACILITATOR */}
                 <button
                   type="button"
                   onClick={() =>
@@ -244,14 +264,15 @@ export default function LoginPage() {
                     Facilitator account
                   </span>
                 </button>
+
               </div>
             </div>
 
-            {/* Login Fields */}
+            {/* LOGIN FIELDS */}
             {form.role && (
               <div className="space-y-5">
 
-                {/* Email */}
+                {/* EMAIL */}
                 <div>
                   <label
                     htmlFor="email"
@@ -277,9 +298,10 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Password */}
+                {/* PASSWORD */}
                 <div>
                   <div className="mb-2 flex items-center justify-between">
+
                     <label
                       htmlFor="password"
                       className="block text-sm font-medium text-slate-700"
@@ -293,6 +315,7 @@ export default function LoginPage() {
                     >
                       Forgot Password?
                     </Link>
+
                   </div>
 
                   <div className="relative">
@@ -312,7 +335,7 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                {/* Facilitator Invitation Code */}
+                {/* FACILITATOR INVITATION CODE */}
                 {form.role === "facilitator" && (
                   <div>
                     <label
@@ -345,7 +368,7 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                {/* Selected Role */}
+                {/* SELECTED ROLE */}
                 <div className="rounded-lg bg-blue-50 px-4 py-3 text-center text-sm text-blue-700">
                   You are signing in as{" "}
                   <span className="font-bold">
@@ -355,7 +378,7 @@ export default function LoginPage() {
                   </span>
                 </div>
 
-                {/* Sign In */}
+                {/* SIGN IN */}
                 <button
                   type="submit"
                   disabled={loading}
@@ -365,11 +388,13 @@ export default function LoginPage() {
                     ? "Signing in..."
                     : "Sign In"}
                 </button>
+
               </div>
             )}
+
           </form>
 
-          {/* Register */}
+          {/* CREATE ACCOUNT */}
           <div className="mt-6 text-center text-sm text-slate-500">
             Don't have an account?{" "}
             <Link
@@ -379,12 +404,14 @@ export default function LoginPage() {
               Create an account
             </Link>
           </div>
+
         </div>
 
-        {/* Footer */}
+        {/* FOOTER TEXT */}
         <p className="mt-6 text-center text-xs text-slate-400">
           Dodoo Coding Club · Student Success & Impact Platform
         </p>
+
       </div>
     </main>
   );
