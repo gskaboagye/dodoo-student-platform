@@ -1,135 +1,131 @@
 import { NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
 import { cookies } from "next/headers";
 
 import clientPromise from "@/lib/mongodb";
 import { verifySession } from "@/lib/auth";
 
-// =====================================================
-// DATABASE
-// =====================================================
-
-async function getDatabase() {
-  const client = await clientPromise;
-
-  return client.db(
-    process.env.DB_NAME || "DCCPlatform"
-  );
-}
-
-// =====================================================
-// SESSION
-// =====================================================
+// =========================================================
+// GET CURRENT SESSION
+// =========================================================
 
 async function getSession() {
   try {
     const cookieStore = await cookies();
-
-    const token =
-      cookieStore.get("dcc_session")?.value;
+    const token = cookieStore.get("dcc_session")?.value;
 
     if (!token) {
       return null;
     }
 
-    return await verifySession(token);
+    const session = await verifySession(token);
+
+    return session || null;
   } catch (error) {
+    console.error("NOTIFICATION SESSION ERROR:", error);
+    return null;
+  }
+}
+
+// =========================================================
+// DATABASE
+// =========================================================
+
+async function getDatabase() {
+  const client = await clientPromise;
+
+  const dbName =
+    process.env.DB_NAME || "DCCPlatform";
+
+  return client.db(dbName);
+}
+
+// =========================================================
+// CLEAN OLD NOTIFICATIONS
+//
+// Read notifications:
+// - Deleted after 7 days.
+//
+// Unread notifications:
+// - Kept for up to 30 days.
+//
+// Any notification older than 30 days:
+// - Deleted regardless of read status.
+//
+// This cleanup runs automatically whenever the
+// notifications API is requested.
+// =========================================================
+
+async function cleanupOldNotifications(db) {
+  try {
+    const now = Date.now();
+
+    const sevenDaysAgo = new Date(
+      now - 7 * 24 * 60 * 60 * 1000
+    );
+
+    const thirtyDaysAgo = new Date(
+      now - 30 * 24 * 60 * 60 * 1000
+    );
+
+    // -------------------------------------------------------
+    // 1. Delete READ notifications older than 7 days
+    // -------------------------------------------------------
+
+    const readCleanup = await db
+      .collection("notifications")
+      .deleteMany({
+        read: true,
+        createdAt: {
+          $lt: sevenDaysAgo,
+        },
+      });
+
+    // -------------------------------------------------------
+    // 2. Delete ALL notifications older than 30 days
+    // -------------------------------------------------------
+
+    const oldCleanup = await db
+      .collection("notifications")
+      .deleteMany({
+        createdAt: {
+          $lt: thirtyDaysAgo,
+        },
+      });
+
+    if (
+      readCleanup.deletedCount > 0 ||
+      oldCleanup.deletedCount > 0
+    ) {
+      console.log(
+        `Notification cleanup: deleted ${
+          readCleanup.deletedCount
+        } read notifications and ${
+          oldCleanup.deletedCount
+        } notifications older than 30 days.`
+      );
+    }
+  } catch (error) {
+    // Cleanup failure should never prevent the user
+    // from seeing their current notifications.
     console.error(
-      "NOTIFICATION SESSION ERROR:",
+      "NOTIFICATION CLEANUP ERROR:",
       error
     );
-
-    return null;
   }
 }
 
-// =====================================================
-// USER ID QUERY
-// =====================================================
-
-function buildUserIdQuery(userId) {
-  const values = [
-    String(userId),
-  ];
-
-  if (
-    ObjectId.isValid(
-      String(userId)
-    )
-  ) {
-    values.push(
-      new ObjectId(
-        String(userId)
-      )
-    );
-  }
-
-  return {
-    userId: {
-      $in: values,
-    },
-  };
-}
-
-// =====================================================
-// FORMAT NOTIFICATION
-// =====================================================
-
-function formatNotification(
-  notification
-) {
-  if (!notification) {
-    return null;
-  }
-
-  return {
-    id: notification._id
-      ? notification._id.toString()
-      : null,
-
-    title:
-      notification.title ||
-      "Notification",
-
-    message:
-      notification.message ||
-      "",
-
-    type:
-      notification.type ||
-      "general",
-
-    link:
-      notification.link ||
-      "",
-
-    read:
-      notification.read === true,
-
-    createdAt:
-      notification.createdAt ||
-      null,
-
-    updatedAt:
-      notification.updatedAt ||
-      null,
-  };
-}
-
-// =====================================================
+// =========================================================
 // GET NOTIFICATIONS
-// =====================================================
+// =========================================================
 
 export async function GET() {
   try {
-    const session =
-      await getSession();
+    const session = await getSession();
 
-    if (!session?.userId) {
+    if (!session) {
       return NextResponse.json(
         {
-          error:
-            "You must be logged in to view notifications.",
+          message: "Unauthorized.",
         },
         {
           status: 401,
@@ -137,53 +133,75 @@ export async function GET() {
       );
     }
 
-    const db =
-      await getDatabase();
+    const db = await getDatabase();
 
-    const notificationsCollection =
-      db.collection(
-        "notifications"
-      );
+    // -------------------------------------------------------
+    // CLEAN OLD NOTIFICATIONS
+    // -------------------------------------------------------
 
-    const userQuery =
-      buildUserIdQuery(
-        session.userId
-      );
+    await cleanupOldNotifications(db);
 
-    // ---------------------------------------------------
-    // GET USER NOTIFICATIONS
-    // ---------------------------------------------------
+    // -------------------------------------------------------
+    // GET CURRENT USER'S NOTIFICATIONS
+    // -------------------------------------------------------
 
-    const notifications =
-      await notificationsCollection
-        .find(userQuery)
-        .sort({
-          createdAt: -1,
-          _id: -1,
-        })
-        .limit(50)
-        .toArray();
+    const notifications = await db
+      .collection("notifications")
+      .find({
+        userId: String(session.userId),
+      })
+      .sort({
+        createdAt: -1,
+      })
+      .limit(50)
+      .toArray();
 
-    // ---------------------------------------------------
-    // COUNT UNREAD
-    // ---------------------------------------------------
+    // -------------------------------------------------------
+    // COUNT UNREAD NOTIFICATIONS
+    // -------------------------------------------------------
 
-    const unreadCount =
-      await notificationsCollection.countDocuments(
-        {
-          ...userQuery,
-          read: {
-            $ne: true,
-          },
-        }
-      );
+    const unreadCount = await db
+      .collection("notifications")
+      .countDocuments({
+        userId: String(session.userId),
+        read: {
+          $ne: true,
+        },
+      });
+
+    // -------------------------------------------------------
+    // FORMAT NOTIFICATIONS
+    // -------------------------------------------------------
+
+    const formattedNotifications =
+      notifications.map((notification) => ({
+        id: notification._id.toString(),
+
+        title:
+          notification.title || "",
+
+        message:
+          notification.message || "",
+
+        type:
+          notification.type || "info",
+
+        link:
+          notification.link || "",
+
+        read:
+          notification.read === true,
+
+        createdAt:
+          notification.createdAt || null,
+
+        updatedAt:
+          notification.updatedAt || null,
+      }));
 
     return NextResponse.json(
       {
-        notifications:
-          notifications.map(
-            formatNotification
-          ),
+        notifications: formattedNotifications,
 
         unreadCount,
       },
@@ -204,7 +222,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        error:
+        message:
           "Unable to load notifications.",
       },
       {
@@ -214,22 +232,26 @@ export async function GET() {
   }
 }
 
-// =====================================================
-// MARK NOTIFICATIONS AS READ
-// =====================================================
+// =========================================================
+// PATCH NOTIFICATIONS
+//
+// Supports:
+//
+// 1. Mark one notification as read
+//    { id: "notificationId" }
+//
+// 2. Mark all notifications as read
+//    { markAllRead: true }
+// =========================================================
 
-export async function PATCH(
-  request
-) {
+export async function PATCH(request) {
   try {
-    const session =
-      await getSession();
+    const session = await getSession();
 
-    if (!session?.userId) {
+    if (!session) {
       return NextResponse.json(
         {
-          error:
-            "You must be logged in.",
+          message: "Unauthorized.",
         },
         {
           status: 401,
@@ -237,53 +259,40 @@ export async function PATCH(
       );
     }
 
-    const body =
-      await request.json();
+    const body = await request.json();
 
-    const db =
-      await getDatabase();
+    const db = await getDatabase();
 
-    const notificationsCollection =
-      db.collection(
-        "notifications"
-      );
-
-    const userQuery =
-      buildUserIdQuery(
-        session.userId
-      );
-
-    // =================================================
+    // -------------------------------------------------------
     // MARK ALL AS READ
-    // =================================================
+    // -------------------------------------------------------
 
-    if (
-      body?.markAllRead === true
-    ) {
-      const result =
-        await notificationsCollection.updateMany(
+    if (body?.markAllRead === true) {
+      const result = await db
+        .collection("notifications")
+        .updateMany(
           {
-            ...userQuery,
+            userId: String(session.userId),
 
             read: {
               $ne: true,
             },
           },
-
           {
             $set: {
               read: true,
-              updatedAt:
-                new Date(),
+
+              updatedAt: new Date(),
             },
           }
         );
 
       return NextResponse.json(
         {
-          success: true,
+          message:
+            "All notifications marked as read.",
 
-          markedRead:
+          updatedCount:
             result.modifiedCount,
         },
         {
@@ -292,23 +301,17 @@ export async function PATCH(
       );
     }
 
-    // =================================================
-    // MARK ONE AS READ
-    // =================================================
+    // -------------------------------------------------------
+    // MARK ONE NOTIFICATION AS READ
+    // -------------------------------------------------------
 
-    const notificationId =
-      body?.id;
+    const id = body?.id;
 
-    if (
-      !notificationId ||
-      !ObjectId.isValid(
-        String(notificationId)
-      )
-    ) {
+    if (!id) {
       return NextResponse.json(
         {
-          error:
-            "A valid notification ID is required.",
+          message:
+            "Notification ID is required.",
         },
         {
           status: 400,
@@ -316,32 +319,42 @@ export async function PATCH(
       );
     }
 
-    const result =
-      await notificationsCollection.updateOne(
+    const { ObjectId } =
+      await import("mongodb");
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
         {
-          ...userQuery,
-
-          _id: new ObjectId(
-            String(notificationId)
-          ),
+          message:
+            "Invalid notification ID.",
         },
+        {
+          status: 400,
+        }
+      );
+    }
 
+    const result = await db
+      .collection("notifications")
+      .updateOne(
+        {
+          _id: new ObjectId(id),
+
+          userId: String(session.userId),
+        },
         {
           $set: {
             read: true,
 
-            updatedAt:
-              new Date(),
+            updatedAt: new Date(),
           },
         }
       );
 
-    if (
-      result.matchedCount === 0
-    ) {
+    if (result.matchedCount === 0) {
       return NextResponse.json(
         {
-          error:
+          message:
             "Notification not found.",
         },
         {
@@ -352,7 +365,8 @@ export async function PATCH(
 
     return NextResponse.json(
       {
-        success: true,
+        message:
+          "Notification marked as read.",
       },
       {
         status: 200,
@@ -366,7 +380,7 @@ export async function PATCH(
 
     return NextResponse.json(
       {
-        error:
+        message:
           "Unable to update notification.",
       },
       {
