@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import {
   LayoutDashboard,
   Users,
@@ -19,6 +20,8 @@ import {
   X,
   ChevronRight,
 } from "lucide-react";
+
+import Announcements from "@/components/Announcements";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -122,7 +125,7 @@ export default function Sidebar() {
     // Close mobile navigation.
     setMobileMenuOpen(false);
 
-    // Tell the AppShell that authentication is no longer active.
+    // Tell AppShell that authentication is no longer active.
     window.dispatchEvent(new Event("dcc-auth-logout"));
 
     try {
@@ -320,7 +323,11 @@ export default function Sidebar() {
     }
 
     return (
-      <nav className="px-3 py-5">
+      <nav className="px-3 py-4">
+        <p className="mb-2 px-4 text-[9px] font-bold uppercase tracking-widest text-slate-400">
+          Navigation
+        </p>
+
         {links.map((link) => {
           const Icon = link.icon;
           const isActive = isActiveLink(link.href);
@@ -465,19 +472,10 @@ export default function Sidebar() {
   // RENDER
   // =========================================================
 
-  /*
-   * Do not render the Sidebar once logout has started.
-   * This removes the navigation immediately while the
-   * logout request is being completed.
-   */
   if (loggingOut) {
     return null;
   }
 
-  /*
-   * If there is no authenticated user and authentication
-   * loading has finished, don't render the dashboard sidebar.
-   */
   if (!loading && !user) {
     return null;
   }
@@ -505,7 +503,7 @@ export default function Sidebar() {
       {mobileMenuOpen && (
         <button
           type="button"
-          aria-label="Close navigation menu"
+          aria-label="Close mobile navigation menu"
           onClick={closeMobileMenu}
           className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[1px] md:hidden"
         />
@@ -518,23 +516,22 @@ export default function Sidebar() {
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
 
         {/* BRAND */}
-
         <div className="border-b border-slate-200 px-5 py-5">
           {renderBrand()}
         </div>
 
         {/* USER */}
-
         {renderUserInformation()}
 
-        {/* NAVIGATION */}
+        {/* ANNOUNCEMENTS */}
+        <Announcements role={user?.role} />
 
-        <div className="flex-1 overflow-y-auto">
+        {/* NAVIGATION */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
 
         {/* SIGN OUT */}
-
         <div className="border-t border-slate-200 px-3 py-3">
           {renderAuthButton()}
         </div>
@@ -545,15 +542,13 @@ export default function Sidebar() {
       ====================================================== */}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[min(82vw,320px)] flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[min(88vw,340px)] flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${
           mobileMenuOpen
             ? "translate-x-0"
             : "-translate-x-full"
         }`}
       >
-
         {/* MOBILE HEADER */}
-
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5">
           {renderBrand({ mobile: true })}
 
@@ -568,17 +563,17 @@ export default function Sidebar() {
         </div>
 
         {/* USER */}
-
         {renderUserInformation()}
 
-        {/* NAVIGATION */}
+        {/* ANNOUNCEMENTS */}
+        <Announcements role={user?.role} />
 
-        <div className="flex-1 overflow-y-auto">
+        {/* NAVIGATION */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
 
         {/* SIGN OUT */}
-
         <div className="border-t border-slate-200 px-3 py-3">
           {renderAuthButton()}
         </div>
