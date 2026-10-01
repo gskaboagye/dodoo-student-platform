@@ -14,14 +14,13 @@ import {
   FolderKanban,
   AlertCircle,
   UserRound,
+  Bell,
   LogIn,
   LogOut,
   Menu,
   X,
   ChevronRight,
 } from "lucide-react";
-
-import Announcements from "@/components/Announcements";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -201,6 +200,11 @@ export default function Sidebar() {
       name: "Dashboard",
       href: "/",
       icon: LayoutDashboard,
+    },
+    {
+      name: "Announcements",
+      href: "/announcements",
+      icon: Bell,
     },
     {
       name: "My Profile",
@@ -523,16 +527,6 @@ export default function Sidebar() {
         {/* USER */}
         {renderUserInformation()}
 
-        {/* =================================================
-            STUDENT ANNOUNCEMENTS ONLY
-        ================================================= */}
-
-        {user?.role === "student" && (
-          <div className="border-b border-slate-200">
-            <Announcements role="student" />
-          </div>
-        )}
-
         {/* NAVIGATION */}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {renderNavigation()}
@@ -572,16 +566,6 @@ export default function Sidebar() {
 
         {/* USER */}
         {renderUserInformation()}
-
-        {/* =================================================
-            STUDENT ANNOUNCEMENTS ONLY
-        ================================================= */}
-
-        {user?.role === "student" && (
-          <div className="border-b border-slate-200">
-            <Announcements role="student" />
-          </div>
-        )}
 
         {/* NAVIGATION */}
         <div className="min-h-0 flex-1 overflow-y-auto">
