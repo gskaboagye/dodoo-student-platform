@@ -338,11 +338,7 @@ export default function Navbar() {
         );
       }
 
-      // -----------------------------------------------------
-      // IMPORTANT:
       // The backend uses "read", not "isRead".
-      // -----------------------------------------------------
-
       setNotifications((current) =>
         current.map((notification) =>
           notification.id === notificationId
@@ -401,11 +397,7 @@ export default function Navbar() {
         );
       }
 
-      // -----------------------------------------------------
-      // IMPORTANT:
       // The backend uses "read", not "isRead".
-      // -----------------------------------------------------
-
       setNotifications((current) =>
         current.map((notification) => ({
           ...notification,
@@ -533,6 +525,10 @@ export default function Navbar() {
 
     if (type === "project") {
       return "Project";
+    }
+
+    if (type === "announcement") {
+      return "Announcement";
     }
 
     return "Platform";
@@ -664,26 +660,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-30 hidden border-b border-slate-200 bg-white lg:block">
-      <div className="flex h-[92px] items-center justify-between px-8">
-
-        {/* =================================================
-            LEFT BRAND
-        ================================================== */}
-
-        <Link
-          href="/"
-          className="group flex items-center gap-3"
-        >
-          <div className="min-w-0">
-            <p className="text-base font-extrabold tracking-[0.18em] text-blue-600">
-              DODOO CODING CLUB
-            </p>
-
-            <p className="mt-1 text-lg font-medium text-slate-500">
-              Student Success Platform
-            </p>
-          </div>
-        </Link>
+      <div className="flex h-[92px] items-center justify-end px-8">
 
         {/* =================================================
             RIGHT SIDE
@@ -771,9 +748,7 @@ export default function Navbar() {
             >
               <Bell size={21} />
 
-              {/* ------------------------------------------------
-                  UNREAD COUNT
-              ------------------------------------------------- */}
+              {/* UNREAD COUNT */}
 
               {unreadCount > 0 && (
                 <span
@@ -824,12 +799,9 @@ export default function Navbar() {
                 "
               >
 
-                {/* =================================================
-                    HEADER
-                ================================================== */}
+                {/* HEADER */}
 
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-
                   <div>
                     <h3 className="font-semibold text-slate-900">
                       Notifications
@@ -873,15 +845,11 @@ export default function Navbar() {
                   </button>
                 </div>
 
-                {/* =================================================
-                    CONTENT
-                ================================================== */}
+                {/* CONTENT */}
 
                 <div className="max-h-[420px] overflow-y-auto">
 
-                  {/* ------------------------------------------------
-                      LOADING
-                  ------------------------------------------------- */}
+                  {/* LOADING */}
 
                   {notificationsLoading ? (
                     <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-slate-500">
@@ -895,12 +863,9 @@ export default function Navbar() {
 
                   ) : notificationsError ? (
 
-                    /* ------------------------------------------------
-                       ERROR
-                    ------------------------------------------------- */
+                    /* ERROR */
 
                     <div className="px-5 py-8 text-center">
-
                       <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-500">
                         <Info size={18} />
                       </div>
@@ -938,12 +903,9 @@ export default function Navbar() {
                   ) : notifications.length ===
                     0 ? (
 
-                    /* ------------------------------------------------
-                       EMPTY STATE
-                    ------------------------------------------------- */
+                    /* EMPTY STATE */
 
                     <div className="px-5 py-10 text-center">
-
                       <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                         <Bell size={20} />
                       </div>
@@ -959,12 +921,9 @@ export default function Navbar() {
 
                   ) : (
 
-                    /* ------------------------------------------------
-                       NOTIFICATION LIST
-                    ------------------------------------------------- */
+                    /* NOTIFICATION LIST */
 
                     <div className="divide-y divide-slate-100">
-
                       {notifications.map(
                         (notification) => (
                           <button
@@ -993,9 +952,7 @@ export default function Navbar() {
                           >
                             <div className="flex gap-3">
 
-                              {/* =================================================
-                                  ICON
-                              ================================================== */}
+                              {/* ICON */}
 
                               <div
                                 className={`
@@ -1019,14 +976,10 @@ export default function Navbar() {
                                 />
                               </div>
 
-                              {/* =================================================
-                                  TEXT
-                              ================================================== */}
+                              {/* TEXT */}
 
                               <div className="min-w-0 flex-1">
-
                                 <div className="flex items-start justify-between gap-3">
-
                                   <p
                                     className={`
                                       text-sm
@@ -1041,9 +994,7 @@ export default function Navbar() {
                                       "Platform Notification"}
                                   </p>
 
-                                  {/* ------------------------------------------------
-                                      UNREAD DOT
-                                  ------------------------------------------------- */}
+                                  {/* UNREAD DOT */}
 
                                   {!notification.read && (
                                     <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
@@ -1055,7 +1006,6 @@ export default function Navbar() {
                                 </p>
 
                                 <div className="mt-2 flex items-center justify-between gap-3">
-
                                   <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                                     {getNotificationIcon(
                                       notification.type
@@ -1067,25 +1017,20 @@ export default function Navbar() {
                                       notification.createdAt
                                     )}
                                   </span>
-
                                 </div>
                               </div>
                             </div>
                           </button>
                         )
                       )}
-
                     </div>
                   )}
                 </div>
 
-                {/* =================================================
-                    FOOTER
-                ================================================== */}
+                {/* FOOTER */}
 
                 {notifications.length > 0 && (
                   <div className="border-t border-slate-100 bg-slate-50 px-5 py-3">
-
                     <Link
                       href="/notifications"
                       onClick={() =>
@@ -1111,10 +1056,8 @@ export default function Navbar() {
                         size={13}
                       />
                     </Link>
-
                   </div>
                 )}
-
               </div>
             )}
           </div>
@@ -1128,7 +1071,6 @@ export default function Navbar() {
               ref={profileRef}
               className="relative"
             >
-
               <button
                 type="button"
                 onClick={() => {
@@ -1152,20 +1094,15 @@ export default function Navbar() {
                 "
               >
 
-                {/* =================================================
-                    AVATAR
-                ================================================== */}
+                {/* AVATAR */}
 
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
                   {getInitials()}
                 </div>
 
-                {/* =================================================
-                    USER
-                ================================================== */}
+                {/* USER */}
 
                 <div className="max-w-[180px] text-left">
-
                   <p className="truncate text-sm font-bold text-slate-800">
                     {getDisplayName()}
                   </p>
@@ -1173,7 +1110,6 @@ export default function Navbar() {
                   <p className="text-xs text-slate-500">
                     {getRoleLabel()}
                   </p>
-
                 </div>
 
                 <ChevronDown
@@ -1189,7 +1125,6 @@ export default function Navbar() {
                     }
                   `}
                 />
-
               </button>
 
               {/* =================================================
@@ -1213,20 +1148,15 @@ export default function Navbar() {
                   "
                 >
 
-                  {/* =================================================
-                      PROFILE HEADER
-                  ================================================== */}
+                  {/* PROFILE HEADER */}
 
                   <div className="border-b border-slate-100 px-4 py-4">
-
                     <div className="flex items-center gap-3">
-
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
                         {getInitials()}
                       </div>
 
                       <div className="min-w-0">
-
                         <p className="truncate text-sm font-bold text-slate-800">
                           {getDisplayName()}
                         </p>
@@ -1234,18 +1164,13 @@ export default function Navbar() {
                         <p className="truncate text-xs text-slate-500">
                           {user.email}
                         </p>
-
                       </div>
-
                     </div>
                   </div>
 
-                  {/* =================================================
-                      PROFILE LINKS
-                  ================================================== */}
+                  {/* PROFILE LINKS */}
 
                   <div className="p-2">
-
                     <Link
                       href="/profile"
                       onClick={() =>
@@ -1329,13 +1254,11 @@ export default function Navbar() {
                         ? "Logging out..."
                         : "Logout"}
                     </button>
-
                   </div>
                 </div>
               )}
             </div>
           )}
-
         </div>
       </div>
     </header>
