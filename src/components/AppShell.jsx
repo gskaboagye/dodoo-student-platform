@@ -7,21 +7,43 @@ import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
+// =========================================================
+// AUTH / STANDALONE ROUTES
+//
+// These pages should NOT display:
+// - Sidebar
+// - Navbar
+// - Footer
+//
+// They are intended to provide a clean authentication
+// experience.
+// =========================================================
+
 const STANDALONE_ROUTES = [
   "/login",
+  "/register",
   "/forgot-password",
   "/reset-password",
+  "/verify-email",
+  "/resend-verification",
 ];
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
-  const [loggingOut, setLoggingOut] = useState(false);
 
-  const isStandaloneRoute = STANDALONE_ROUTES.some(
-    (route) =>
-      pathname === route ||
-      pathname.startsWith(`${route}/`)
-  );
+  const [loggingOut, setLoggingOut] =
+    useState(false);
+
+  // =========================================================
+  // CHECK IF CURRENT PAGE IS AN AUTH PAGE
+  // =========================================================
+
+  const isStandaloneRoute =
+    STANDALONE_ROUTES.some(
+      (route) =>
+        pathname === route ||
+        pathname.startsWith(`${route}/`)
+    );
 
   // =========================================================
   // LISTEN FOR LOGOUT
@@ -47,10 +69,21 @@ export default function AppShell({ children }) {
 
   // =========================================================
   // AUTH PAGES
+  //
+  // Render only the page itself.
+  //
+  // No:
+  // - Sidebar
+  // - Navbar
+  // - Footer
   // =========================================================
 
   if (isStandaloneRoute) {
-    return children;
+    return (
+      <div className="min-h-screen bg-[#f3f4f6]">
+        {children}
+      </div>
+    );
   }
 
   // =========================================================
@@ -70,6 +103,7 @@ export default function AppShell({ children }) {
 
       {/* ===================================================
           MAIN APPLICATION AREA
+
           Sidebar + Dashboard Content
       ==================================================== */}
 
@@ -87,11 +121,15 @@ export default function AppShell({ children }) {
 
         <div className="flex min-w-0 flex-1 flex-col">
 
-          {/* NAVBAR */}
+          {/* =================================================
+              NAVBAR
+          ================================================== */}
 
           <Navbar />
 
-          {/* PAGE CONTENT */}
+          {/* =================================================
+              PAGE CONTENT
+          ================================================== */}
 
           <main className="min-w-0 flex-1">
             {children}
@@ -103,9 +141,8 @@ export default function AppShell({ children }) {
       {/* ===================================================
           FULL-WIDTH FOOTER
 
-          IMPORTANT:
-          Footer is OUTSIDE the Sidebar/Main-content row.
-          Therefore it spans the entire screen width.
+          Footer stays outside the Sidebar/Main-content
+          row so that it spans the entire application width.
       ==================================================== */}
 
       <Footer />
