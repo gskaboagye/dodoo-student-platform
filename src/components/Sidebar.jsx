@@ -202,6 +202,11 @@ export default function Sidebar() {
       icon: LayoutDashboard,
     },
     {
+      name: "Announcements",
+      href: "/announcements",
+      icon: Megaphone,
+    },
+    {
       name: "My Profile",
       href: "/student/profile",
       icon: UserRound,
@@ -275,7 +280,11 @@ export default function Sidebar() {
     return (
       <Link
         href="/"
-        onClick={mobile ? closeMobileMenu : undefined}
+        onClick={
+          mobile
+            ? closeMobileMenu
+            : undefined
+        }
         className="group flex items-center gap-3"
       >
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-blue-600 text-lg font-bold text-blue-600 transition group-hover:bg-blue-50">
@@ -300,55 +309,6 @@ export default function Sidebar() {
   }
 
   // =========================================================
-  // STUDENT ANNOUNCEMENT ICON
-  // =========================================================
-
-  function renderAnnouncementIcon() {
-    // Only students should see the announcement icon.
-    if (loading || user?.role !== "student") {
-      return null;
-    }
-
-    const announcementActive = isActiveLink("/announcements");
-
-    return (
-      <div className="border-b border-slate-200 px-3 py-3">
-        <Link
-          href="/announcements"
-          onClick={closeMobileMenu}
-          aria-label="Announcements"
-          title="Announcements"
-          className={`group flex min-h-[44px] w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition ${
-            announcementActive
-              ? "bg-blue-50 text-blue-700 shadow-sm"
-              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-          }`}
-        >
-          <span className="flex items-center gap-3">
-            <Megaphone
-              size={19}
-              className={`shrink-0 transition ${
-                announcementActive
-                  ? "text-blue-600"
-                  : "text-slate-500 group-hover:text-blue-600"
-              }`}
-            />
-
-            <span>Announcements</span>
-          </span>
-
-          {announcementActive && (
-            <ChevronRight
-              size={15}
-              className="text-blue-500"
-            />
-          )}
-        </Link>
-      </div>
-    );
-  }
-
-  // =========================================================
   // NAVIGATION
   // =========================================================
 
@@ -356,12 +316,14 @@ export default function Sidebar() {
     if (loading) {
       return (
         <div className="space-y-2 px-3 py-5">
-          {Array.from({ length: 7 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-11 animate-pulse rounded-xl bg-slate-100"
-            />
-          ))}
+          {Array.from({ length: 8 }).map(
+            (_, index) => (
+              <div
+                key={index}
+                className="h-11 animate-pulse rounded-xl bg-slate-100"
+              />
+            )
+          )}
         </div>
       );
     }
@@ -538,7 +500,9 @@ export default function Sidebar() {
         type="button"
         aria-label="Open navigation menu"
         aria-expanded={mobileMenuOpen}
-        onClick={() => setMobileMenuOpen(true)}
+        onClick={() =>
+          setMobileMenuOpen(true)
+        }
         className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 md:hidden"
       >
         <Menu size={22} />
@@ -562,6 +526,7 @@ export default function Sidebar() {
       ====================================================== */}
 
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+
         {/* BRAND */}
         <div className="border-b border-slate-200 px-5 py-5">
           {renderBrand()}
@@ -574,9 +539,6 @@ export default function Sidebar() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
-
-        {/* STUDENT ANNOUNCEMENT ICON */}
-        {renderAnnouncementIcon()}
 
         {/* SIGN OUT */}
         <div className="border-t border-slate-200 px-3 py-3">
@@ -595,6 +557,7 @@ export default function Sidebar() {
             : "-translate-x-full"
         }`}
       >
+
         {/* MOBILE HEADER */}
 
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5">
@@ -619,9 +582,6 @@ export default function Sidebar() {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
-
-        {/* STUDENT ANNOUNCEMENT ICON */}
-        {renderAnnouncementIcon()}
 
         {/* SIGN OUT */}
         <div className="border-t border-slate-200 px-3 py-3">
