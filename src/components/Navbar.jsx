@@ -13,7 +13,6 @@ import {
   LogOut,
   Search,
   UserRound,
-  X,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -21,8 +20,7 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
 
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] =
-    useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -122,6 +120,10 @@ export default function Navbar() {
         }
       );
 
+      // -----------------------------------------------------
+      // USER IS NOT LOGGED IN
+      // -----------------------------------------------------
+
       if (response.status === 401) {
         setNotifications([]);
         setUnreadCount(0);
@@ -145,6 +147,10 @@ export default function Navbar() {
 
       setNotifications(loadedNotifications);
 
+      // -----------------------------------------------------
+      // SERVER UNREAD COUNT
+      // -----------------------------------------------------
+
       const serverUnreadCount =
         Number.isFinite(
           Number(data?.unreadCount)
@@ -152,7 +158,7 @@ export default function Navbar() {
           ? Number(data.unreadCount)
           : loadedNotifications.filter(
               (notification) =>
-                !notification.isRead
+                notification.read !== true
             ).length;
 
       setUnreadCount(serverUnreadCount);
@@ -188,6 +194,7 @@ export default function Navbar() {
 
     loadNotifications();
 
+    // Refresh notifications every 15 seconds.
     const interval = setInterval(() => {
       loadNotifications({
         silent: true,
@@ -331,13 +338,17 @@ export default function Navbar() {
         );
       }
 
+      // -----------------------------------------------------
+      // IMPORTANT:
+      // The backend uses "read", not "isRead".
+      // -----------------------------------------------------
+
       setNotifications((current) =>
         current.map((notification) =>
-          notification.id ===
-          notificationId
+          notification.id === notificationId
             ? {
                 ...notification,
-                isRead: true,
+                read: true,
               }
             : notification
         )
@@ -390,10 +401,15 @@ export default function Navbar() {
         );
       }
 
+      // -----------------------------------------------------
+      // IMPORTANT:
+      // The backend uses "read", not "isRead".
+      // -----------------------------------------------------
+
       setNotifications((current) =>
         current.map((notification) => ({
           ...notification,
-          isRead: true,
+          read: true,
         }))
       );
 
@@ -417,7 +433,8 @@ export default function Navbar() {
       return;
     }
 
-    if (!notification.isRead) {
+    // Mark unread notification as read first.
+    if (!notification.read) {
       await markNotificationAsRead(
         notification.id
       );
@@ -425,6 +442,8 @@ export default function Navbar() {
 
     setNotificationsOpen(false);
 
+    // Navigate to the notification link
+    // if one was provided.
     if (notification.link) {
       window.location.href =
         notification.link;
@@ -496,33 +515,23 @@ export default function Navbar() {
   }
 
   // =========================================================
-  // GET NOTIFICATION ICON
+  // GET NOTIFICATION TYPE LABEL
   // =========================================================
 
-  function getNotificationIcon(
-    type
-  ) {
-    if (
-      type === "attendance"
-    ) {
+  function getNotificationIcon(type) {
+    if (type === "attendance") {
       return "Attendance";
     }
 
-    if (
-      type === "progress"
-    ) {
+    if (type === "progress") {
       return "Progress";
     }
 
-    if (
-      type === "student-request"
-    ) {
+    if (type === "student-request") {
       return "Application";
     }
 
-    if (
-      type === "project"
-    ) {
+    if (type === "project") {
       return "Project";
     }
 
@@ -638,15 +647,11 @@ export default function Navbar() {
       return "User";
     }
 
-    if (
-      user.role === "facilitator"
-    ) {
+    if (user.role === "facilitator") {
       return "Facilitator";
     }
 
-    if (
-      user.role === "student"
-    ) {
+    if (user.role === "student") {
       return "Student";
     }
 
@@ -766,6 +771,10 @@ export default function Navbar() {
             >
               <Bell size={21} />
 
+              {/* ------------------------------------------------
+                  UNREAD COUNT
+              ------------------------------------------------- */}
+
               {unreadCount > 0 && (
                 <span
                   className="
@@ -794,6 +803,10 @@ export default function Navbar() {
               )}
             </button>
 
+            {/* =================================================
+                NOTIFICATION DROPDOWN
+            ================================================== */}
+
             {notificationsOpen && (
               <div
                 className="
@@ -811,7 +824,9 @@ export default function Navbar() {
                 "
               >
 
-                {/* HEADER */}
+                {/* =================================================
+                    HEADER
+                ================================================== */}
 
                 <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
 
@@ -858,9 +873,15 @@ export default function Navbar() {
                   </button>
                 </div>
 
-                {/* CONTENT */}
+                {/* =================================================
+                    CONTENT
+                ================================================== */}
 
                 <div className="max-h-[420px] overflow-y-auto">
+
+                  {/* ------------------------------------------------
+                      LOADING
+                  ------------------------------------------------- */}
 
                   {notificationsLoading ? (
                     <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-slate-500">
@@ -871,7 +892,13 @@ export default function Navbar() {
 
                       Loading notifications...
                     </div>
+
                   ) : notificationsError ? (
+
+                    /* ------------------------------------------------
+                       ERROR
+                    ------------------------------------------------- */
+
                     <div className="px-5 py-8 text-center">
 
                       <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-500">
@@ -907,8 +934,14 @@ export default function Navbar() {
                         Try again
                       </button>
                     </div>
+
                   ) : notifications.length ===
                     0 ? (
+
+                    /* ------------------------------------------------
+                       EMPTY STATE
+                    ------------------------------------------------- */
+
                     <div className="px-5 py-10 text-center">
 
                       <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
@@ -923,7 +956,13 @@ export default function Navbar() {
                         You are all caught up.
                       </p>
                     </div>
+
                   ) : (
+
+                    /* ------------------------------------------------
+                       NOTIFICATION LIST
+                    ------------------------------------------------- */
+
                     <div className="divide-y divide-slate-100">
 
                       {notifications.map(
@@ -946,7 +985,7 @@ export default function Navbar() {
                               transition
                               hover:bg-slate-50
                               ${
-                                notification.isRead
+                                notification.read
                                   ? "bg-white"
                                   : "bg-blue-50/60"
                               }
@@ -954,7 +993,9 @@ export default function Navbar() {
                           >
                             <div className="flex gap-3">
 
-                              {/* ICON */}
+                              {/* =================================================
+                                  ICON
+                              ================================================== */}
 
                               <div
                                 className={`
@@ -967,7 +1008,7 @@ export default function Navbar() {
                                   justify-center
                                   rounded-lg
                                   ${
-                                    notification.isRead
+                                    notification.read
                                       ? "bg-slate-100 text-slate-500"
                                       : "bg-blue-100 text-blue-600"
                                   }
@@ -978,7 +1019,9 @@ export default function Navbar() {
                                 />
                               </div>
 
-                              {/* TEXT */}
+                              {/* =================================================
+                                  TEXT
+                              ================================================== */}
 
                               <div className="min-w-0 flex-1">
 
@@ -988,7 +1031,7 @@ export default function Navbar() {
                                     className={`
                                       text-sm
                                       ${
-                                        notification.isRead
+                                        notification.read
                                           ? "font-medium text-slate-700"
                                           : "font-bold text-slate-900"
                                       }
@@ -998,7 +1041,11 @@ export default function Navbar() {
                                       "Platform Notification"}
                                   </p>
 
-                                  {!notification.isRead && (
+                                  {/* ------------------------------------------------
+                                      UNREAD DOT
+                                  ------------------------------------------------- */}
+
+                                  {!notification.read && (
                                     <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
                                   )}
                                 </div>
@@ -1020,8 +1067,8 @@ export default function Navbar() {
                                       notification.createdAt
                                     )}
                                   </span>
-                                </div>
 
+                                </div>
                               </div>
                             </div>
                           </button>
@@ -1032,10 +1079,13 @@ export default function Navbar() {
                   )}
                 </div>
 
-                {/* FOOTER */}
+                {/* =================================================
+                    FOOTER
+                ================================================== */}
 
                 {notifications.length > 0 && (
                   <div className="border-t border-slate-100 bg-slate-50 px-5 py-3">
+
                     <Link
                       href="/notifications"
                       onClick={() =>
@@ -1061,8 +1111,10 @@ export default function Navbar() {
                         size={13}
                       />
                     </Link>
+
                   </div>
                 )}
+
               </div>
             )}
           </div>
@@ -1076,6 +1128,7 @@ export default function Navbar() {
               ref={profileRef}
               className="relative"
             >
+
               <button
                 type="button"
                 onClick={() => {
@@ -1098,15 +1151,21 @@ export default function Navbar() {
                   hover:bg-slate-50
                 "
               >
-                {/* AVATAR */}
+
+                {/* =================================================
+                    AVATAR
+                ================================================== */}
 
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
                   {getInitials()}
                 </div>
 
-                {/* USER */}
+                {/* =================================================
+                    USER
+                ================================================== */}
 
                 <div className="max-w-[180px] text-left">
+
                   <p className="truncate text-sm font-bold text-slate-800">
                     {getDisplayName()}
                   </p>
@@ -1114,6 +1173,7 @@ export default function Navbar() {
                   <p className="text-xs text-slate-500">
                     {getRoleLabel()}
                   </p>
+
                 </div>
 
                 <ChevronDown
@@ -1129,7 +1189,12 @@ export default function Navbar() {
                     }
                   `}
                 />
+
               </button>
+
+              {/* =================================================
+                  PROFILE DROPDOWN
+              ================================================== */}
 
               {profileOpen && (
                 <div
@@ -1147,9 +1212,13 @@ export default function Navbar() {
                     shadow-xl
                   "
                 >
-                  {/* PROFILE HEADER */}
+
+                  {/* =================================================
+                      PROFILE HEADER
+                  ================================================== */}
 
                   <div className="border-b border-slate-100 px-4 py-4">
+
                     <div className="flex items-center gap-3">
 
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
@@ -1157,6 +1226,7 @@ export default function Navbar() {
                       </div>
 
                       <div className="min-w-0">
+
                         <p className="truncate text-sm font-bold text-slate-800">
                           {getDisplayName()}
                         </p>
@@ -1164,12 +1234,15 @@ export default function Navbar() {
                         <p className="truncate text-xs text-slate-500">
                           {user.email}
                         </p>
+
                       </div>
 
                     </div>
                   </div>
 
-                  {/* PROFILE LINKS */}
+                  {/* =================================================
+                      PROFILE LINKS
+                  ================================================== */}
 
                   <div className="p-2">
 

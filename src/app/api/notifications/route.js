@@ -18,20 +18,102 @@ async function getDatabase() {
 }
 
 // =====================================================
-// GET SESSION
+// SESSION
 // =====================================================
 
 async function getSession() {
-  const cookieStore = await cookies();
+  try {
+    const cookieStore = await cookies();
 
-  const token =
-    cookieStore.get("dcc_session")?.value;
+    const token =
+      cookieStore.get("dcc_session")?.value;
 
-  if (!token) {
+    if (!token) {
+      return null;
+    }
+
+    return await verifySession(token);
+  } catch (error) {
+    console.error(
+      "NOTIFICATION SESSION ERROR:",
+      error
+    );
+
+    return null;
+  }
+}
+
+// =====================================================
+// USER ID QUERY
+// =====================================================
+
+function buildUserIdQuery(userId) {
+  const values = [
+    String(userId),
+  ];
+
+  if (
+    ObjectId.isValid(
+      String(userId)
+    )
+  ) {
+    values.push(
+      new ObjectId(
+        String(userId)
+      )
+    );
+  }
+
+  return {
+    userId: {
+      $in: values,
+    },
+  };
+}
+
+// =====================================================
+// FORMAT NOTIFICATION
+// =====================================================
+
+function formatNotification(
+  notification
+) {
+  if (!notification) {
     return null;
   }
 
-  return await verifySession(token);
+  return {
+    id: notification._id
+      ? notification._id.toString()
+      : null,
+
+    title:
+      notification.title ||
+      "Notification",
+
+    message:
+      notification.message ||
+      "",
+
+    type:
+      notification.type ||
+      "general",
+
+    link:
+      notification.link ||
+      "",
+
+    read:
+      notification.read === true,
+
+    createdAt:
+      notification.createdAt ||
+      null,
+
+    updatedAt:
+      notification.updatedAt ||
+      null,
+  };
 }
 
 // =====================================================
@@ -40,12 +122,14 @@ async function getSession() {
 
 export async function GET() {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
-    if (!session) {
+    if (!session?.userId) {
       return NextResponse.json(
         {
-          message: "Unauthorized.",
+          error:
+            "You must be logged in to view notifications.",
         },
         {
           status: 401,
@@ -53,70 +137,65 @@ export async function GET() {
       );
     }
 
-    if (!session.userId) {
-      return NextResponse.json(
-        {
-          message: "User ID was not found.",
-        },
-        {
-          status: 400,
-        }
+    const db =
+      await getDatabase();
+
+    const notificationsCollection =
+      db.collection(
+        "notifications"
       );
-    }
 
-    const userId = String(session.userId);
+    const userQuery =
+      buildUserIdQuery(
+        session.userId
+      );
 
-    const db = await getDatabase();
+    // ---------------------------------------------------
+    // GET USER NOTIFICATIONS
+    // ---------------------------------------------------
 
     const notifications =
-      await db
-        .collection("notifications")
-        .find({
-          userId,
-        })
+      await notificationsCollection
+        .find(userQuery)
         .sort({
           createdAt: -1,
+          _id: -1,
         })
         .limit(50)
         .toArray();
 
+    // ---------------------------------------------------
+    // COUNT UNREAD
+    // ---------------------------------------------------
+
     const unreadCount =
-      await db
-        .collection("notifications")
-        .countDocuments({
-          userId,
-          read: false,
-        });
-
-    const formattedNotifications =
-      notifications.map(
-        (notification) => ({
-          ...notification,
-
-          _id:
-            notification._id.toString(),
-
-          createdAt:
-            notification.createdAt instanceof Date
-              ? notification.createdAt.toISOString()
-              : notification.createdAt,
-
-          updatedAt:
-            notification.updatedAt instanceof Date
-              ? notification.updatedAt.toISOString()
-              : notification.updatedAt,
-        })
+      await notificationsCollection.countDocuments(
+        {
+          ...userQuery,
+          read: {
+            $ne: true,
+          },
+        }
       );
 
-    return NextResponse.json({
-      notifications:
-        formattedNotifications,
+    return NextResponse.json(
+      {
+        notifications:
+          notifications.map(
+            formatNotification
+          ),
 
-      unreadCount,
+        unreadCount,
+      },
+      {
+        status: 200,
 
-      total:
-        formattedNotifications.length,
-    });
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate",
+        },
+      }
+    );
   } catch (error) {
     console.error(
       "GET NOTIFICATIONS ERROR:",
@@ -125,8 +204,8 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        message:
-          "Failed to load notifications.",
+        error:
+          "Unable to load notifications.",
       },
       {
         status: 500,
@@ -136,17 +215,21 @@ export async function GET() {
 }
 
 // =====================================================
-// MARK NOTIFICATION AS READ
+// MARK NOTIFICATIONS AS READ
 // =====================================================
 
-export async function PATCH(request) {
+export async function PATCH(
+  request
+) {
   try {
-    const session = await getSession();
+    const session =
+      await getSession();
 
-    if (!session) {
+    if (!session?.userId) {
       return NextResponse.json(
         {
-          message: "Unauthorized.",
+          error:
+            "You must be logged in.",
         },
         {
           status: 401,
@@ -154,10 +237,78 @@ export async function PATCH(request) {
       );
     }
 
-    if (!session.userId) {
+    const body =
+      await request.json();
+
+    const db =
+      await getDatabase();
+
+    const notificationsCollection =
+      db.collection(
+        "notifications"
+      );
+
+    const userQuery =
+      buildUserIdQuery(
+        session.userId
+      );
+
+    // =================================================
+    // MARK ALL AS READ
+    // =================================================
+
+    if (
+      body?.markAllRead === true
+    ) {
+      const result =
+        await notificationsCollection.updateMany(
+          {
+            ...userQuery,
+
+            read: {
+              $ne: true,
+            },
+          },
+
+          {
+            $set: {
+              read: true,
+              updatedAt:
+                new Date(),
+            },
+          }
+        );
+
       return NextResponse.json(
         {
-          message: "User ID was not found.",
+          success: true,
+
+          markedRead:
+            result.modifiedCount,
+        },
+        {
+          status: 200,
+        }
+      );
+    }
+
+    // =================================================
+    // MARK ONE AS READ
+    // =================================================
+
+    const notificationId =
+      body?.id;
+
+    if (
+      !notificationId ||
+      !ObjectId.isValid(
+        String(notificationId)
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "A valid notification ID is required.",
         },
         {
           status: 400,
@@ -165,117 +316,46 @@ export async function PATCH(request) {
       );
     }
 
-    const userId = String(session.userId);
+    const result =
+      await notificationsCollection.updateOne(
+        {
+          ...userQuery,
 
-    const body = await request.json();
+          _id: new ObjectId(
+            String(notificationId)
+          ),
+        },
 
-    const action = body?.action;
+        {
+          $set: {
+            read: true,
 
-    const db = await getDatabase();
-
-    // =================================================
-    // MARK ALL NOTIFICATIONS AS READ
-    // =================================================
-
-    if (action === "markAllRead") {
-      const result =
-        await db
-          .collection("notifications")
-          .updateMany(
-            {
-              userId,
-              read: false,
-            },
-            {
-              $set: {
-                read: true,
-                updatedAt: new Date(),
-              },
-            }
-          );
-
-      return NextResponse.json({
-        success: true,
-
-        message:
-          "All notifications marked as read.",
-
-        modifiedCount:
-          result.modifiedCount,
-      });
-    }
-
-    // =================================================
-    // MARK ONE NOTIFICATION AS READ
-    // =================================================
-
-    if (action === "markRead") {
-      const notificationId =
-        body?.notificationId;
-
-      if (
-        !notificationId ||
-        !ObjectId.isValid(
-          String(notificationId)
-        )
-      ) {
-        return NextResponse.json(
-          {
-            message:
-              "A valid notification ID is required.",
+            updatedAt:
+              new Date(),
           },
-          {
-            status: 400,
-          }
-        );
-      }
+        }
+      );
 
-      const result =
-        await db
-          .collection("notifications")
-          .updateOne(
-            {
-              _id: new ObjectId(
-                String(notificationId)
-              ),
-
-              userId,
-            },
-            {
-              $set: {
-                read: true,
-                updatedAt: new Date(),
-              },
-            }
-          );
-
-      if (result.matchedCount === 0) {
-        return NextResponse.json(
-          {
-            message:
-              "Notification not found.",
-          },
-          {
-            status: 404,
-          }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-
-        message:
-          "Notification marked as read.",
-      });
+    if (
+      result.matchedCount === 0
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Notification not found.",
+        },
+        {
+          status: 404,
+        }
+      );
     }
 
     return NextResponse.json(
       {
-        message:
-          "Invalid notification action.",
+        success: true,
       },
       {
-        status: 400,
+        status: 200,
       }
     );
   } catch (error) {
@@ -286,8 +366,8 @@ export async function PATCH(request) {
 
     return NextResponse.json(
       {
-        message:
-          "Failed to update notification.",
+        error:
+          "Unable to update notification.",
       },
       {
         status: 500,
