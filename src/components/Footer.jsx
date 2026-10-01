@@ -297,20 +297,19 @@ export default function Footer() {
           </span>
         </div>
       </div>
+{/* Copyright Bar */}
+<div className="bg-blue-700">
+  <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-5 text-center text-sm text-blue-100 sm:flex-row sm:items-center sm:justify-between sm:text-left lg:px-8">
+    <p>
+      © {currentYear} Dodoo Coding Club. All rights reserved.
+    </p>
 
-      {/* Copyright Bar */}
-      <div className="bg-blue-700">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-5 text-center text-sm text-blue-100 sm:flex-row sm:items-center sm:justify-between sm:text-left lg:px-8">
-          <p>
-            © {currentYear} Dodoo Coding Club. All rights reserved.
-          </p>
-
-          <p>
-            Student Success &amp; Impact Platform
-          </p>
-        </div>
-      </div>
-    </footer>
-  );
-}
+    <p>
+      Developed by{" "}
+      <span className="font-semibold text-white">
+        Godfred Sefa Aboagye
+      </span>
+    </p>
+  </div>
+</div>
 
