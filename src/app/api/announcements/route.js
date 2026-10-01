@@ -54,8 +54,7 @@ async function requireFacilitator() {
       session: null,
       error: NextResponse.json(
         {
-          message:
-            "Only facilitators can manage announcements.",
+          message: "Only facilitators can manage announcements.",
         },
         {
           status: 403,
@@ -111,10 +110,17 @@ async function notifyActiveStudents({
     await createNotifications(
       students.map((student) => ({
         userId: student._id.toString(),
+
         title,
+
         message,
+
         type: "announcement",
-        link: "/",
+
+        // IMPORTANT:
+        // Clicking the notification now opens
+        // the student's announcements page.
+        link: "/announcements",
       }))
     );
   } catch (error) {
@@ -274,8 +280,10 @@ export async function POST(request) {
       message,
       createdAt: now,
       updatedAt: now,
+
       createdBy:
         auth.session.userId || null,
+
       createdByName:
         auth.session.name ||
         "Facilitator",
@@ -445,9 +453,11 @@ export async function PUT(request) {
             title,
             message,
             updatedAt,
+
             updatedBy:
               auth.session.userId ||
               null,
+
             updatedByName:
               auth.session.name ||
               "Facilitator",
@@ -484,12 +494,17 @@ export async function PUT(request) {
 
         announcement: {
           id,
+
           title,
+
           message,
+
           createdAt:
             existingAnnouncement.createdAt ||
             null,
+
           updatedAt,
+
           createdByName:
             existingAnnouncement.createdByName ||
             "Facilitator",
