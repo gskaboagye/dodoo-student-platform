@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  ExternalLink,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -116,15 +117,12 @@ export default function Sidebar() {
     }
 
     setLoggingOut(true);
-
-    // Immediately remove authenticated state.
     setUser(null);
-
-    // Close mobile navigation.
     setMobileMenuOpen(false);
 
-    // Tell AppShell that logout has started.
-    window.dispatchEvent(new Event("dcc-auth-logout"));
+    window.dispatchEvent(
+      new Event("dcc-auth-logout")
+    );
 
     try {
       await fetch("/api/auth/logout", {
@@ -137,7 +135,10 @@ export default function Sidebar() {
         keepalive: true,
       });
     } catch (error) {
-      console.error("Logout request failed:", error);
+      console.error(
+        "Logout request failed:",
+        error
+      );
     } finally {
       window.location.replace("/login");
     }
@@ -274,7 +275,9 @@ export default function Sidebar() {
     return (
       <Link
         href="/"
-        onClick={mobile ? closeMobileMenu : undefined}
+        onClick={
+          mobile ? closeMobileMenu : undefined
+        }
         className="group flex items-center gap-3"
       >
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-blue-600 text-lg font-bold text-blue-600 transition group-hover:bg-blue-50">
@@ -306,12 +309,14 @@ export default function Sidebar() {
     if (loading) {
       return (
         <div className="space-y-2 px-3 py-5">
-          {Array.from({ length: 7 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-11 animate-pulse rounded-xl bg-slate-100"
-            />
-          ))}
+          {Array.from({ length: 7 }).map(
+            (_, index) => (
+              <div
+                key={index}
+                className="h-11 animate-pulse rounded-xl bg-slate-100"
+              />
+            )
+          )}
         </div>
       );
     }
@@ -324,7 +329,8 @@ export default function Sidebar() {
       <nav className="px-3 py-5">
         {links.map((link) => {
           const Icon = link.icon;
-          const isActive = isActiveLink(link.href);
+          const isActive =
+            isActiveLink(link.href);
 
           return (
             <Link
@@ -412,51 +418,71 @@ export default function Sidebar() {
   }
 
   // =========================================================
-  // LOGIN / LOGOUT BUTTON
+  // SIDEBAR BOTTOM ACTIONS
   // =========================================================
 
-  function renderAuthButton() {
+  function renderSidebarActions() {
     if (loading) {
       return null;
     }
 
-    if (user) {
-      return (
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+    return (
+      <div className="border-t border-slate-200 px-3 py-3">
+
+        {/* OFFICIAL DCC WEBSITE */}
+
+        <a
+          href="https://dodoocodingclub.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-1 flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
         >
-          <LogOut
+          <ExternalLink
             size={19}
             className="shrink-0"
           />
 
           <span>
-            {loggingOut ? "Logging out..." : "Logout"}
+            DCC Official Website
           </span>
-        </button>
-      );
-    }
+        </a>
 
-    return (
-      <Link
-        href="/login"
-        onClick={closeMobileMenu}
-        className={`flex min-h-[44px] items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition ${
-          pathname === "/login"
-            ? "bg-blue-50 text-blue-700"
-            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-        }`}
-      >
-        <LogIn
-          size={19}
-          className="shrink-0"
-        />
+        {/* SIGN OUT */}
 
-        <span>Login</span>
-      </Link>
+        {user ? (
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <LogOut
+              size={19}
+              className="shrink-0"
+            />
+
+            <span>
+              {loggingOut
+                ? "Signing out..."
+                : "Sign Out"}
+            </span>
+          </button>
+        ) : (
+          <Link
+            href="/login"
+            onClick={closeMobileMenu}
+            className="flex min-h-[44px] items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+          >
+            <LogIn
+              size={19}
+              className="shrink-0"
+            />
+
+            <span>Login</span>
+          </Link>
+        )}
+
+      </div>
     );
   }
 
@@ -482,7 +508,9 @@ export default function Sidebar() {
         type="button"
         aria-label="Open navigation menu"
         aria-expanded={mobileMenuOpen}
-        onClick={() => setMobileMenuOpen(true)}
+        onClick={() =>
+          setMobileMenuOpen(true)
+        }
         className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 md:hidden"
       >
         <Menu size={22} />
@@ -519,15 +547,13 @@ export default function Sidebar() {
 
         {/* NAVIGATION */}
 
-        <div className="overflow-y-auto">
+        <div className="flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
 
-        {/* LOGOUT */}
+        {/* SIDEBAR ACTIONS */}
 
-        <div className="border-t border-slate-200 px-3 py-3">
-          {renderAuthButton()}
-        </div>
+        {renderSidebarActions()}
       </aside>
 
       {/* =====================================================
@@ -545,7 +571,9 @@ export default function Sidebar() {
         {/* MOBILE HEADER */}
 
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5">
-          {renderBrand({ mobile: true })}
+          {renderBrand({
+            mobile: true,
+          })}
 
           <button
             type="button"
@@ -563,15 +591,13 @@ export default function Sidebar() {
 
         {/* NAVIGATION */}
 
-        <div className="overflow-y-auto">
+        <div className="flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
 
-        {/* LOGOUT */}
+        {/* SIDEBAR ACTIONS */}
 
-        <div className="border-t border-slate-200 px-3 py-3">
-          {renderAuthButton()}
-        </div>
+        {renderSidebarActions()}
       </aside>
     </>
   );

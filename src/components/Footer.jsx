@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+
 import {
   ArrowUpRight,
   Code2,
@@ -13,24 +14,32 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-gray-300 bg-white">
+    <footer className="mt-auto min-h-[520px] border-t border-gray-300 bg-white">
+
       {/* =====================================================
           MAIN FOOTER
-          ===================================================== */}
+      ====================================================== */}
 
-      <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
+      <div className="mx-auto flex min-h-[455px] max-w-7xl flex-col justify-between px-6 py-14 lg:px-8">
+
+        {/* ===================================================
+            FOOTER CONTENT
+        ==================================================== */}
+
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
 
           {/* =================================================
               DODOO CODING CLUB
-              ================================================= */}
+          ================================================== */}
 
           <div className="lg:col-span-1">
+
             <Link
               href="/"
               className="group inline-flex items-center gap-3"
             >
-              {/* DCC LOGO MARK */}
+
+              {/* DCC LOGO */}
 
               <div
                 className="
@@ -67,6 +76,7 @@ export default function Footer() {
                   CODING CLUB
                 </p>
               </div>
+
             </Link>
 
             <p className="mt-6 max-w-sm text-sm leading-7 text-gray-600">
@@ -101,20 +111,24 @@ export default function Footer() {
               "
             >
               Visit DCC
+
               <ArrowUpRight className="h-4 w-4" />
             </a>
+
           </div>
 
           {/* =================================================
               PLATFORM
-              ================================================= */}
+          ================================================== */}
 
           <div>
+
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-900">
               Platform
             </h3>
 
             <ul className="mt-5 space-y-3 text-sm">
+
               <li>
                 <Link
                   href="/"
@@ -159,19 +173,23 @@ export default function Footer() {
                   Reports
                 </Link>
               </li>
+
             </ul>
+
           </div>
 
           {/* =================================================
-              DCC
-              ================================================= */}
+              DODOO CODING CLUB
+          ================================================== */}
 
           <div>
+
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-900">
               Dodoo Coding Club
             </h3>
 
             <ul className="mt-5 space-y-3 text-sm">
+
               <li>
                 <a
                   href="https://dodoocodingclub.com/"
@@ -213,14 +231,17 @@ export default function Footer() {
                   Join the Platform
                 </Link>
               </li>
+
             </ul>
+
           </div>
 
           {/* =================================================
               CONTACT
-              ================================================= */}
+          ================================================== */}
 
           <div>
+
             <h3 className="text-sm font-extrabold uppercase tracking-wider text-gray-900">
               Contact
             </h3>
@@ -230,11 +251,13 @@ export default function Footer() {
               {/* LOCATION */}
 
               <div className="flex items-start gap-3">
+
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
                   <MapPin className="h-5 w-5 text-blue-700" />
                 </div>
 
                 <div>
+
                   <p className="text-sm font-semibold text-gray-900">
                     Ghana
                   </p>
@@ -248,7 +271,9 @@ export default function Footer() {
                     <br />
                     GW-0080-2132
                   </p>
+
                 </div>
+
               </div>
 
               {/* PHONE */}
@@ -257,6 +282,7 @@ export default function Footer() {
                 href="tel:+233558446017"
                 className="group flex items-center gap-3"
               >
+
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
                   <Phone className="h-4 w-4 text-blue-700" />
                 </div>
@@ -264,6 +290,7 @@ export default function Footer() {
                 <span className="text-sm text-gray-600 transition group-hover:text-blue-700">
                   +233 55 844 6017
                 </span>
+
               </a>
 
               {/* EMAIL */}
@@ -272,6 +299,7 @@ export default function Footer() {
                 href="mailto:info@dodoocodingclub.com"
                 className="group flex items-center gap-3"
               >
+
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
                   <Mail className="h-4 w-4 text-blue-700" />
                 </div>
@@ -279,9 +307,10 @@ export default function Footer() {
                 <span className="break-all text-sm text-gray-600 transition group-hover:text-blue-700">
                   info@dodoocodingclub.com
                 </span>
+
               </a>
 
-              {/* SUPPORT BUTTON */}
+              {/* SUPPORT */}
 
               <a
                 href="https://dodoocodingclub.com/"
@@ -307,43 +336,55 @@ export default function Footer() {
               >
                 Support DCC
               </a>
+
             </div>
+
           </div>
+
         </div>
 
         {/* =====================================================
             DIVIDER
-            ===================================================== */}
+        ====================================================== */}
 
         <div className="my-10 h-px bg-gray-200" />
 
         {/* =====================================================
             PLATFORM INFORMATION
-            ===================================================== */}
+        ====================================================== */}
 
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
           <div className="flex items-center gap-2 text-sm text-gray-500">
+
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50">
+
               <Code2 className="h-4 w-4 text-blue-700" />
+
             </div>
 
             <span>
               Student Success &amp; Impact Platform
             </span>
+
           </div>
 
           <p className="text-sm text-gray-500">
             Built to support learning, growth, and impact.
           </p>
+
         </div>
+
       </div>
 
       {/* =====================================================
           BLUE COPYRIGHT BAR
-          ===================================================== */}
+      ====================================================== */}
 
       <div className="bg-blue-700">
+
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-6 py-5 text-center sm:flex-row sm:text-left lg:px-8">
+
           <p className="text-sm font-medium text-white">
             © {currentYear} - Dodoo Coding Club
           </p>
@@ -358,8 +399,11 @@ export default function Footer() {
               Godfred Sefa Aboagye
             </span>
           </p>
+
         </div>
+
       </div>
+
     </footer>
   );
 }
