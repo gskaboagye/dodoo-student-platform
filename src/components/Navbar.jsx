@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import {
   Bell,
+  Building2,
   CheckCheck,
   ChevronDown,
   ExternalLink,
@@ -13,6 +14,7 @@ import {
   LogOut,
   Search,
   UserRound,
+  UsersRound,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -20,7 +22,8 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
 
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] =
+    useState(false);
 
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -30,8 +33,10 @@ export default function Navbar() {
 
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
   const [notificationsLoading, setNotificationsLoading] =
     useState(false);
+
   const [notificationsError, setNotificationsError] =
     useState("");
 
@@ -49,14 +54,17 @@ export default function Navbar() {
       try {
         setLoading(true);
 
-        const response = await fetch("/api/auth/me", {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-          },
-        });
+        const response = await fetch(
+          "/api/auth/me",
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Cache-Control": "no-cache",
+            },
+          }
+        );
 
         if (!response.ok) {
           if (!cancelled) {
@@ -1138,7 +1146,7 @@ export default function Navbar() {
                     right-0
                     top-[58px]
                     z-50
-                    w-64
+                    w-72
                     overflow-hidden
                     rounded-2xl
                     border
@@ -1168,11 +1176,18 @@ export default function Navbar() {
                     </div>
                   </div>
 
-                  {/* PROFILE LINKS */}
+                  {/* =================================================
+                      CLUB LINKS
+                  ================================================== */}
 
                   <div className="p-2">
-                    <Link
-                      href="/profile"
+
+                    {/* ABOUT DODOO CODING CLUB */}
+
+                    <a
+                      href="https://dodoocodingclub.com/about/"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() =>
                         setProfileOpen(false)
                       }
@@ -1190,15 +1205,27 @@ export default function Navbar() {
                         hover:bg-slate-50
                       "
                     >
-                      <UserRound
+                      <Building2
                         size={17}
+                        className="shrink-0 text-slate-500"
                       />
 
-                      Profile
-                    </Link>
+                      <span className="flex-1">
+                        About Dodoo Coding Club
+                      </span>
 
-                    <Link
-                      href="/about"
+                      <ExternalLink
+                        size={14}
+                        className="shrink-0 text-slate-400"
+                      />
+                    </a>
+
+                    {/* FOUNDERS OF THE CLUB */}
+
+                    <a
+                      href="https://dodoocodingclub.com/founders-board/"
+                      target="_blank"
+                      rel="noopener noreferrer"
                       onClick={() =>
                         setProfileOpen(false)
                       }
@@ -1216,12 +1243,26 @@ export default function Navbar() {
                         hover:bg-slate-50
                       "
                     >
-                      <Info size={17} />
+                      <UsersRound
+                        size={17}
+                        className="shrink-0 text-slate-500"
+                      />
 
-                      About Platform
-                    </Link>
+                      <span className="flex-1">
+                        Founders of the Club
+                      </span>
+
+                      <ExternalLink
+                        size={14}
+                        className="shrink-0 text-slate-400"
+                      />
+                    </a>
+
+                    {/* DIVIDER */}
 
                     <div className="my-2 border-t border-slate-100" />
+
+                    {/* LOGOUT */}
 
                     <button
                       type="button"
