@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
 import {
   Bell,
@@ -18,7 +17,6 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
 
   const [profileOpen, setProfileOpen] = useState(false);
-
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const [loggingOut, setLoggingOut] = useState(false);
@@ -190,7 +188,7 @@ export default function Navbar() {
   }
 
   // =========================================================
-  // CLOSE PROFILE WHEN CLICKING OUTSIDE
+  // CLOSE PROFILE / NOTIFICATIONS WHEN CLICKING OUTSIDE
   // =========================================================
 
   useEffect(() => {
@@ -235,26 +233,7 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-30 hidden border-b border-slate-200 bg-white lg:block">
-      <div className="flex h-[92px] items-center justify-between px-8">
-
-        {/* =================================================
-            LEFT BRAND
-        ================================================== */}
-
-        <Link
-          href="/"
-          className="group flex items-center gap-3"
-        >
-          <div className="min-w-0">
-            <p className="text-base font-extrabold tracking-[0.18em] text-blue-600">
-              DODOO CODING CLUB
-            </p>
-
-            <p className="mt-1 text-lg font-medium text-slate-500">
-              Student Success Platform
-            </p>
-          </div>
-        </Link>
+      <div className="flex h-[92px] items-center justify-end px-8">
 
         {/* =================================================
             RIGHT SIDE

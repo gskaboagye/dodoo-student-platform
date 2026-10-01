@@ -1177,6 +1177,8 @@ export default function Dashboard() {
 
         </div>
 
+        {/* FACILITATOR ANNOUNCEMENTS */}
+
         <div className="mt-6">
           <Announcements role={user?.role} />
         </div>
@@ -1487,8 +1489,6 @@ export default function Dashboard() {
         </div>
 
       </section>
-
-      <Announcements role={user?.role} />
 
       {/* STUDENT STATISTICS */}
 
