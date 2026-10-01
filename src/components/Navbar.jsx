@@ -1,15 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
 import {
   Bell,
+  CheckCheck,
   ChevronDown,
   ExternalLink,
   Info,
+  Loader2,
   LogOut,
   Search,
-  Users,
+  UserRound,
+  X,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -17,9 +21,24 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
 
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] =
+    useState(false);
 
   const [loggingOut, setLoggingOut] = useState(false);
+
+  // =========================================================
+  // NOTIFICATIONS
+  // =========================================================
+
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsLoading, setNotificationsLoading] =
+    useState(false);
+  const [notificationsError, setNotificationsError] =
+    useState("");
+
+  const notificationRef = useRef(null);
+  const profileRef = useRef(null);
 
   // =========================================================
   // LOAD CURRENT USER
@@ -55,7 +74,10 @@ export default function Navbar() {
           setUser(data?.user || null);
         }
       } catch (error) {
-        console.error("Navbar user loading error:", error);
+        console.error(
+          "Navbar user loading error:",
+          error
+        );
 
         if (!cancelled) {
           setUser(null);
@@ -75,6 +97,176 @@ export default function Navbar() {
   }, []);
 
   // =========================================================
+  // LOAD NOTIFICATIONS
+  // =========================================================
+
+  async function loadNotifications({
+    silent = false,
+  } = {}) {
+    try {
+      if (!silent) {
+        setNotificationsLoading(true);
+      }
+
+      setNotificationsError("");
+
+      const response = await fetch(
+        "/api/notifications",
+        {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+          },
+        }
+      );
+
+      if (response.status === 401) {
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            "Unable to load notifications."
+        );
+      }
+
+      const loadedNotifications =
+        Array.isArray(data?.notifications)
+          ? data.notifications
+          : [];
+
+      setNotifications(loadedNotifications);
+
+      const serverUnreadCount =
+        Number.isFinite(
+          Number(data?.unreadCount)
+        )
+          ? Number(data.unreadCount)
+          : loadedNotifications.filter(
+              (notification) =>
+                !notification.isRead
+            ).length;
+
+      setUnreadCount(serverUnreadCount);
+    } catch (error) {
+      console.error(
+        "NOTIFICATIONS LOAD ERROR:",
+        error
+      );
+
+      if (!silent) {
+        setNotificationsError(
+          error?.message ||
+            "Unable to load notifications."
+        );
+      }
+    } finally {
+      if (!silent) {
+        setNotificationsLoading(false);
+      }
+    }
+  }
+
+  // =========================================================
+  // LOAD NOTIFICATIONS AFTER USER IS KNOWN
+  // =========================================================
+
+  useEffect(() => {
+    if (!user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    loadNotifications();
+
+    const interval = setInterval(() => {
+      loadNotifications({
+        silent: true,
+      });
+    }, 15000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [user]);
+
+  // =========================================================
+  // REFRESH WHEN TAB BECOMES ACTIVE
+  // =========================================================
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (
+        document.visibilityState ===
+        "visible"
+      ) {
+        loadNotifications({
+          silent: true,
+        });
+      }
+    }
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, []);
+
+  // =========================================================
+  // CLOSE MENUS WHEN CLICKING OUTSIDE
+  // =========================================================
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(
+          event.target
+        )
+      ) {
+        setNotificationsOpen(false);
+      }
+
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(
+          event.target
+        )
+      ) {
+        setProfileOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      );
+    };
+  }, []);
+
+  // =========================================================
   // LISTEN FOR LOGOUT FROM OTHER COMPONENTS
   // =========================================================
 
@@ -83,15 +275,259 @@ export default function Navbar() {
       setUser(null);
       setProfileOpen(false);
       setNotificationsOpen(false);
+      setNotifications([]);
+      setUnreadCount(0);
       setLoggingOut(true);
     }
 
-    window.addEventListener("dcc-auth-logout", handleLogout);
+    window.addEventListener(
+      "dcc-auth-logout",
+      handleLogout
+    );
 
     return () => {
-      window.removeEventListener("dcc-auth-logout", handleLogout);
+      window.removeEventListener(
+        "dcc-auth-logout",
+        handleLogout
+      );
     };
   }, []);
+
+  // =========================================================
+  // MARK ONE NOTIFICATION AS READ
+  // =========================================================
+
+  async function markNotificationAsRead(
+    notificationId
+  ) {
+    if (!notificationId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "/api/notifications",
+        {
+          method: "PATCH",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            id: notificationId,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            "Unable to mark notification as read."
+        );
+      }
+
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id ===
+          notificationId
+            ? {
+                ...notification,
+                isRead: true,
+              }
+            : notification
+        )
+      );
+
+      setUnreadCount((current) =>
+        Math.max(current - 1, 0)
+      );
+    } catch (error) {
+      console.error(
+        "MARK NOTIFICATION READ ERROR:",
+        error
+      );
+    }
+  }
+
+  // =========================================================
+  // MARK ALL NOTIFICATIONS AS READ
+  // =========================================================
+
+  async function markAllNotificationsAsRead() {
+    if (unreadCount === 0) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        "/api/notifications",
+        {
+          method: "PATCH",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            markAllRead: true,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            "Unable to mark notifications as read."
+        );
+      }
+
+      setNotifications((current) =>
+        current.map((notification) => ({
+          ...notification,
+          isRead: true,
+        }))
+      );
+
+      setUnreadCount(0);
+    } catch (error) {
+      console.error(
+        "MARK ALL NOTIFICATIONS READ ERROR:",
+        error
+      );
+    }
+  }
+
+  // =========================================================
+  // OPEN NOTIFICATION
+  // =========================================================
+
+  async function handleNotificationClick(
+    notification
+  ) {
+    if (!notification) {
+      return;
+    }
+
+    if (!notification.isRead) {
+      await markNotificationAsRead(
+        notification.id
+      );
+    }
+
+    setNotificationsOpen(false);
+
+    if (notification.link) {
+      window.location.href =
+        notification.link;
+    }
+  }
+
+  // =========================================================
+  // FORMAT NOTIFICATION DATE
+  // =========================================================
+
+  function formatNotificationDate(
+    createdAt
+  ) {
+    if (!createdAt) {
+      return "";
+    }
+
+    const date = new Date(createdAt);
+
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    const now = new Date();
+
+    const difference =
+      now.getTime() - date.getTime();
+
+    const seconds = Math.floor(
+      difference / 1000
+    );
+
+    if (seconds < 60) {
+      return "Just now";
+    }
+
+    const minutes = Math.floor(
+      seconds / 60
+    );
+
+    if (minutes < 60) {
+      return `${minutes}m ago`;
+    }
+
+    const hours = Math.floor(
+      minutes / 60
+    );
+
+    if (hours < 24) {
+      return `${hours}h ago`;
+    }
+
+    const days = Math.floor(
+      hours / 24
+    );
+
+    if (days < 7) {
+      return `${days}d ago`;
+    }
+
+    return date.toLocaleDateString(
+      "en-US",
+      {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }
+    );
+  }
+
+  // =========================================================
+  // GET NOTIFICATION ICON
+  // =========================================================
+
+  function getNotificationIcon(
+    type
+  ) {
+    if (
+      type === "attendance"
+    ) {
+      return "Attendance";
+    }
+
+    if (
+      type === "progress"
+    ) {
+      return "Progress";
+    }
+
+    if (
+      type === "student-request"
+    ) {
+      return "Application";
+    }
+
+    if (
+      type === "project"
+    ) {
+      return "Project";
+    }
+
+    return "Platform";
+  }
 
   // =========================================================
   // LOGOUT
@@ -106,23 +542,36 @@ export default function Navbar() {
     setUser(null);
     setProfileOpen(false);
     setNotificationsOpen(false);
+    setNotifications([]);
+    setUnreadCount(0);
 
-    window.dispatchEvent(new Event("dcc-auth-logout"));
+    window.dispatchEvent(
+      new Event("dcc-auth-logout")
+    );
 
     try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-        cache: "no-store",
-        headers: {
-          "Cache-Control": "no-cache",
-        },
-        keepalive: true,
-      });
+      await fetch(
+        "/api/auth/logout",
+        {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Cache-Control":
+              "no-cache",
+          },
+          keepalive: true,
+        }
+      );
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error(
+        "Logout error:",
+        error
+      );
     } finally {
-      window.location.replace("/login");
+      window.location.replace(
+        "/login"
+      );
     }
   }
 
@@ -149,12 +598,16 @@ export default function Navbar() {
       }
 
       if (parts[0]) {
-        return parts[0].slice(0, 2).toUpperCase();
+        return parts[0]
+          .slice(0, 2)
+          .toUpperCase();
       }
     }
 
     if (user.email) {
-      return user.email.slice(0, 2).toUpperCase();
+      return user.email
+        .slice(0, 2)
+        .toUpperCase();
     }
 
     return "U";
@@ -169,7 +622,11 @@ export default function Navbar() {
       return "User";
     }
 
-    return user.name || user.firstName || "User";
+    return (
+      user.name ||
+      user.email ||
+      "User"
+    );
   }
 
   // =========================================================
@@ -181,59 +638,47 @@ export default function Navbar() {
       return "User";
     }
 
-    return (
-      user.role.charAt(0).toUpperCase() +
-      user.role.slice(1)
-    );
-  }
-
-  // =========================================================
-  // CLOSE PROFILE / NOTIFICATIONS WHEN CLICKING OUTSIDE
-  // =========================================================
-
-  useEffect(() => {
-    function handleOutsideClick(event) {
-      if (
-        !event.target.closest(
-          "[data-profile-menu]"
-        )
-      ) {
-        setProfileOpen(false);
-      }
-
-      if (
-        !event.target.closest(
-          "[data-notification-menu]"
-        )
-      ) {
-        setNotificationsOpen(false);
-      }
+    if (
+      user.role === "facilitator"
+    ) {
+      return "Facilitator";
     }
 
-    document.addEventListener(
-      "mousedown",
-      handleOutsideClick
-    );
+    if (
+      user.role === "student"
+    ) {
+      return "Student";
+    }
 
-    return () => {
-      document.removeEventListener(
-        "mousedown",
-        handleOutsideClick
-      );
-    };
-  }, []);
+    return user.role;
+  }
 
   // =========================================================
   // RENDER
   // =========================================================
 
-  if (loggingOut) {
-    return null;
-  }
-
   return (
     <header className="sticky top-0 z-30 hidden border-b border-slate-200 bg-white lg:block">
-      <div className="flex h-[92px] items-center justify-end px-8">
+      <div className="flex h-[92px] items-center justify-between px-8">
+
+        {/* =================================================
+            LEFT BRAND
+        ================================================== */}
+
+        <Link
+          href="/"
+          className="group flex items-center gap-3"
+        >
+          <div className="min-w-0">
+            <p className="text-base font-extrabold tracking-[0.18em] text-blue-600">
+              DODOO CODING CLUB
+            </p>
+
+            <p className="mt-1 text-lg font-medium text-slate-500">
+              Student Success Platform
+            </p>
+          </div>
+        </Link>
 
         {/* =================================================
             RIGHT SIDE
@@ -247,7 +692,7 @@ export default function Navbar() {
 
           <div className="relative">
             <Search
-              size={20}
+              size={18}
               className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
             />
 
@@ -281,41 +726,343 @@ export default function Navbar() {
           ================================================== */}
 
           <div
+            ref={notificationRef}
             className="relative"
-            data-notification-menu
           >
             <button
               type="button"
               aria-label="Notifications"
-              onClick={() =>
+              aria-expanded={
+                notificationsOpen
+              }
+              onClick={() => {
                 setNotificationsOpen(
                   (value) => !value
-                )
-              }
-              className="relative flex h-13 w-13 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                );
+
+                setProfileOpen(false);
+
+                if (!notificationsOpen) {
+                  loadNotifications();
+                }
+              }}
+              className="
+                relative
+                flex
+                h-13
+                w-13
+                items-center
+                justify-center
+                rounded-xl
+                border
+                border-slate-200
+                bg-white
+                text-slate-600
+                transition
+                hover:border-blue-200
+                hover:bg-blue-50
+                hover:text-blue-600
+              "
             >
               <Bell size={21} />
 
-              <span className="absolute right-2.5 top-2 h-2.5 w-2.5 rounded-full bg-yellow-400 ring-2 ring-white" />
+              {unreadCount > 0 && (
+                <span
+                  className="
+                    absolute
+                    -right-1
+                    -top-1
+                    flex
+                    min-h-5
+                    min-w-5
+                    items-center
+                    justify-center
+                    rounded-full
+                    bg-red-500
+                    px-1.5
+                    text-[10px]
+                    font-bold
+                    text-white
+                    ring-2
+                    ring-white
+                  "
+                >
+                  {unreadCount > 99
+                    ? "99+"
+                    : unreadCount}
+                </span>
+              )}
             </button>
 
             {notificationsOpen && (
-              <div className="absolute right-0 top-[58px] w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                <div className="border-b border-slate-100 px-5 py-4">
-                  <h3 className="font-semibold text-slate-900">
-                    Notifications
-                  </h3>
+              <div
+                className="
+                  absolute
+                  right-0
+                  top-[58px]
+                  z-50
+                  w-[390px]
+                  overflow-hidden
+                  rounded-2xl
+                  border
+                  border-slate-200
+                  bg-white
+                  shadow-2xl
+                "
+              >
 
-                  <p className="mt-1 text-xs text-slate-500">
-                    Your latest platform updates.
-                  </p>
+                {/* HEADER */}
+
+                <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+
+                  <div>
+                    <h3 className="font-semibold text-slate-900">
+                      Notifications
+                    </h3>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Your latest platform updates.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={
+                      markAllNotificationsAsRead
+                    }
+                    disabled={
+                      unreadCount === 0 ||
+                      notificationsLoading
+                    }
+                    className="
+                      flex
+                      items-center
+                      gap-1.5
+                      rounded-lg
+                      px-2.5
+                      py-2
+                      text-xs
+                      font-semibold
+                      text-blue-600
+                      transition
+                      hover:bg-blue-50
+                      disabled:cursor-not-allowed
+                      disabled:opacity-40
+                    "
+                  >
+                    <CheckCheck
+                      size={15}
+                    />
+
+                    Mark all read
+                  </button>
                 </div>
 
-                <div className="px-5 py-6 text-center">
-                  <p className="text-sm text-slate-500">
-                    No new notifications.
-                  </p>
+                {/* CONTENT */}
+
+                <div className="max-h-[420px] overflow-y-auto">
+
+                  {notificationsLoading ? (
+                    <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-slate-500">
+                      <Loader2
+                        size={18}
+                        className="animate-spin"
+                      />
+
+                      Loading notifications...
+                    </div>
+                  ) : notificationsError ? (
+                    <div className="px-5 py-8 text-center">
+
+                      <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-500">
+                        <Info size={18} />
+                      </div>
+
+                      <p className="text-sm font-semibold text-slate-700">
+                        Unable to load notifications
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        {notificationsError}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          loadNotifications()
+                        }
+                        className="
+                          mt-4
+                          rounded-lg
+                          bg-blue-600
+                          px-4
+                          py-2
+                          text-xs
+                          font-semibold
+                          text-white
+                          transition
+                          hover:bg-blue-700
+                        "
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : notifications.length ===
+                    0 ? (
+                    <div className="px-5 py-10 text-center">
+
+                      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+                        <Bell size={20} />
+                      </div>
+
+                      <p className="text-sm font-semibold text-slate-700">
+                        No notifications
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-400">
+                        You are all caught up.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+
+                      {notifications.map(
+                        (notification) => (
+                          <button
+                            key={
+                              notification.id
+                            }
+                            type="button"
+                            onClick={() =>
+                              handleNotificationClick(
+                                notification
+                              )
+                            }
+                            className={`
+                              w-full
+                              px-5
+                              py-4
+                              text-left
+                              transition
+                              hover:bg-slate-50
+                              ${
+                                notification.isRead
+                                  ? "bg-white"
+                                  : "bg-blue-50/60"
+                              }
+                            `}
+                          >
+                            <div className="flex gap-3">
+
+                              {/* ICON */}
+
+                              <div
+                                className={`
+                                  mt-0.5
+                                  flex
+                                  h-9
+                                  w-9
+                                  shrink-0
+                                  items-center
+                                  justify-center
+                                  rounded-lg
+                                  ${
+                                    notification.isRead
+                                      ? "bg-slate-100 text-slate-500"
+                                      : "bg-blue-100 text-blue-600"
+                                  }
+                                `}
+                              >
+                                <Bell
+                                  size={16}
+                                />
+                              </div>
+
+                              {/* TEXT */}
+
+                              <div className="min-w-0 flex-1">
+
+                                <div className="flex items-start justify-between gap-3">
+
+                                  <p
+                                    className={`
+                                      text-sm
+                                      ${
+                                        notification.isRead
+                                          ? "font-medium text-slate-700"
+                                          : "font-bold text-slate-900"
+                                      }
+                                    `}
+                                  >
+                                    {notification.title ||
+                                      "Platform Notification"}
+                                  </p>
+
+                                  {!notification.isRead && (
+                                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+                                  )}
+                                </div>
+
+                                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                                  {notification.message}
+                                </p>
+
+                                <div className="mt-2 flex items-center justify-between gap-3">
+
+                                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                    {getNotificationIcon(
+                                      notification.type
+                                    )}
+                                  </span>
+
+                                  <span className="text-[10px] text-slate-400">
+                                    {formatNotificationDate(
+                                      notification.createdAt
+                                    )}
+                                  </span>
+                                </div>
+
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      )}
+
+                    </div>
+                  )}
                 </div>
+
+                {/* FOOTER */}
+
+                {notifications.length > 0 && (
+                  <div className="border-t border-slate-100 bg-slate-50 px-5 py-3">
+                    <Link
+                      href="/notifications"
+                      onClick={() =>
+                        setNotificationsOpen(
+                          false
+                        )
+                      }
+                      className="
+                        flex
+                        items-center
+                        justify-center
+                        gap-2
+                        text-xs
+                        font-semibold
+                        text-blue-600
+                        transition
+                        hover:text-blue-700
+                      "
+                    >
+                      View all notifications
+
+                      <ExternalLink
+                        size={13}
+                      />
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -326,17 +1073,30 @@ export default function Navbar() {
 
           {!loading && user && (
             <div
+              ref={profileRef}
               className="relative"
-              data-profile-menu
             >
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
                   setProfileOpen(
                     (value) => !value
-                  )
-                }
-                className="flex h-13 items-center gap-3 rounded-xl px-2.5 transition hover:bg-slate-50"
+                  );
+
+                  setNotificationsOpen(
+                    false
+                  );
+                }}
+                className="
+                  flex
+                  h-13
+                  items-center
+                  gap-3
+                  rounded-xl
+                  px-2.5
+                  transition
+                  hover:bg-slate-50
+                "
               >
                 {/* AVATAR */}
 
@@ -358,123 +1118,143 @@ export default function Navbar() {
 
                 <ChevronDown
                   size={18}
-                  className={`ml-1 text-slate-400 transition-transform ${
-                    profileOpen
-                      ? "rotate-180"
-                      : ""
-                  }`}
+                  className={`
+                    ml-1
+                    text-slate-400
+                    transition-transform
+                    ${
+                      profileOpen
+                        ? "rotate-180"
+                        : ""
+                    }
+                  `}
                 />
               </button>
 
-              {/* =================================================
-                  PROFILE DROPDOWN
-              ================================================== */}
-
               {profileOpen && (
-                <div className="absolute right-0 top-[62px] z-50 w-[330px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                <div
+                  className="
+                    absolute
+                    right-0
+                    top-[58px]
+                    z-50
+                    w-64
+                    overflow-hidden
+                    rounded-2xl
+                    border
+                    border-slate-200
+                    bg-white
+                    shadow-xl
+                  "
+                >
+                  {/* PROFILE HEADER */}
 
-                  {/* USER HEADER */}
+                  <div className="border-b border-slate-100 px-4 py-4">
+                    <div className="flex items-center gap-3">
 
-                  <div className="flex items-center gap-4 border-b border-slate-200 px-5 py-5">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
-                      {getInitials()}
-                    </div>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                        {getInitials()}
+                      </div>
 
-                    <div className="min-w-0">
-                      <p className="truncate font-bold text-slate-900">
-                        {getDisplayName()}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-slate-800">
+                          {getDisplayName()}
+                        </p>
 
-                      <p className="truncate text-sm text-slate-500">
-                        {user.email}
-                      </p>
+                        <p className="truncate text-xs text-slate-500">
+                          {user.email}
+                        </p>
+                      </div>
+
                     </div>
                   </div>
 
-                  {/* =================================================
-                      DROPDOWN LINKS
-                  ================================================== */}
+                  {/* PROFILE LINKS */}
 
                   <div className="p-2">
 
-                    {/* ABOUT DODOO CODING CLUB */}
-
-                    <a
-                      href="https://dodoocodingclub.com/about/"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      href="/profile"
                       onClick={() =>
                         setProfileOpen(false)
                       }
-                      className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                      className="
+                        flex
+                        items-center
+                        gap-3
+                        rounded-lg
+                        px-3
+                        py-2.5
+                        text-sm
+                        font-medium
+                        text-slate-700
+                        transition
+                        hover:bg-slate-50
+                      "
                     >
-                      <span className="flex items-center gap-3">
-                        <Info
-                          size={20}
-                          className="text-slate-500"
-                        />
-
-                        <span>
-                          About Dodoo Coding Club
-                        </span>
-                      </span>
-
-                      <ExternalLink
-                        size={15}
-                        className="text-slate-400"
+                      <UserRound
+                        size={17}
                       />
-                    </a>
 
-                    {/* FOUNDERS OF THE CLUB */}
+                      Profile
+                    </Link>
 
-                    <a
-                      href="https://dodoocodingclub.com/founders-board/"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      href="/about"
                       onClick={() =>
                         setProfileOpen(false)
                       }
-                      className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                      className="
+                        flex
+                        items-center
+                        gap-3
+                        rounded-lg
+                        px-3
+                        py-2.5
+                        text-sm
+                        font-medium
+                        text-slate-700
+                        transition
+                        hover:bg-slate-50
+                      "
                     >
-                      <span className="flex items-center gap-3">
-                        <Users
-                          size={20}
-                          className="text-slate-500"
-                        />
+                      <Info size={17} />
 
-                        <span>
-                          Founders of the Club
-                        </span>
-                      </span>
+                      About Platform
+                    </Link>
 
-                      <ExternalLink
-                        size={15}
-                        className="text-slate-400"
-                      />
-                    </a>
-
-                    {/* DIVIDER */}
-
-                    <div className="my-1 border-t border-slate-100" />
-
-                    {/* SIGN OUT */}
+                    <div className="my-2 border-t border-slate-100" />
 
                     <button
                       type="button"
-                      onClick={handleLogout}
+                      onClick={
+                        handleLogout
+                      }
                       disabled={loggingOut}
-                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="
+                        flex
+                        w-full
+                        items-center
+                        gap-3
+                        rounded-lg
+                        px-3
+                        py-2.5
+                        text-sm
+                        font-semibold
+                        text-red-600
+                        transition
+                        hover:bg-red-50
+                        disabled:cursor-not-allowed
+                        disabled:opacity-50
+                      "
                     >
                       <LogOut
-                        size={20}
-                        className="text-slate-500"
+                        size={17}
                       />
 
-                      <span>
-                        {loggingOut
-                          ? "Signing out..."
-                          : "Sign Out"}
-                      </span>
+                      {loggingOut
+                        ? "Logging out..."
+                        : "Logout"}
                     </button>
 
                   </div>
