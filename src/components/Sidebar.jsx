@@ -550,6 +550,7 @@ export default function Sidebar() {
         }`}
       >
         {/* MOBILE HEADER */}
+
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-5">
           {renderBrand({ mobile: true })}
 
