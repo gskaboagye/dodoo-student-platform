@@ -22,8 +22,6 @@ import {
   Megaphone,
 } from "lucide-react";
 
-import Announcements from "@/components/Announcements";
-
 export default function Sidebar() {
   const pathname = usePathname();
 
@@ -127,9 +125,7 @@ export default function Sidebar() {
     setMobileMenuOpen(false);
 
     // Tell AppShell that authentication is no longer active.
-    window.dispatchEvent(
-      new Event("dcc-auth-logout")
-    );
+    window.dispatchEvent(new Event("dcc-auth-logout"));
 
     try {
       await fetch("/api/auth/logout", {
@@ -142,10 +138,7 @@ export default function Sidebar() {
         keepalive: true,
       });
     } catch (error) {
-      console.error(
-        "Logout request failed:",
-        error
-      );
+      console.error("Logout request failed:", error);
     } finally {
       window.location.replace("/login");
     }
@@ -248,8 +241,8 @@ export default function Sidebar() {
     user?.role === "facilitator"
       ? facilitatorLinks
       : user?.role === "student"
-      ? studentLinks
-      : [];
+        ? studentLinks
+        : [];
 
   // =========================================================
   // ACTIVE LINK
@@ -282,11 +275,7 @@ export default function Sidebar() {
     return (
       <Link
         href="/"
-        onClick={
-          mobile
-            ? closeMobileMenu
-            : undefined
-        }
+        onClick={mobile ? closeMobileMenu : undefined}
         className="group flex items-center gap-3"
       >
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-blue-600 text-lg font-bold text-blue-600 transition group-hover:bg-blue-50">
@@ -311,34 +300,50 @@ export default function Sidebar() {
   }
 
   // =========================================================
-  // ANNOUNCEMENTS
+  // STUDENT ANNOUNCEMENT ICON
   // =========================================================
 
-  function renderAnnouncements() {
-    // Announcements should only appear for students.
-    if (
-      loading ||
-      user?.role !== "student"
-    ) {
+  function renderAnnouncementIcon() {
+    // Only students should see the announcement icon.
+    if (loading || user?.role !== "student") {
       return null;
     }
 
+    const announcementActive = isActiveLink("/announcements");
+
     return (
-      <div className="border-b border-slate-200">
-        {/* Announcement label */}
-        <div className="flex items-center gap-2 px-5 pt-4 pb-2">
-          <Megaphone
-            size={17}
-            className="shrink-0 text-blue-600"
-          />
+      <div className="border-b border-slate-200 px-3 py-3">
+        <Link
+          href="/announcements"
+          onClick={closeMobileMenu}
+          aria-label="Announcements"
+          title="Announcements"
+          className={`group flex min-h-[44px] w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition ${
+            announcementActive
+              ? "bg-blue-50 text-blue-700 shadow-sm"
+              : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+          }`}
+        >
+          <span className="flex items-center gap-3">
+            <Megaphone
+              size={19}
+              className={`shrink-0 transition ${
+                announcementActive
+                  ? "text-blue-600"
+                  : "text-slate-500 group-hover:text-blue-600"
+              }`}
+            />
 
-          <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
-            Announcements
+            <span>Announcements</span>
           </span>
-        </div>
 
-        {/* Announcement content */}
-        <Announcements role="student" />
+          {announcementActive && (
+            <ChevronRight
+              size={15}
+              className="text-blue-500"
+            />
+          )}
+        </Link>
       </div>
     );
   }
@@ -351,14 +356,12 @@ export default function Sidebar() {
     if (loading) {
       return (
         <div className="space-y-2 px-3 py-5">
-          {Array.from({ length: 7 }).map(
-            (_, index) => (
-              <div
-                key={index}
-                className="h-11 animate-pulse rounded-xl bg-slate-100"
-              />
-            )
-          )}
+          {Array.from({ length: 7 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-11 animate-pulse rounded-xl bg-slate-100"
+            />
+          ))}
         </div>
       );
     }
@@ -375,8 +378,7 @@ export default function Sidebar() {
 
         {links.map((link) => {
           const Icon = link.icon;
-          const isActive =
-            isActiveLink(link.href);
+          const isActive = isActiveLink(link.href);
 
           return (
             <Link
@@ -440,8 +442,7 @@ export default function Sidebar() {
       return null;
     }
 
-    const initials =
-      getUserInitials(user);
+    const initials = getUserInitials(user);
 
     return (
       <div className="border-b border-slate-200 px-5 py-4">
@@ -537,9 +538,7 @@ export default function Sidebar() {
         type="button"
         aria-label="Open navigation menu"
         aria-expanded={mobileMenuOpen}
-        onClick={() =>
-          setMobileMenuOpen(true)
-        }
+        onClick={() => setMobileMenuOpen(true)}
         className="fixed left-4 top-4 z-50 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-md transition hover:bg-slate-50 md:hidden"
       >
         <Menu size={22} />
@@ -563,7 +562,6 @@ export default function Sidebar() {
       ====================================================== */}
 
       <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-
         {/* BRAND */}
         <div className="border-b border-slate-200 px-5 py-5">
           {renderBrand()}
@@ -572,13 +570,13 @@ export default function Sidebar() {
         {/* USER */}
         {renderUserInformation()}
 
-        {/* STUDENT ANNOUNCEMENTS */}
-        {renderAnnouncements()}
-
         {/* NAVIGATION */}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
+
+        {/* STUDENT ANNOUNCEMENT ICON */}
+        {renderAnnouncementIcon()}
 
         {/* SIGN OUT */}
         <div className="border-t border-slate-200 px-3 py-3">
@@ -617,13 +615,13 @@ export default function Sidebar() {
         {/* USER */}
         {renderUserInformation()}
 
-        {/* STUDENT ANNOUNCEMENTS */}
-        {renderAnnouncements()}
-
         {/* NAVIGATION */}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {renderNavigation()}
         </div>
+
+        {/* STUDENT ANNOUNCEMENT ICON */}
+        {renderAnnouncementIcon()}
 
         {/* SIGN OUT */}
         <div className="border-t border-slate-200 px-3 py-3">
