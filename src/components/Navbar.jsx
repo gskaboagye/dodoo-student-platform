@@ -2,22 +2,25 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+
 import {
   Bell,
-  Search,
-  UserRound,
   ChevronDown,
-  Settings,
+  ExternalLink,
+  Info,
   LogOut,
-  X,
+  Search,
+  Users,
 } from "lucide-react";
 
 export default function Navbar() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
   const [profileOpen, setProfileOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] =
-    useState(false);
+
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
   const [loggingOut, setLoggingOut] = useState(false);
 
   // =========================================================
@@ -54,10 +57,7 @@ export default function Navbar() {
           setUser(data?.user || null);
         }
       } catch (error) {
-        console.error(
-          "Navbar user load error:",
-          error
-        );
+        console.error("Navbar user loading error:", error);
 
         if (!cancelled) {
           setUser(null);
@@ -77,67 +77,23 @@ export default function Navbar() {
   }, []);
 
   // =========================================================
-  // LISTEN FOR GLOBAL LOGOUT
+  // LISTEN FOR LOGOUT FROM OTHER COMPONENTS
   // =========================================================
 
   useEffect(() => {
-    function handleGlobalLogout() {
+    function handleLogout() {
       setUser(null);
       setProfileOpen(false);
       setNotificationsOpen(false);
       setLoggingOut(true);
     }
 
-    window.addEventListener(
-      "dcc-auth-logout",
-      handleGlobalLogout
-    );
+    window.addEventListener("dcc-auth-logout", handleLogout);
 
     return () => {
-      window.removeEventListener(
-        "dcc-auth-logout",
-        handleGlobalLogout
-      );
+      window.removeEventListener("dcc-auth-logout", handleLogout);
     };
   }, []);
-
-  // =========================================================
-  // DISPLAY NAME
-  // =========================================================
-
-  function getDisplayName() {
-    if (!user) {
-      return "User";
-    }
-
-    return (
-      user.name ||
-      `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
-      user.email?.split("@")[0] ||
-      "User"
-    );
-  }
-
-  // =========================================================
-  // INITIALS
-  // =========================================================
-
-  function getInitials() {
-    const name = getDisplayName();
-
-    const parts = name
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${
-        parts[parts.length - 1][0]
-      }`.toUpperCase();
-    }
-
-    return name.slice(0, 2).toUpperCase();
-  }
 
   // =========================================================
   // LOGOUT
@@ -153,13 +109,7 @@ export default function Navbar() {
     setProfileOpen(false);
     setNotificationsOpen(false);
 
-    /*
-     * Tell Sidebar and AppShell that logout has started.
-     * This immediately removes authenticated dashboard UI.
-     */
-    window.dispatchEvent(
-      new Event("dcc-auth-logout")
-    );
+    window.dispatchEvent(new Event("dcc-auth-logout"));
 
     try {
       await fetch("/api/auth/logout", {
@@ -174,16 +124,109 @@ export default function Navbar() {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
-      /*
-       * Replace the dashboard with the standalone
-       * login page.
-       */
       window.location.replace("/login");
     }
   }
 
   // =========================================================
-  // HIDE NAVBAR DURING LOGOUT
+  // USER INITIALS
+  // =========================================================
+
+  function getInitials() {
+    if (!user) {
+      return "U";
+    }
+
+    if (user.name) {
+      const parts = user.name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+      if (parts.length >= 2) {
+        return (
+          parts[0][0] +
+          parts[parts.length - 1][0]
+        ).toUpperCase();
+      }
+
+      if (parts[0]) {
+        return parts[0].slice(0, 2).toUpperCase();
+      }
+    }
+
+    if (user.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+
+    return "U";
+  }
+
+  // =========================================================
+  // DISPLAY NAME
+  // =========================================================
+
+  function getDisplayName() {
+    if (!user) {
+      return "User";
+    }
+
+    return user.name || user.firstName || "User";
+  }
+
+  // =========================================================
+  // ROLE LABEL
+  // =========================================================
+
+  function getRoleLabel() {
+    if (!user?.role) {
+      return "User";
+    }
+
+    return (
+      user.role.charAt(0).toUpperCase() +
+      user.role.slice(1)
+    );
+  }
+
+  // =========================================================
+  // CLOSE PROFILE WHEN CLICKING OUTSIDE
+  // =========================================================
+
+  useEffect(() => {
+    function handleOutsideClick(event) {
+      if (
+        !event.target.closest(
+          "[data-profile-menu]"
+        )
+      ) {
+        setProfileOpen(false);
+      }
+
+      if (
+        !event.target.closest(
+          "[data-notification-menu]"
+        )
+      ) {
+        setNotificationsOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick
+      );
+    };
+  }, []);
+
+  // =========================================================
+  // RENDER
   // =========================================================
 
   if (loggingOut) {
@@ -191,207 +234,276 @@ export default function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-30 hidden h-[72px] border-b border-slate-200 bg-white/95 backdrop-blur lg:block">
-      <div className="flex h-full items-center justify-between px-6">
-        {/* LEFT */}
+    <header className="sticky top-0 z-30 hidden border-b border-slate-200 bg-white lg:block">
+      <div className="flex h-[92px] items-center justify-between px-8">
 
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
-            Dodoo Coding Club
-          </p>
+        {/* =================================================
+            LEFT BRAND
+        ================================================== */}
 
-          <p className="mt-0.5 text-sm font-medium text-slate-500">
-            Student Success Platform
-          </p>
-        </div>
+        <Link
+          href="/"
+          className="group flex items-center gap-3"
+        >
+          <div className="min-w-0">
+            <p className="text-base font-extrabold tracking-[0.18em] text-blue-600">
+              DODOO CODING CLUB
+            </p>
 
-        {/* RIGHT */}
+            <p className="mt-1 text-lg font-medium text-slate-500">
+              Student Success Platform
+            </p>
+          </div>
+        </Link>
+
+        {/* =================================================
+            RIGHT SIDE
+        ================================================== */}
 
         <div className="flex items-center gap-3">
-          {/* SEARCH */}
 
-          <div className="hidden xl:flex">
-            <div className="flex h-10 w-64 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-slate-400 transition focus-within:border-blue-300 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100">
-              <Search size={17} />
-
-              <input
-                type="search"
-                placeholder="Search..."
-                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-              />
-            </div>
-          </div>
-
-          {/* NOTIFICATIONS */}
+          {/* =================================================
+              SEARCH
+          ================================================== */}
 
           <div className="relative">
+            <Search
+              size={20}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+
+            <input
+              type="search"
+              placeholder="Search..."
+              className="
+                h-13
+                w-[330px]
+                rounded-xl
+                border
+                border-slate-200
+                bg-slate-50
+                pl-12
+                pr-4
+                text-sm
+                text-slate-700
+                outline-none
+                transition
+                placeholder:text-slate-400
+                focus:border-blue-300
+                focus:bg-white
+                focus:ring-4
+                focus:ring-blue-50
+              "
+            />
+          </div>
+
+          {/* =================================================
+              NOTIFICATIONS
+          ================================================== */}
+
+          <div
+            className="relative"
+            data-notification-menu
+          >
             <button
               type="button"
               aria-label="Notifications"
               onClick={() =>
                 setNotificationsOpen(
-                  (previous) => !previous
+                  (value) => !value
                 )
               }
-              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+              className="relative flex h-13 w-13 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
             >
-              <Bell size={18} />
+              <Bell size={21} />
 
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-yellow-400 ring-2 ring-white" />
+              <span className="absolute right-2.5 top-2 h-2.5 w-2.5 rounded-full bg-yellow-400 ring-2 ring-white" />
             </button>
 
             {notificationsOpen && (
-              <div className="absolute right-0 top-12 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      Notifications
-                    </p>
+              <div className="absolute right-0 top-[58px] w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                <div className="border-b border-slate-100 px-5 py-4">
+                  <h3 className="font-semibold text-slate-900">
+                    Notifications
+                  </h3>
 
-                    <p className="text-xs text-slate-500">
-                      Stay updated with your platform activity.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setNotificationsOpen(false)
-                    }
-                    className="text-slate-400 hover:text-slate-600"
-                    aria-label="Close notifications"
-                  >
-                    <X size={16} />
-                  </button>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Your latest platform updates.
+                  </p>
                 </div>
 
-                <div className="px-4 py-8 text-center">
-                  <Bell
-                    size={28}
-                    className="mx-auto text-slate-300"
-                  />
-
-                  <p className="mt-3 text-sm font-medium text-slate-600">
-                    Open Notifications
+                <div className="px-5 py-6 text-center">
+                  <p className="text-sm text-slate-500">
+                    No new notifications.
                   </p>
-
-                  <Link
-                    href="/"
-                    onClick={() =>
-                      setNotificationsOpen(false)
-                    }
-                    className="mt-3 inline-flex text-xs font-semibold text-blue-600 hover:text-blue-700"
-                  >
-                    View platform updates
-                  </Link>
                 </div>
               </div>
             )}
           </div>
 
-          {/* PROFILE */}
+          {/* =================================================
+              PROFILE
+          ================================================== */}
 
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() =>
-                setProfileOpen(
-                  (previous) => !previous
-                )
-              }
-              className="flex items-center gap-3 rounded-xl border border-transparent px-2 py-1.5 transition hover:border-slate-200 hover:bg-slate-50"
+          {!loading && user && (
+            <div
+              className="relative"
+              data-profile-menu
             >
-              {loading ? (
-                <div className="h-9 w-9 animate-pulse rounded-full bg-slate-200" />
-              ) : (
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+              <button
+                type="button"
+                onClick={() =>
+                  setProfileOpen(
+                    (value) => !value
+                  )
+                }
+                className="flex h-13 items-center gap-3 rounded-xl px-2.5 transition hover:bg-slate-50"
+              >
+                {/* AVATAR */}
+
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
                   {getInitials()}
                 </div>
-              )}
 
-              <div className="hidden text-left xl:block">
-                <p className="max-w-[140px] truncate text-sm font-semibold text-slate-800">
-                  {getDisplayName()}
-                </p>
+                {/* USER */}
 
-                <p className="text-[11px] capitalize text-slate-500">
-                  {user?.role || "User"}
-                </p>
-              </div>
+                <div className="max-w-[180px] text-left">
+                  <p className="truncate text-sm font-bold text-slate-800">
+                    {getDisplayName()}
+                  </p>
 
-              <ChevronDown
-                size={15}
-                className={`text-slate-400 transition-transform ${
-                  profileOpen
-                    ? "rotate-180"
-                    : ""
-                }`}
-              />
-            </button>
+                  <p className="text-xs text-slate-500">
+                    {getRoleLabel()}
+                  </p>
+                </div>
 
-            {profileOpen && (
-              <div className="absolute right-0 top-12 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                <div className="border-b border-slate-100 px-4 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                <ChevronDown
+                  size={18}
+                  className={`ml-1 text-slate-400 transition-transform ${
+                    profileOpen
+                      ? "rotate-180"
+                      : ""
+                  }`}
+                />
+              </button>
+
+              {/* =================================================
+                  PROFILE DROPDOWN
+              ================================================== */}
+
+              {profileOpen && (
+                <div className="absolute right-0 top-[62px] z-50 w-[330px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+
+                  {/* USER HEADER */}
+
+                  <div className="flex items-center gap-4 border-b border-slate-200 px-5 py-5">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
                       {getInitials()}
                     </div>
 
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">
+                      <p className="truncate font-bold text-slate-900">
                         {getDisplayName()}
                       </p>
 
-                      <p className="truncate text-xs text-slate-500">
-                        {user?.email || ""}
+                      <p className="truncate text-sm text-slate-500">
+                        {user.email}
                       </p>
                     </div>
                   </div>
+
+                  {/* =================================================
+                      DROPDOWN LINKS
+                  ================================================== */}
+
+                  <div className="p-2">
+
+                    {/* ABOUT DODOO CODING CLUB */}
+
+                    <a
+                      href="https://dodoocodingclub.com/about/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() =>
+                        setProfileOpen(false)
+                      }
+                      className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <span className="flex items-center gap-3">
+                        <Info
+                          size={20}
+                          className="text-slate-500"
+                        />
+
+                        <span>
+                          About Dodoo Coding Club
+                        </span>
+                      </span>
+
+                      <ExternalLink
+                        size={15}
+                        className="text-slate-400"
+                      />
+                    </a>
+
+                    {/* FOUNDERS OF THE CLUB */}
+
+                    <a
+                      href="https://dodoocodingclub.com/founders-board/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() =>
+                        setProfileOpen(false)
+                      }
+                      className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+                    >
+                      <span className="flex items-center gap-3">
+                        <Users
+                          size={20}
+                          className="text-slate-500"
+                        />
+
+                        <span>
+                          Founders of the Club
+                        </span>
+                      </span>
+
+                      <ExternalLink
+                        size={15}
+                        className="text-slate-400"
+                      />
+                    </a>
+
+                    {/* DIVIDER */}
+
+                    <div className="my-1 border-t border-slate-100" />
+
+                    {/* SIGN OUT */}
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={loggingOut}
+                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-slate-700 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <LogOut
+                        size={20}
+                        className="text-slate-500"
+                      />
+
+                      <span>
+                        {loggingOut
+                          ? "Signing out..."
+                          : "Sign Out"}
+                      </span>
+                    </button>
+
+                  </div>
                 </div>
+              )}
+            </div>
+          )}
 
-                <div className="p-2">
-                  <Link
-                    href={
-                      user?.role === "student"
-                        ? "/student/profile"
-                        : "/"
-                    }
-                    onClick={() =>
-                      setProfileOpen(false)
-                    }
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
-                  >
-                    <UserRound size={17} />
-                    Profile
-                  </Link>
-
-                  <Link
-                    href="/"
-                    onClick={() =>
-                      setProfileOpen(false)
-                    }
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
-                  >
-                    <Settings size={17} />
-                    Platform
-                  </Link>
-
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    disabled={loggingOut}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <LogOut size={17} />
-
-                    {loggingOut
-                      ? "Signing Out..."
-                      : "Sign Out"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </header>

@@ -14,17 +14,13 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="mt-auto min-h-[520px] border-t border-gray-300 bg-white">
+    <footer className="w-full border-t border-gray-300 bg-white">
 
       {/* =====================================================
           MAIN FOOTER
       ====================================================== */}
 
-      <div className="mx-auto flex min-h-[455px] max-w-7xl flex-col justify-between px-6 py-14 lg:px-8">
-
-        {/* ===================================================
-            FOOTER CONTENT
-        ==================================================== */}
+      <div className="mx-auto w-full max-w-7xl px-6 py-14 lg:px-8">
 
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
 
@@ -32,14 +28,12 @@ export default function Footer() {
               DODOO CODING CLUB
           ================================================== */}
 
-          <div className="lg:col-span-1">
+          <div>
 
             <Link
               href="/"
               className="group inline-flex items-center gap-3"
             >
-
-              {/* DCC LOGO */}
 
               <div
                 className="
@@ -65,9 +59,8 @@ export default function Footer() {
                 &lt;/&gt;
               </div>
 
-              {/* DCC NAME */}
-
               <div>
+
                 <h2 className="text-xl font-extrabold leading-tight text-blue-700">
                   DODOO
                 </h2>
@@ -75,6 +68,7 @@ export default function Footer() {
                 <p className="font-bold leading-tight text-blue-700">
                   CODING CLUB
                 </p>
+
               </div>
 
             </Link>
@@ -84,8 +78,6 @@ export default function Footer() {
               and software-development skills through learning,
               projects, mentorship, and real-world experience.
             </p>
-
-            {/* VISIT DCC */}
 
             <a
               href="https://dodoocodingclub.com/"
@@ -105,13 +97,11 @@ export default function Footer() {
                 text-white
                 shadow-sm
                 transition
-                duration-200
                 hover:bg-blue-800
                 hover:shadow-md
               "
             >
               Visit DCC
-
               <ArrowUpRight className="h-4 w-4" />
             </a>
 
@@ -179,7 +169,7 @@ export default function Footer() {
           </div>
 
           {/* =================================================
-              DODOO CODING CLUB
+              DCC
           ================================================== */}
 
           <div>
@@ -248,8 +238,6 @@ export default function Footer() {
 
             <div className="mt-5 space-y-5">
 
-              {/* LOCATION */}
-
               <div className="flex items-start gap-3">
 
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50">
@@ -276,8 +264,6 @@ export default function Footer() {
 
               </div>
 
-              {/* PHONE */}
-
               <a
                 href="tel:+233558446017"
                 className="group flex items-center gap-3"
@@ -293,8 +279,6 @@ export default function Footer() {
 
               </a>
 
-              {/* EMAIL */}
-
               <a
                 href="mailto:info@dodoocodingclub.com"
                 className="group flex items-center gap-3"
@@ -309,8 +293,6 @@ export default function Footer() {
                 </span>
 
               </a>
-
-              {/* SUPPORT */}
 
               <a
                 href="https://dodoocodingclub.com/"
@@ -329,7 +311,6 @@ export default function Footer() {
                   text-gray-900
                   shadow-sm
                   transition
-                  duration-200
                   hover:bg-yellow-500
                   hover:shadow-md
                 "
@@ -358,9 +339,7 @@ export default function Footer() {
           <div className="flex items-center gap-2 text-sm text-gray-500">
 
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50">
-
               <Code2 className="h-4 w-4 text-blue-700" />
-
             </div>
 
             <span>
@@ -378,7 +357,7 @@ export default function Footer() {
       </div>
 
       {/* =====================================================
-          BLUE COPYRIGHT BAR
+          COPYRIGHT
       ====================================================== */}
 
       <div className="bg-blue-700">

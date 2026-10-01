@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import Sidebar from "@/components/Sidebar";
@@ -14,6 +15,7 @@ const STANDALONE_ROUTES = [
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const isStandaloneRoute = STANDALONE_ROUTES.some(
     (route) =>
@@ -21,35 +23,67 @@ export default function AppShell({ children }) {
       pathname.startsWith(`${route}/`)
   );
 
-  /*
-   * LOGIN / PASSWORD PAGES
-   *
-   * These pages should NOT receive:
-   * - Sidebar
-   * - Navbar
-   * - Footer
-   */
+  // =========================================================
+  // LISTEN FOR LOGOUT
+  // =========================================================
+
+  useEffect(() => {
+    function handleLogout() {
+      setLoggingOut(true);
+    }
+
+    window.addEventListener(
+      "dcc-auth-logout",
+      handleLogout
+    );
+
+    return () => {
+      window.removeEventListener(
+        "dcc-auth-logout",
+        handleLogout
+      );
+    };
+  }, []);
+
+  // =========================================================
+  // AUTH PAGES
+  // =========================================================
 
   if (isStandaloneRoute) {
     return children;
   }
 
-  /*
-   * ALL OTHER PAGES
-   *
-   * These pages receive the complete
-   * DCC application shell.
-   */
+  // =========================================================
+  // LOGGING OUT
+  // =========================================================
+
+  if (loggingOut) {
+    return null;
+  }
+
+  // =========================================================
+  // APPLICATION SHELL
+  // =========================================================
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] text-slate-900">
-      <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col bg-[#f3f4f6] text-slate-900">
 
-        {/* SIDEBAR */}
+      {/* ===================================================
+          MAIN APPLICATION AREA
+          Sidebar + Dashboard Content
+      ==================================================== */}
+
+      <div className="flex min-h-0 flex-1">
+
+        {/* =================================================
+            SIDEBAR
+        ================================================== */}
 
         <Sidebar />
 
-        {/* MAIN AREA */}
+        {/* =================================================
+            MAIN CONTENT COLUMN
+        ================================================== */}
 
         <div className="flex min-w-0 flex-1 flex-col">
 
@@ -63,12 +97,19 @@ export default function AppShell({ children }) {
             {children}
           </main>
 
-          {/* FOOTER */}
-
-          <Footer />
-
         </div>
       </div>
+
+      {/* ===================================================
+          FULL-WIDTH FOOTER
+
+          IMPORTANT:
+          Footer is OUTSIDE the Sidebar/Main-content row.
+          Therefore it spans the entire screen width.
+      ==================================================== */}
+
+      <Footer />
+
     </div>
   );
 }
