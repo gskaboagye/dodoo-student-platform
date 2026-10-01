@@ -5,16 +5,15 @@ import Link from "next/link";
 
 import {
   Bell,
-  Building2,
   CheckCheck,
   ChevronDown,
   ExternalLink,
   Info,
+  KeyRound,
   Loader2,
   LogOut,
   Search,
   UserRound,
-  UsersRound,
 } from "lucide-react";
 
 export default function Navbar() {
@@ -27,16 +26,11 @@ export default function Navbar() {
 
   const [loggingOut, setLoggingOut] = useState(false);
 
-  // =========================================================
   // NOTIFICATIONS
-  // =========================================================
-
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-
   const [notificationsLoading, setNotificationsLoading] =
     useState(false);
-
   const [notificationsError, setNotificationsError] =
     useState("");
 
@@ -54,17 +48,14 @@ export default function Navbar() {
       try {
         setLoading(true);
 
-        const response = await fetch(
-          "/api/auth/me",
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              "Cache-Control": "no-cache",
-            },
-          }
-        );
+        const response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+          },
+        });
 
         if (!response.ok) {
           if (!cancelled) {
@@ -106,9 +97,7 @@ export default function Navbar() {
   // LOAD NOTIFICATIONS
   // =========================================================
 
-  async function loadNotifications({
-    silent = false,
-  } = {}) {
+  async function loadNotifications({ silent = false } = {}) {
     try {
       if (!silent) {
         setNotificationsLoading(true);
@@ -127,10 +116,6 @@ export default function Navbar() {
           },
         }
       );
-
-      // -----------------------------------------------------
-      // USER IS NOT LOGGED IN
-      // -----------------------------------------------------
 
       if (response.status === 401) {
         setNotifications([]);
@@ -155,14 +140,8 @@ export default function Navbar() {
 
       setNotifications(loadedNotifications);
 
-      // -----------------------------------------------------
-      // SERVER UNREAD COUNT
-      // -----------------------------------------------------
-
       const serverUnreadCount =
-        Number.isFinite(
-          Number(data?.unreadCount)
-        )
+        Number.isFinite(Number(data?.unreadCount))
           ? Number(data.unreadCount)
           : loadedNotifications.filter(
               (notification) =>
@@ -202,11 +181,8 @@ export default function Navbar() {
 
     loadNotifications();
 
-    // Refresh notifications every 15 seconds.
     const interval = setInterval(() => {
-      loadNotifications({
-        silent: true,
-      });
+      loadNotifications({ silent: true });
     }, 15000);
 
     return () => {
@@ -221,12 +197,9 @@ export default function Navbar() {
   useEffect(() => {
     function handleVisibilityChange() {
       if (
-        document.visibilityState ===
-        "visible"
+        document.visibilityState === "visible"
       ) {
-        loadNotifications({
-          silent: true,
-        });
+        loadNotifications({ silent: true });
       }
     }
 
@@ -315,9 +288,7 @@ export default function Navbar() {
   async function markNotificationAsRead(
     notificationId
   ) {
-    if (!notificationId) {
-      return;
-    }
+    if (!notificationId) return;
 
     try {
       const response = await fetch(
@@ -327,8 +298,7 @@ export default function Navbar() {
           credentials: "include",
           cache: "no-store",
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             id: notificationId,
@@ -346,7 +316,6 @@ export default function Navbar() {
         );
       }
 
-      // The backend uses "read", not "isRead".
       setNotifications((current) =>
         current.map((notification) =>
           notification.id === notificationId
@@ -374,9 +343,7 @@ export default function Navbar() {
   // =========================================================
 
   async function markAllNotificationsAsRead() {
-    if (unreadCount === 0) {
-      return;
-    }
+    if (unreadCount === 0) return;
 
     try {
       const response = await fetch(
@@ -386,8 +353,7 @@ export default function Navbar() {
           credentials: "include",
           cache: "no-store",
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             markAllRead: true,
@@ -405,7 +371,6 @@ export default function Navbar() {
         );
       }
 
-      // The backend uses "read", not "isRead".
       setNotifications((current) =>
         current.map((notification) => ({
           ...notification,
@@ -429,11 +394,8 @@ export default function Navbar() {
   async function handleNotificationClick(
     notification
   ) {
-    if (!notification) {
-      return;
-    }
+    if (!notification) return;
 
-    // Mark unread notification as read first.
     if (!notification.read) {
       await markNotificationAsRead(
         notification.id
@@ -442,11 +404,8 @@ export default function Navbar() {
 
     setNotificationsOpen(false);
 
-    // Navigate to the notification link
-    // if one was provided.
     if (notification.link) {
-      window.location.href =
-        notification.link;
+      window.location.href = notification.link;
     }
   }
 
@@ -454,12 +413,8 @@ export default function Navbar() {
   // FORMAT NOTIFICATION DATE
   // =========================================================
 
-  function formatNotificationDate(
-    createdAt
-  ) {
-    if (!createdAt) {
-      return "";
-    }
+  function formatNotificationDate(createdAt) {
+    if (!createdAt) return "";
 
     const date = new Date(createdAt);
 
@@ -480,38 +435,29 @@ export default function Navbar() {
       return "Just now";
     }
 
-    const minutes = Math.floor(
-      seconds / 60
-    );
+    const minutes = Math.floor(seconds / 60);
 
     if (minutes < 60) {
       return `${minutes}m ago`;
     }
 
-    const hours = Math.floor(
-      minutes / 60
-    );
+    const hours = Math.floor(minutes / 60);
 
     if (hours < 24) {
       return `${hours}h ago`;
     }
 
-    const days = Math.floor(
-      hours / 24
-    );
+    const days = Math.floor(hours / 24);
 
     if (days < 7) {
       return `${days}d ago`;
     }
 
-    return date.toLocaleDateString(
-      "en-US",
-      {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }
-    );
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   }
 
   // =========================================================
@@ -547,9 +493,7 @@ export default function Navbar() {
   // =========================================================
 
   async function handleLogout() {
-    if (loggingOut) {
-      return;
-    }
+    if (loggingOut) return;
 
     setLoggingOut(true);
     setUser(null);
@@ -563,28 +507,22 @@ export default function Navbar() {
     );
 
     try {
-      await fetch(
-        "/api/auth/logout",
-        {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            "Cache-Control":
-              "no-cache",
-          },
-          keepalive: true,
-        }
-      );
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-cache",
+        },
+        keepalive: true,
+      });
     } catch (error) {
       console.error(
         "Logout error:",
         error
       );
     } finally {
-      window.location.replace(
-        "/login"
-      );
+      window.location.replace("/login");
     }
   }
 
@@ -593,9 +531,7 @@ export default function Navbar() {
   // =========================================================
 
   function getInitials() {
-    if (!user) {
-      return "U";
-    }
+    if (!user) return "U";
 
     if (user.name) {
       const parts = user.name
@@ -631,9 +567,7 @@ export default function Navbar() {
   // =========================================================
 
   function getDisplayName() {
-    if (!user) {
-      return "User";
-    }
+    if (!user) return "User";
 
     return (
       user.name ||
@@ -647,9 +581,7 @@ export default function Navbar() {
   // =========================================================
 
   function getRoleLabel() {
-    if (!user?.role) {
-      return "User";
-    }
+    if (!user?.role) return "User";
 
     if (user.role === "facilitator") {
       return "Facilitator";
@@ -756,8 +688,6 @@ export default function Navbar() {
             >
               <Bell size={21} />
 
-              {/* UNREAD COUNT */}
-
               {unreadCount > 0 && (
                 <span
                   className="
@@ -845,9 +775,7 @@ export default function Navbar() {
                       disabled:opacity-40
                     "
                   >
-                    <CheckCheck
-                      size={15}
-                    />
+                    <CheckCheck size={15} />
 
                     Mark all read
                   </button>
@@ -856,8 +784,6 @@ export default function Navbar() {
                 {/* CONTENT */}
 
                 <div className="max-h-[420px] overflow-y-auto">
-
-                  {/* LOADING */}
 
                   {notificationsLoading ? (
                     <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-slate-500">
@@ -868,11 +794,7 @@ export default function Navbar() {
 
                       Loading notifications...
                     </div>
-
                   ) : notificationsError ? (
-
-                    /* ERROR */
-
                     <div className="px-5 py-8 text-center">
                       <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-500">
                         <Info size={18} />
@@ -907,12 +829,7 @@ export default function Navbar() {
                         Try again
                       </button>
                     </div>
-
-                  ) : notifications.length ===
-                    0 ? (
-
-                    /* EMPTY STATE */
-
+                  ) : notifications.length === 0 ? (
                     <div className="px-5 py-10 text-center">
                       <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                         <Bell size={20} />
@@ -926,18 +843,12 @@ export default function Navbar() {
                         You are all caught up.
                       </p>
                     </div>
-
                   ) : (
-
-                    /* NOTIFICATION LIST */
-
                     <div className="divide-y divide-slate-100">
                       {notifications.map(
                         (notification) => (
                           <button
-                            key={
-                              notification.id
-                            }
+                            key={notification.id}
                             type="button"
                             onClick={() =>
                               handleNotificationClick(
@@ -979,9 +890,7 @@ export default function Navbar() {
                                   }
                                 `}
                               >
-                                <Bell
-                                  size={16}
-                                />
+                                <Bell size={16} />
                               </div>
 
                               {/* TEXT */}
@@ -1001,8 +910,6 @@ export default function Navbar() {
                                     {notification.title ||
                                       "Platform Notification"}
                                   </p>
-
-                                  {/* UNREAD DOT */}
 
                                   {!notification.read && (
                                     <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
@@ -1042,9 +949,7 @@ export default function Navbar() {
                     <Link
                       href="/notifications"
                       onClick={() =>
-                        setNotificationsOpen(
-                          false
-                        )
+                        setNotificationsOpen(false)
                       }
                       className="
                         flex
@@ -1060,9 +965,7 @@ export default function Navbar() {
                     >
                       View all notifications
 
-                      <ExternalLink
-                        size={13}
-                      />
+                      <ExternalLink size={13} />
                     </Link>
                   </div>
                 )}
@@ -1086,9 +989,7 @@ export default function Navbar() {
                     (value) => !value
                   );
 
-                  setNotificationsOpen(
-                    false
-                  );
+                  setNotificationsOpen(false);
                 }}
                 className="
                   flex
@@ -1146,7 +1047,7 @@ export default function Navbar() {
                     right-0
                     top-[58px]
                     z-50
-                    w-72
+                    w-64
                     overflow-hidden
                     rounded-2xl
                     border
@@ -1177,17 +1078,15 @@ export default function Navbar() {
                   </div>
 
                   {/* =================================================
-                      CLUB LINKS
+                      ACCOUNT LINKS
                   ================================================== */}
 
                   <div className="p-2">
 
-                    {/* ABOUT DODOO CODING CLUB */}
+                    {/* CHANGE PASSWORD */}
 
-                    <a
-                      href="https://dodoocodingclub.com/about/"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      href="/change-password"
                       onClick={() =>
                         setProfileOpen(false)
                       }
@@ -1205,27 +1104,20 @@ export default function Navbar() {
                         hover:bg-slate-50
                       "
                     >
-                      <Building2
+                      <KeyRound
                         size={17}
                         className="shrink-0 text-slate-500"
                       />
 
                       <span className="flex-1">
-                        About Dodoo Coding Club
+                        Change Password
                       </span>
+                    </Link>
 
-                      <ExternalLink
-                        size={14}
-                        className="shrink-0 text-slate-400"
-                      />
-                    </a>
+                    {/* FORGOT PASSWORD */}
 
-                    {/* FOUNDERS OF THE CLUB */}
-
-                    <a
-                      href="https://dodoocodingclub.com/founders-board/"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      href="/forgot-password"
                       onClick={() =>
                         setProfileOpen(false)
                       }
@@ -1243,20 +1135,15 @@ export default function Navbar() {
                         hover:bg-slate-50
                       "
                     >
-                      <UsersRound
+                      <KeyRound
                         size={17}
                         className="shrink-0 text-slate-500"
                       />
 
                       <span className="flex-1">
-                        Founders of the Club
+                        Forgot Password
                       </span>
-
-                      <ExternalLink
-                        size={14}
-                        className="shrink-0 text-slate-400"
-                      />
-                    </a>
+                    </Link>
 
                     {/* DIVIDER */}
 
@@ -1266,9 +1153,7 @@ export default function Navbar() {
 
                     <button
                       type="button"
-                      onClick={
-                        handleLogout
-                      }
+                      onClick={handleLogout}
                       disabled={loggingOut}
                       className="
                         flex
@@ -1287,9 +1172,7 @@ export default function Navbar() {
                         disabled:opacity-50
                       "
                     >
-                      <LogOut
-                        size={17}
-                      />
+                      <LogOut size={17} />
 
                       {loggingOut
                         ? "Logging out..."
