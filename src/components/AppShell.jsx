@@ -28,6 +28,15 @@ const STANDALONE_ROUTES = [
   "/resend-verification",
 ];
 
+// =========================================================
+// SESSION CHECK INTERVAL
+//
+// The application checks the session every 30 seconds.
+// If the JWT has expired, the user is redirected to login.
+// =========================================================
+
+const SESSION_CHECK_INTERVAL = 30 * 1000;
+
 export default function AppShell({ children }) {
   const pathname = usePathname();
 
@@ -66,6 +75,147 @@ export default function AppShell({ children }) {
       );
     };
   }, []);
+
+  // =========================================================
+  // SESSION EXPIRATION CHECK
+  //
+  // This checks the server-side session instead of relying
+  // only on the browser cookie.
+  //
+  // If /api/auth/me returns 401, the session is no longer
+  // valid and the user is sent to the login page.
+  // =========================================================
+
+  useEffect(() => {
+    // Do not check authentication on standalone pages.
+    if (isStandaloneRoute) {
+      return;
+    }
+
+    // Do not check while logout is already happening.
+    if (loggingOut) {
+      return;
+    }
+
+    let cancelled = false;
+    let checkingSession = false;
+
+    async function checkSession() {
+      if (cancelled || checkingSession) {
+        return;
+      }
+
+      checkingSession = true;
+
+      try {
+        const response = await fetch(
+          "/api/auth/me",
+          {
+            method: "GET",
+            credentials: "include",
+            cache: "no-store",
+            headers: {
+              "Cache-Control": "no-cache",
+            },
+          }
+        );
+
+        // ===================================================
+        // SESSION EXPIRED / INVALID
+        // ===================================================
+
+        if (response.status === 401) {
+          if (!cancelled) {
+            setLoggingOut(true);
+
+            // Tell other components that authentication
+            // is no longer active.
+            window.dispatchEvent(
+              new Event("dcc-auth-logout")
+            );
+
+            // Send the user to login.
+            window.location.replace(
+              "/login?expired=true"
+            );
+          }
+
+          return;
+        }
+
+        // ===================================================
+        // OTHER AUTH FAILURE
+        //
+        // We only redirect for 401.
+        // Server errors such as 500 should not immediately
+        // log the user out.
+        // ===================================================
+
+        if (!response.ok) {
+          return;
+        }
+      } catch (error) {
+        // Network/server errors should not automatically
+        // log the user out.
+        console.error(
+          "Session check failed:",
+          error
+        );
+      } finally {
+        checkingSession = false;
+      }
+    }
+
+    // =======================================================
+    // CHECK IMMEDIATELY
+    // =======================================================
+
+    checkSession();
+
+    // =======================================================
+    // PERIODIC CHECK
+    // =======================================================
+
+    const interval = setInterval(
+      checkSession,
+      SESSION_CHECK_INTERVAL
+    );
+
+    // =======================================================
+    // CHECK WHEN USER RETURNS TO TAB
+    // =======================================================
+
+    function handleVisibilityChange() {
+      if (
+        document.visibilityState === "visible"
+      ) {
+        checkSession();
+      }
+    }
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    // =======================================================
+    // CLEANUP
+    // =======================================================
+
+    return () => {
+      cancelled = true;
+
+      clearInterval(interval);
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+    };
+  }, [
+    isStandaloneRoute,
+    loggingOut,
+  ]);
 
   // =========================================================
   // AUTH PAGES
