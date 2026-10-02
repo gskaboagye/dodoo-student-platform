@@ -688,6 +688,8 @@ export default function Navbar() {
             >
               <Bell size={21} />
 
+              {/* UNREAD COUNT */}
+
               {unreadCount > 0 && (
                 <span
                   className="
@@ -785,6 +787,8 @@ export default function Navbar() {
 
                 <div className="max-h-[420px] overflow-y-auto">
 
+                  {/* LOADING */}
+
                   {notificationsLoading ? (
                     <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-slate-500">
                       <Loader2
@@ -794,7 +798,11 @@ export default function Navbar() {
 
                       Loading notifications...
                     </div>
+
                   ) : notificationsError ? (
+
+                    /* ERROR */
+
                     <div className="px-5 py-8 text-center">
                       <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-500">
                         <Info size={18} />
@@ -829,7 +837,11 @@ export default function Navbar() {
                         Try again
                       </button>
                     </div>
+
                   ) : notifications.length === 0 ? (
+
+                    /* EMPTY STATE */
+
                     <div className="px-5 py-10 text-center">
                       <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                         <Bell size={20} />
@@ -843,7 +855,11 @@ export default function Navbar() {
                         You are all caught up.
                       </p>
                     </div>
+
                   ) : (
+
+                    /* NOTIFICATION LIST */
+
                     <div className="divide-y divide-slate-100">
                       {notifications.map(
                         (notification) => (
@@ -910,6 +926,8 @@ export default function Navbar() {
                                     {notification.title ||
                                       "Platform Notification"}
                                   </p>
+
+                                  {/* UNREAD DOT */}
 
                                   {!notification.read && (
                                     <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-600" />
@@ -1111,37 +1129,6 @@ export default function Navbar() {
 
                       <span className="flex-1">
                         Change Password
-                      </span>
-                    </Link>
-
-                    {/* FORGOT PASSWORD */}
-
-                    <Link
-                      href="/forgot-password"
-                      onClick={() =>
-                        setProfileOpen(false)
-                      }
-                      className="
-                        flex
-                        items-center
-                        gap-3
-                        rounded-lg
-                        px-3
-                        py-2.5
-                        text-sm
-                        font-medium
-                        text-slate-700
-                        transition
-                        hover:bg-slate-50
-                      "
-                    >
-                      <KeyRound
-                        size={17}
-                        className="shrink-0 text-slate-500"
-                      />
-
-                      <span className="flex-1">
-                        Forgot Password
                       </span>
                     </Link>
 
