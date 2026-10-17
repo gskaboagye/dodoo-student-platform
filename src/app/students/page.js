@@ -1496,332 +1496,213 @@ return (
     );
   }
   
-      // ===================================================
-    // STUDENT PROFILE VIEW
-    // ===================================================
+     
+  // ===================================================
+  // STUDENTS LIST VIEW
+  // ===================================================
 
-    return (
-      <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
-        <div className="mx-auto max-w-7xl">
+  return (
+    <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">
+              Students
+            </h1>
+            <p className="mt-2 text-slate-600">
+              Manage student records and review their progress.
+            </p>
+          </div>
+
           <button
             type="button"
-            onClick={handleBackToStudents}
-            className="mb-6 inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 font-semibold text-slate-700 shadow-sm hover:bg-blue-50"
+            onClick={() => loadStudents({ refresh: true })}
+            disabled={refreshing || loading}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Students
+            <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {refreshing ? "Refreshing..." : "Refresh Students"}
           </button>
-
-          {message && (
-            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-700">
-              {message}
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
-              {error}
-            </div>
-          )}
-
-          <section className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-            {/* STUDENT HEADER */}
-
-            <div className="bg-slate-900 px-6 py-8 md:px-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center">
-                {selectedStudent.profileImage ? (
-                  <img
-                    src={selectedStudent.profileImage}
-                    alt={fullName}
-                    className="h-28 w-28 rounded-full object-cover ring-4 ring-white/20"
-                  />
-                ) : (
-                  <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-blue-100 text-3xl font-bold text-blue-700 ring-4 ring-white/20">
-                    {initials}
-                  </div>
-                )}
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">
-                    Student Profile
-                  </p>
-
-                  <h1 className="mt-1 break-words text-3xl font-bold text-white">
-                    {fullName}
-                  </h1>
-
-                  <p className="mt-2 break-all text-slate-300">
-                    {selectedStudent.email ||
-                      "No email provided"}
-                  </p>
-
-                  {selectedStudent.studentId && (
-                    <p className="mt-2 text-sm text-slate-400">
-                      Student ID:{" "}
-                      <span className="font-semibold text-white">
-                        {selectedStudent.studentId}
-                      </span>
-                    </p>
-                  )}
-                </div>
-
-                <span
-                  className={`rounded-full px-4 py-2 text-sm font-semibold ${getStatusClasses(
-                    selectedStudent.status
-                  )}`}
-                >
-                  {selectedStudent.status || "Active"}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-6 md:p-8">
-              {/* SUMMARY CARDS */}
-
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <SummaryCard
-                  label="Overall Progress"
-                  value={`${progress}%`}
-                  description="Combined progress"
-                />
-
-                <SummaryCard
-                  label="Projects"
-                  value={selectedStudent.projectCount || 0}
-                  description={`${selectedStudent.completedProjects || 0} completed`}
-                />
-
-                <SummaryCard
-                  label="Attendance"
-                  value={`${attendanceProgress}%`}
-                  description={`${selectedStudent.attendanceCount || 0} records`}
-                />
-
-                <SummaryCard
-                  label="Timeline"
-                  value={`${timelineProgress}%`}
-                  description="Program timeline"
-                />
-              </div>
-
-              {/* PERSONAL INFORMATION */}
-
-              <section className="mt-10 border-t border-slate-200 pt-8">
-                <h2 className="text-xl font-bold text-slate-900">
-                  Personal Information
-                </h2>
-
-                <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  <InfoItem
-                    label="First Name"
-                    value={selectedStudent.firstName}
-                  />
-
-                  <InfoItem
-                    label="Last Name"
-                    value={selectedStudent.lastName}
-                  />
-
-                  <InfoItem
-                    label="Email"
-                    value={selectedStudent.email}
-                  />
-
-                  <InfoItem
-                    label="Phone"
-                    value={selectedStudent.phone}
-                  />
-
-                  <InfoItem
-                    label="Date of Birth"
-                    value={formatDate(
-                      selectedStudent.dateOfBirth
-                    )}
-                  />
-
-                  <InfoItem
-                    label="Gender"
-                    value={selectedStudent.gender}
-                  />
-
-                  <InfoItem
-                    label="Program"
-                    value={selectedStudent.program}
-                  />
-
-                  <InfoItem
-                    label="Education Level"
-                    value={selectedStudent.educationLevel}
-                  />
-
-                  <InfoItem
-                    label="School"
-                    value={selectedStudent.school}
-                  />
-
-                  <InfoItem
-                    label="Address"
-                    value={selectedStudent.address}
-                    wide
-                  />
-                </div>
-              </section>
-
-              {/* EMERGENCY CONTACT */}
-
-              <section className="mt-10 border-t border-slate-200 pt-8">
-                <h2 className="text-xl font-bold text-slate-900">
-                  Emergency Contact
-                </h2>
-
-                <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                  <InfoItem
-                    label="Contact Name"
-                    value={
-                      selectedStudent.emergencyContactName
-                    }
-                  />
-
-                  <InfoItem
-                    label="Contact Phone"
-                    value={
-                      selectedStudent.emergencyContactPhone
-                    }
-                  />
-                </div>
-              </section>
-
-              {/* PROGRAM INFORMATION */}
-
-              <section className="mt-10 border-t border-slate-200 pt-8">
-                <h2 className="text-xl font-bold text-slate-900">
-                  Program Information
-                </h2>
-
-                <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                  <InfoItem
-                    label="Student ID"
-                    value={selectedStudent.studentId}
-                  />
-
-                  <InfoItem
-                    label="Enrollment Date"
-                    value={formatDate(
-                      selectedStudent.enrollmentDate
-                    )}
-                  />
-
-                  <InfoItem
-                    label="Expected Completion"
-                    value={formatDate(
-                      selectedStudent.expectedCompletionDate
-                    )}
-                  />
-
-                  <InfoItem
-                    label="Program Duration"
-                    value={
-                      selectedStudent.programDurationMonths
-                        ? `${selectedStudent.programDurationMonths} months`
-                        : "24 months"
-                    }
-                  />
-                </div>
-              </section>
-
-              {/* PROGRESS DETAILS */}
-
-              <section className="mt-10 border-t border-slate-200 pt-8">
-                <h2 className="text-xl font-bold text-slate-900">
-                  Student Progress
-                </h2>
-
-                <p className="mt-2 text-sm text-slate-500">
-                  Review the student's current progress across
-                  the program.
-                </p>
-
-                <div className="mt-6 space-y-6">
-                  {[
-                    {
-                      label: "Overall Progress",
-                      value: progress,
-                    },
-                    {
-                      label: "Project Progress",
-                      value: projectProgress,
-                    },
-                    {
-                      label: "Attendance Progress",
-                      value: attendanceProgress,
-                    },
-                    {
-                      label: "Timeline Progress",
-                      value: timelineProgress,
-                    },
-                  ].map((item) => (
-                    <div key={item.label}>
-                      <div className="mb-2 flex items-center justify-between gap-4">
-                        <span className="font-medium text-slate-700">
-                          {item.label}
-                        </span>
-
-                        <span className="font-bold text-blue-600">
-                          {item.value}%
-                        </span>
-                      </div>
-
-                      <div className="h-3 overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className="h-full rounded-full bg-blue-600 transition-all"
-                          style={{
-                            width: `${item.value}%`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* PROFILE ACTIONS */}
-
-              <section className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-8 sm:flex-row sm:justify-between">
-                <button
-                  type="button"
-                  onClick={handleBackToStudents}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Students
-                </button>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={startEditing}
-                    className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700"
-                  >
-                    Edit Student
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleDelete(selectedStudent._id)
-                    }
-                    className="rounded-xl border border-red-200 px-5 py-3 font-semibold text-red-600 hover:bg-red-50"
-                  >
-                    Delete Student
-                  </button>
-                </div>
-              </section>
-            </div>
-          </section>
         </div>
-      </main>
-    );
-  }
+
+        {message && (
+          <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-700">
+            {message}
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+            {error}
+          </div>
+        )}
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Total Students"
+            value={statistics.total}
+            description="All registered students"
+            icon={<Users className="h-5 w-5" />}
+          />
+          <StatCard
+            label="Active Students"
+            value={statistics.active}
+            description="Currently active"
+            icon={<UserCheck className="h-5 w-5" />}
+          />
+          <StatCard
+            label="Completed"
+            value={statistics.completed}
+            description="Completed the program"
+            icon={<GraduationCap className="h-5 w-5" />}
+          />
+          <StatCard
+            label="Average Progress"
+            value={`${statistics.averageProgress}%`}
+            description="Across all students"
+            icon={<TrendingUp className="h-5 w-5" />}
+          />
+        </div>
+
+        <section className="mt-8 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200 md:p-6">
+          <div className="grid gap-4 md:grid-cols-[1fr_220px]">
+            <div>
+              <label
+                htmlFor="student-search"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
+                Search students
+              </label>
+              <input
+                id="student-search"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by name, email, phone, or student ID"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="student-status"
+                className="mb-2 block text-sm font-semibold text-slate-700"
+              >
+                Filter by status
+              </label>
+              <select
+                id="student-status"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="completed">Completed</option>
+                <option value="inactive">Inactive</option>
+                <option value="suspended">Suspended</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+            <h2 className="font-bold text-slate-900">
+              Student Directory
+            </h2>
+            <span className="text-sm text-slate-500">
+              {filteredStudents.length} found
+            </span>
+          </div>
+
+          {loading ? (
+            <div className="py-12 text-center text-slate-500">
+              Loading students...
+            </div>
+          ) : filteredStudents.length === 0 ? (
+            <div className="py-12 text-center">
+              <UserRound className="mx-auto h-10 w-10 text-slate-400" />
+              <h3 className="mt-3 font-semibold text-slate-900">
+                No students found
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Try another search term or change the status filter.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setGlobalSearch("");
+                  setStatusFilter("all");
+                  router.replace("/students", { scroll: false });
+                }}
+                className="mt-4 rounded-lg px-4 py-2 font-semibold text-blue-600 hover:bg-blue-50"
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 divide-y divide-slate-100">
+              {filteredStudents.map((student) => (
+                <button
+                  key={student._id}
+                  type="button"
+                  onClick={() => handleStudentClick(student)}
+                  className="flex w-full flex-col gap-4 rounded-xl px-3 py-5 text-left transition hover:bg-blue-50 sm:flex-row sm:items-center"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-bold text-blue-700">
+                    {student.profileImage ? (
+                      <img
+                        src={student.profileImage}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      getInitials(student)
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold text-slate-900">
+                      {getFullName(student)}
+                    </p>
+                    <p className="mt-1 break-all text-sm text-slate-500">
+                      {student.email || "No email provided"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {student.studentId || "No student ID"}
+                      {student.program ? ` · ${student.program}` : ""}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4 sm:justify-end">
+                    <div className="text-left sm:text-right">
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(student.status)}`}
+                      >
+                        {student.status || "Active"}
+                      </span>
+                      <p className="mt-2 text-sm font-semibold text-slate-700">
+                        {safePercentage(
+                          student.overallProgress ?? student.progress
+                        )}% progress
+                      </p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 shrink-0 text-slate-400" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
 
 // =====================================================
 // FORM FIELD
