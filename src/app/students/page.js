@@ -1196,17 +1196,20 @@ export default function StudentsPage() {
 
             <div className="bg-slate-900 px-6 py-8 md:px-8">
               <div className="flex flex-col gap-6 md:flex-row md:items-center">
-                {selectedStudent.profileImage ? (
-                  <img
-                    src={selectedStudent.profileImage}
-                    alt={fullName}
-                    className="h-28 w-28 rounded-full object-cover ring-4 ring-white/20"
-                  />
-                ) : (
-                  <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-blue-100 text-3xl font-bold text-blue-700 ring-4 ring-white/20">
-                    {initials}
-                  </div>
-                )}
+                {selectedStudent?.profileImage ? (
+  <img
+    src={selectedStudent.profileImage}
+    alt={fullName}
+    className="h-28 w-28 rounded-full object-cover ring-4 ring-white/20"
+    onError={(event) => {
+      event.currentTarget.style.display = "none";
+    }}
+  />
+) : (
+  <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-full bg-blue-100 text-3xl font-bold text-blue-700 ring-4 ring-white/20">
+    {initials}
+  </div>
+)}
 
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold uppercase tracking-wide text-blue-300">
