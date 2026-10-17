@@ -1166,8 +1166,11 @@ export default function StudentsPage() {
         // ===================================================
     // STUDENT PROFILE VIEW
     // ===================================================
+if (!selectedStudent) {
+  return null;
+}
 
-    return (
+return (
       <main className="min-h-screen bg-slate-50 px-6 py-10 md:px-10">
         <div className="mx-auto max-w-7xl">
           <button
