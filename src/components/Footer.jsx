@@ -64,7 +64,7 @@ export default function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="w-full border-t border-slate-200 bg-white">
+    <footer className="w-full border-t border-blue-800 bg-blue-700 text-white">
       {/* =====================================================
           MAIN FOOTER
       ====================================================== */}
@@ -76,22 +76,22 @@ export default function Footer() {
           ================================================== */}
           <div className="max-w-sm">
             <div className="mb-5 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-blue-700 text-lg font-bold text-blue-700">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-white text-lg font-bold text-white">
                 &lt;/&gt;
               </div>
 
               <div>
-                <h2 className="text-lg font-extrabold tracking-tight text-blue-700">
+                <h2 className="text-lg font-extrabold tracking-tight text-white">
                   DODOO
                 </h2>
 
-                <p className="text-sm font-bold tracking-wide text-blue-700">
+                <p className="text-sm font-bold tracking-wide text-white">
                   CODING CLUB
                 </p>
               </div>
             </div>
 
-            <p className="text-sm leading-6 text-slate-500">
+            <p className="text-sm leading-6 text-blue-100">
               Empowering students through technology, practical learning,
               mentorship, and real-world software development opportunities.
             </p>
@@ -101,7 +101,7 @@ export default function Footer() {
               href="https://dodoocodingclub.com/"
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
             >
               Visit DCC Website
               <ArrowUpRight size={16} />
@@ -109,7 +109,7 @@ export default function Footer() {
 
             {/* Social Media */}
             <div className="mt-7">
-              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-blue-200">
                 Follow Dodoo Coding Club
               </p>
 
@@ -120,7 +120,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Facebook"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-700 hover:bg-blue-50 hover:text-blue-700"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/30 text-white transition hover:border-white hover:bg-white hover:text-blue-700"
                 >
                   <FacebookIcon />
                 </a>
@@ -131,7 +131,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-700 hover:bg-blue-50 hover:text-blue-700"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/30 text-white transition hover:border-white hover:bg-white hover:text-blue-700"
                 >
                   <InstagramIcon />
                 </a>
@@ -142,7 +142,7 @@ export default function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="LinkedIn"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-700 hover:bg-blue-50 hover:text-blue-700"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/30 text-white transition hover:border-white hover:bg-white hover:text-blue-700"
                 >
                   <LinkedInIcon />
                 </a>
@@ -154,7 +154,7 @@ export default function Footer() {
               DCC LINKS
           ================================================== */}
           <div>
-            <h3 className="mb-5 text-sm font-bold uppercase tracking-wider text-slate-900">
+            <h3 className="mb-5 text-sm font-bold uppercase tracking-wider text-white">
               Dodoo Coding Club
             </h3>
 
@@ -164,7 +164,7 @@ export default function Footer() {
                   href="https://dodoocodingclub.com/about/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group inline-flex items-center gap-2 text-sm text-slate-500 transition hover:text-blue-700"
+                  className="group inline-flex items-center gap-2 text-sm text-blue-100 transition hover:text-white"
                 >
                   About DCC
 
@@ -180,7 +180,7 @@ export default function Footer() {
                   href="https://dodoocodingclub.com/founders-board/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group inline-flex items-center gap-2 text-sm text-slate-500 transition hover:text-blue-700"
+                  className="group inline-flex items-center gap-2 text-sm text-blue-100 transition hover:text-white"
                 >
                   Founders of the Club
 
@@ -196,7 +196,7 @@ export default function Footer() {
                   href="https://dodoocodingclub.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group inline-flex items-center gap-2 text-sm text-slate-500 transition hover:text-blue-700"
+                  className="group inline-flex items-center gap-2 text-sm text-blue-100 transition hover:text-white"
                 >
                   Official Website
 
@@ -209,12 +209,12 @@ export default function Footer() {
             </ul>
 
             {/* Brand Statement */}
-            <div className="mt-8 border-l-2 border-blue-700 pl-4">
-              <p className="text-sm font-semibold text-slate-700">
+            <div className="mt-8 border-l-2 border-yellow-400 pl-4">
+              <p className="text-sm font-semibold text-blue-800">
                 Learn. Build. Grow.
               </p>
 
-              <p className="mt-1 text-xs leading-5 text-slate-400">
+              <p className="mt-1 text-xs leading-5 text-blue-200">
                 Building the next generation of technology professionals.
               </p>
             </div>
@@ -224,7 +224,7 @@ export default function Footer() {
               CONTACT
           ================================================== */}
           <div>
-            <h3 className="mb-5 text-sm font-bold uppercase tracking-wider text-slate-900">
+            <h3 className="mb-5 text-sm font-bold uppercase tracking-wider text-white">
               Contact
             </h3>
 
@@ -233,15 +233,15 @@ export default function Footer() {
               <div className="flex items-start gap-3">
                 <MapPin
                   size={19}
-                  className="mt-0.5 shrink-0 text-blue-700"
+                  className="mt-0.5 shrink-0 text-white"
                 />
 
                 <div>
-                  <p className="text-sm font-semibold text-slate-700">
+                  <p className="text-sm font-semibold text-blue-800">
                     Ghana
                   </p>
 
-                  <p className="mt-1 text-sm leading-5 text-slate-500">
+                  <p className="mt-1 text-sm leading-5 text-blue-100">
                     Pokuase Community Library
                     <br />
                     Pokuase, Ghana
@@ -254,11 +254,11 @@ export default function Footer() {
               {/* Phone */}
               <a
                 href="tel:+233558446017"
-                className="flex items-center gap-3 text-sm text-slate-500 transition hover:text-blue-700"
+                className="flex items-center gap-3 text-sm text-blue-100 transition hover:text-white"
               >
                 <Phone
                   size={18}
-                  className="shrink-0 text-blue-700"
+                  className="shrink-0 text-white"
                 />
 
                 <span>+233 55 844 6017</span>
@@ -267,11 +267,11 @@ export default function Footer() {
               {/* Email */}
               <a
                 href="mailto:info@dodoocodingclub.com"
-                className="flex items-center gap-3 text-sm text-slate-500 transition hover:text-blue-700"
+                className="flex items-center gap-3 text-sm text-blue-100 transition hover:text-white"
               >
                 <Mail
                   size={18}
-                  className="shrink-0 text-blue-700"
+                  className="shrink-0 text-white"
                 />
 
                 <span>info@dodoocodingclub.com</span>
@@ -279,12 +279,12 @@ export default function Footer() {
             </div>
 
             {/* Support DCC */}
-            <div className="mt-7 rounded-xl border border-slate-200 bg-slate-50 p-5">
-              <h4 className="text-sm font-bold text-slate-900">
+            <div className="mt-7 rounded-xl border border-white/20 bg-blue-800 p-5">
+              <h4 className="text-sm font-bold text-white">
                 Support DCC
               </h4>
 
-              <p className="mt-1 text-xs leading-5 text-slate-500">
+              <p className="mt-1 text-xs leading-5 text-blue-100">
                 Help support technology education and opportunities for
                 students.
               </p>
@@ -293,7 +293,7 @@ export default function Footer() {
                 href="https://www.paypal.com/donate/?hosted_button_id=D385MY7AE8QR6"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center justify-center rounded-lg bg-yellow-400 px-5 py-2.5 text-sm font-bold text-slate-900 shadow-sm transition hover:bg-yellow-500 hover:shadow-md"
+                className="mt-4 inline-flex items-center justify-center rounded-lg bg-yellow-400 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-yellow-500 hover:shadow-md"
               >
                 Support DCC
               </a>
@@ -304,12 +304,12 @@ export default function Footer() {
         {/* =================================================
             DIVIDER
         ================================================== */}
-        <div className="my-10 border-t border-slate-200" />
+        <div className="my-10 border-t border-white/20" />
 
         {/* =================================================
             PLATFORM INFO
         ================================================== */}
-        <div className="flex flex-col gap-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 text-xs text-blue-100 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <Code2
               size={15}
@@ -330,15 +330,15 @@ export default function Footer() {
       {/* =====================================================
           COPYRIGHT BAR
       ====================================================== */}
-      <div className="bg-blue-700">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-5 text-center text-sm text-blue-100 sm:flex-row sm:items-center sm:justify-between sm:text-left lg:px-8">
+      <div className="bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-6 py-5 text-center text-sm text-blue-700 sm:flex-row sm:items-center sm:justify-between sm:text-left lg:px-8">
           <p>
             © {currentYear} Dodoo Coding Club. All rights reserved.
           </p>
 
           <p>
             Developed by{" "}
-            <span className="font-semibold text-white">
+            <span className="font-semibold text-blue-800">
               Godfred Sefa Aboagye
             </span>
           </p>
