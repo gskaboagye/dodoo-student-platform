@@ -611,7 +611,7 @@ export default function Dashboard() {
 
         <section
           aria-label="Dodoo Coding Club community"
-          className="dcc-panel-enter relative isolate mb-8 min-h-[220px] overflow-hidden rounded-[28px] border border-blue-100 bg-blue-950 shadow-lg sm:min-h-[270px] lg:min-h-[310px]"
+          className="dcc-panel-enter relative isolate mb-8 min-h-[220px] overflow-hidden rounded-[28px] border border-blue-100 bg-blue-700 shadow-lg sm:min-h-[270px] lg:min-h-[310px]"
         >
           <img
             src="/images/dcc-community.jpg"
@@ -620,8 +620,8 @@ export default function Dashboard() {
             loading="lazy"
           />
 
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-950/90 via-blue-900/65 to-blue-950/20" />
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-950/45 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-700/95 via-blue-700/65 to-blue-700/15" />
+          <div className="absolute inset-0 bg-gradient-to-t from-blue-900/50 via-transparent to-transparent" />
 
           <div className="relative z-10 flex min-h-[220px] items-end px-6 py-7 sm:min-h-[270px] sm:px-9 sm:py-9 lg:min-h-[310px] lg:px-12">
             <div className="max-w-2xl">
@@ -644,7 +644,7 @@ export default function Dashboard() {
 
         {/* FACILITATOR HERO */}
 
-        <section className="dcc-hero dcc-hero-enter relative mb-8 overflow-hidden rounded-[28px] border border-[#F4B400]/30 bg-gradient-to-br from-[#1554B8] via-[#1961D6] to-[#1554B8] px-6 py-7 text-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.65)] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
+        <section className="dcc-hero dcc-hero-enter relative mb-8 overflow-hidden rounded-[28px] border border-[#F4B400]/30 bg-blue-700 px-6 py-7 text-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.65)] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
 
           <div className="dcc-grid-motion pointer-events-none absolute inset-0 opacity-40" />
 
@@ -1342,7 +1342,7 @@ export default function Dashboard() {
 
       <section
         aria-label="Dodoo Coding Club community"
-        className="dcc-panel-enter relative isolate mb-8 min-h-[220px] overflow-hidden rounded-[28px] border border-blue-100 bg-blue-950 shadow-lg sm:min-h-[270px] lg:min-h-[310px]"
+        className="dcc-panel-enter relative isolate mb-8 min-h-[220px] overflow-hidden rounded-[28px] border border-blue-100 bg-blue-700 shadow-lg sm:min-h-[270px] lg:min-h-[310px]"
       >
         <img
           src="/images/dcc-community.jpg"
@@ -1351,8 +1351,8 @@ export default function Dashboard() {
           loading="lazy"
         />
 
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-950/90 via-blue-900/65 to-blue-950/20" />
-        <div className="absolute inset-0 bg-gradient-to-t from-blue-950/45 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-700/95 via-blue-700/65 to-blue-700/15" />
+        <div className="absolute inset-0 bg-gradient-to-t from-blue-900/50 via-transparent to-transparent" />
 
         <div className="relative z-10 flex min-h-[220px] items-end px-6 py-7 sm:min-h-[270px] sm:px-9 sm:py-9 lg:min-h-[310px] lg:px-12">
           <div className="max-w-2xl">
@@ -1375,7 +1375,7 @@ export default function Dashboard() {
 
       {/* STUDENT HERO */}
 
-      <section className="dcc-hero dcc-hero-enter relative mb-8 overflow-hidden rounded-[28px] border border-[#F4B400]/30 bg-gradient-to-br from-[#1554B8] via-[#1961D6] to-[#1554B8] p-6 text-white shadow-[0_20px_60px_-25px_rgba(30,64,175,0.45)] sm:p-8 lg:p-9">
+      <section className="dcc-hero dcc-hero-enter relative mb-8 overflow-hidden rounded-[28px] border border-[#F4B400]/30 bg-blue-700 p-6 text-white shadow-[0_20px_60px_-25px_rgba(30,64,175,0.45)] sm:p-8 lg:p-9">
 
         <div className="dcc-grid-motion pointer-events-none absolute inset-0 opacity-25" />
 
@@ -2210,6 +2210,7 @@ function ProgressSnapshot({
     </div>
   );
 }
+
 
 
 
