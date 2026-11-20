@@ -607,6 +607,41 @@ export default function Dashboard() {
     return (
       <div className="p-4 sm:p-6">
 
+        {/* DCC COMMUNITY IMAGE BANNER */}
+
+        <section
+          aria-label="Dodoo Coding Club community"
+          className="dcc-panel-enter relative isolate mb-8 min-h-[220px] overflow-hidden rounded-[28px] border border-blue-100 bg-blue-950 shadow-lg sm:min-h-[270px] lg:min-h-[310px]"
+        >
+          <img
+            src="/images/dcc-community.jpg"
+            alt="Dodoo Coding Club students and facilitators gathered outside the community learning centre"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+            loading="lazy"
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-950/90 via-blue-900/65 to-blue-950/20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-blue-950/45 via-transparent to-transparent" />
+
+          <div className="relative z-10 flex min-h-[220px] items-end px-6 py-7 sm:min-h-[270px] sm:px-9 sm:py-9 lg:min-h-[310px] lg:px-12">
+            <div className="max-w-2xl">
+              <span className="inline-flex items-center rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
+                The DCC Community
+              </span>
+
+              <h2 className="mt-4 max-w-xl text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl lg:text-4xl">
+                Empowering the Next Generation of Technology Professionals
+              </h2>
+
+              <p className="mt-3 text-sm font-medium tracking-wide text-blue-50 sm:text-base">
+                Learn. Build. Grow.
+              </p>
+
+              <div className="mt-5 h-1 w-14 rounded-full bg-yellow-400" />
+            </div>
+          </div>
+        </section>
+
         {/* FACILITATOR HERO */}
 
         <section className="dcc-hero dcc-hero-enter relative mb-8 overflow-hidden rounded-[28px] border border-[#F4B400]/30 bg-gradient-to-br from-[#1554B8] via-[#1961D6] to-[#1554B8] px-6 py-7 text-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.65)] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
@@ -759,40 +794,7 @@ export default function Dashboard() {
 
         </section>
 
-        {/* DCC COMMUNITY IMAGE BANNER */}
-
-        <section
-          aria-label="Dodoo Coding Club community"
-          className="dcc-panel-enter relative isolate mb-8 min-h-[220px] overflow-hidden rounded-[28px] border border-blue-100 bg-blue-950 shadow-lg sm:min-h-[270px] lg:min-h-[310px]"
-        >
-          <img
-            src="/images/dcc-community.jpg"
-            alt="Dodoo Coding Club students and facilitators gathered outside the community learning centre"
-            className="absolute inset-0 h-full w-full object-cover object-center"
-            loading="lazy"
-          />
-
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-950/90 via-blue-900/65 to-blue-950/20" />
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-950/45 via-transparent to-transparent" />
-
-          <div className="relative z-10 flex min-h-[220px] items-end px-6 py-7 sm:min-h-[270px] sm:px-9 sm:py-9 lg:min-h-[310px] lg:px-12">
-            <div className="max-w-2xl">
-              <span className="inline-flex items-center rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
-                The DCC Community
-              </span>
-
-              <h2 className="mt-4 max-w-xl text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl lg:text-4xl">
-                Empowering the Next Generation of Technology Professionals
-              </h2>
-
-              <p className="mt-3 text-sm font-medium tracking-wide text-blue-50 sm:text-base">
-                Learn. Build. Grow.
-              </p>
-
-              <div className="mt-5 h-1 w-14 rounded-full bg-yellow-400" />
-            </div>
-          </div>
-        </section>
+        
 
         {/* STATISTICS */}
 
@@ -1336,6 +1338,41 @@ export default function Dashboard() {
   return (
     <div className="p-4 sm:p-6">
 
+      {/* DCC COMMUNITY IMAGE BANNER */}
+
+      <section
+        aria-label="Dodoo Coding Club community"
+        className="dcc-panel-enter relative isolate mb-8 min-h-[220px] overflow-hidden rounded-[28px] border border-blue-100 bg-blue-950 shadow-lg sm:min-h-[270px] lg:min-h-[310px]"
+      >
+        <img
+          src="/images/dcc-community.jpg"
+          alt="Dodoo Coding Club students and facilitators gathered outside the community learning centre"
+          className="absolute inset-0 h-full w-full object-cover object-center"
+          loading="lazy"
+        />
+
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-950/90 via-blue-900/65 to-blue-950/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-blue-950/45 via-transparent to-transparent" />
+
+        <div className="relative z-10 flex min-h-[220px] items-end px-6 py-7 sm:min-h-[270px] sm:px-9 sm:py-9 lg:min-h-[310px] lg:px-12">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
+              The DCC Community
+            </span>
+
+            <h2 className="mt-4 max-w-xl text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl lg:text-4xl">
+              Empowering the Next Generation of Technology Professionals
+            </h2>
+
+            <p className="mt-3 text-sm font-medium tracking-wide text-blue-50 sm:text-base">
+              Learn. Build. Grow.
+            </p>
+
+            <div className="mt-5 h-1 w-14 rounded-full bg-[#F4B400]" />
+          </div>
+        </div>
+      </section>
+
       {/* STUDENT HERO */}
 
       <section className="dcc-hero dcc-hero-enter relative mb-8 overflow-hidden rounded-[28px] border border-[#F4B400]/30 bg-gradient-to-br from-[#1554B8] via-[#1961D6] to-[#1554B8] p-6 text-white shadow-[0_20px_60px_-25px_rgba(30,64,175,0.45)] sm:p-8 lg:p-9">
@@ -1526,40 +1563,7 @@ export default function Dashboard() {
       </section>
 
       
-      {/* DCC COMMUNITY IMAGE BANNER */}
-
-      <section
-        aria-label="Dodoo Coding Club community"
-        className="dcc-panel-enter relative isolate mb-8 min-h-[220px] overflow-hidden rounded-[28px] border border-blue-100 bg-blue-950 shadow-lg sm:min-h-[270px] lg:min-h-[310px]"
-      >
-        <img
-          src="/images/dcc-community.jpg"
-          alt="Dodoo Coding Club students and facilitators gathered outside the community learning centre"
-          className="absolute inset-0 h-full w-full object-cover object-center"
-          loading="lazy"
-        />
-
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-950/90 via-blue-900/65 to-blue-950/20" />
-        <div className="absolute inset-0 bg-gradient-to-t from-blue-950/45 via-transparent to-transparent" />
-
-        <div className="relative z-10 flex min-h-[220px] items-end px-6 py-7 sm:min-h-[270px] sm:px-9 sm:py-9 lg:min-h-[310px] lg:px-12">
-          <div className="max-w-2xl">
-            <span className="inline-flex items-center rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
-              The DCC Community
-            </span>
-
-            <h2 className="mt-4 max-w-xl text-2xl font-bold leading-tight tracking-tight text-white sm:text-3xl lg:text-4xl">
-              Empowering the Next Generation of Technology Professionals
-            </h2>
-
-            <p className="mt-3 text-sm font-medium tracking-wide text-blue-50 sm:text-base">
-              Learn. Build. Grow.
-            </p>
-
-            <div className="mt-5 h-1 w-14 rounded-full bg-[#F4B400]" />
-          </div>
-        </div>
-      </section>
+      
 {/* STUDENT STATISTICS */}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -2206,6 +2210,8 @@ function ProgressSnapshot({
     </div>
   );
 }
+
+
 
 
 
