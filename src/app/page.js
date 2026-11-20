@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -609,13 +609,13 @@ export default function Dashboard() {
 
         {/* FACILITATOR HERO */}
 
-        <section className="dcc-hero dcc-hero-enter relative mb-8 overflow-hidden rounded-[28px] border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-950 to-blue-950 px-6 py-7 text-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.65)] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
+        <section className="dcc-hero dcc-hero-enter relative mb-8 overflow-hidden rounded-[28px] border border-[#F4B400]/30 bg-gradient-to-br from-[#1554B8] via-[#1961D6] to-[#1554B8] px-6 py-7 text-white shadow-[0_20px_60px_-25px_rgba(15,23,42,0.65)] sm:px-8 sm:py-9 lg:px-10 lg:py-10">
 
           <div className="dcc-grid-motion pointer-events-none absolute inset-0 opacity-40" />
 
-          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-500/15 blur-3xl dcc-gentle-float" />
+          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#F4B400]/15 blur-3xl dcc-gentle-float" />
 
-          <div className="pointer-events-none absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-[#F4B400]/10 blur-3xl" />
 
           <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
 
@@ -623,9 +623,9 @@ export default function Dashboard() {
 
               <div className="flex flex-wrap items-center gap-2.5">
 
-                <div className="dcc-interactive flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1.5 text-xs font-semibold text-blue-300">
+                <div className="dcc-interactive flex items-center gap-2 rounded-full border border-[#F4B400]/40 bg-[#F4B400]/10 px-3 py-1.5 text-xs font-semibold text-[#FFE08A]">
 
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/15">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#F4B400]/15">
                     <Terminal className="h-3.5 w-3.5" />
                   </span>
 
@@ -640,7 +640,7 @@ export default function Dashboard() {
 
               </div>
 
-              <p className="mt-6 text-sm font-semibold text-blue-400">
+              <p className="mt-6 text-sm font-semibold text-[#F4B400]">
                 Tech Facilitator Dashboard
               </p>
 
@@ -659,7 +659,7 @@ export default function Dashboard() {
 
                 <Link
                   href="/student-requests"
-                  className="dcc-primary-button inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/30"
+                  className="dcc-primary-button inline-flex items-center gap-2 rounded-xl bg-[#F4B400] px-4 py-2.5 text-sm font-bold text-[#15376B] shadow-lg shadow-blue-950/20 hover:bg-[#FFD04A]"
                 >
                   <FileCheck2 className="h-4 w-4" />
 
@@ -674,7 +674,7 @@ export default function Dashboard() {
 
                 <Link
                   href="/students"
-                  className="dcc-button-motion inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-200"
+                  className="dcc-button-motion inline-flex items-center gap-2 rounded-xl border border-white/40 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20"
                 >
                   <Users className="h-4 w-4" />
                   Manage Students
@@ -685,7 +685,7 @@ export default function Dashboard() {
               <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400">
 
                 <span className="inline-flex items-center gap-2">
-                  <GitBranch className="h-3.5 w-3.5 text-blue-400" />
+                  <GitBranch className="h-3.5 w-3.5 text-[#F4B400]" />
                   Real-world development
                 </span>
 
@@ -700,7 +700,7 @@ export default function Dashboard() {
 
             {/* AT A GLANCE */}
 
-            <div className="dcc-card-motion relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05] p-4 shadow-xl backdrop-blur-md">
+            <div className="dcc-card-motion relative overflow-hidden rounded-2xl border border-white/20 bg-[#1554B8]/75 p-4 shadow-xl backdrop-blur-md">
 
               <div className="mb-4 flex items-center justify-between">
 
@@ -748,7 +748,7 @@ export default function Dashboard() {
 
               </div>
 
-              <div className="mt-4 flex items-center gap-2 rounded-xl border border-blue-400/10 bg-blue-400/5 px-3 py-2.5 text-xs text-slate-300">
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs text-white">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 Platform services are available
               </div>
